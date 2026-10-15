@@ -302,18 +302,22 @@ BEGIN
 
         IF @NEW_STATUS = 'SUCCEEDED'
         BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM ecl_audit.RunEvent
-                WHERE RUN_ID = @RUN_ID AND EVENT_TYPE = 'RECONCILIATION' AND EVENT_STATUS = 'SUCCEEDED'
-            )
-                THROW 51036, 'A successful reconciliation event is required before SUCCEEDED.', 1;
+            IF ISNULL((
+                SELECT TOP (1) EVENT_STATUS
+                FROM ecl_audit.RunEvent
+                WHERE RUN_ID = @RUN_ID AND EVENT_TYPE = 'RECONCILIATION'
+                ORDER BY EVENT_ID DESC
+            ), '') <> 'SUCCEEDED'
+                THROW 51036, 'The latest reconciliation event must be SUCCEEDED before SUCCEEDED.', 1;
         END;
 
-        IF @NEW_STATUS = 'PUBLISHED' AND NOT EXISTS (
-            SELECT 1 FROM ecl_audit.RunEvent
-            WHERE RUN_ID = @RUN_ID AND EVENT_TYPE = 'PUBLICATION' AND EVENT_STATUS = 'SUCCEEDED'
-        )
-            THROW 51037, 'A successful publication event is required before PUBLISHED.', 1;
+        IF @NEW_STATUS = 'PUBLISHED' AND ISNULL((
+            SELECT TOP (1) EVENT_STATUS
+            FROM ecl_audit.RunEvent
+            WHERE RUN_ID = @RUN_ID AND EVENT_TYPE = 'PUBLICATION'
+            ORDER BY EVENT_ID DESC
+        ), '') <> 'SUCCEEDED'
+            THROW 51037, 'The latest publication event must be SUCCEEDED before PUBLISHED.', 1;
 
         UPDATE ecl_core.RunControl
         SET RUN_STATUS = @NEW_STATUS,
@@ -393,5 +397,56 @@ BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         THROW;
     END CATCH
+END;
+GO
+
+/* Defense in depth: sealed manifest items cannot be inserted, updated, or deleted. */
+IF OBJECT_ID(N'ecl_core.trg_RunInputManifestItem_Sealed', N'TR') IS NOT NULL
+    DROP TRIGGER ecl_core.trg_RunInputManifestItem_Sealed;
+GO
+CREATE TRIGGER ecl_core.trg_RunInputManifestItem_Sealed
+ON ecl_core.RunInputManifestItem
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN ecl_core.RunInputManifest h ON h.RUN_ID = i.RUN_ID
+        WHERE h.IS_SEALED = 1
+    )
+    OR EXISTS (
+        SELECT 1
+        FROM deleted d
+        JOIN ecl_core.RunInputManifest h ON h.RUN_ID = d.RUN_ID
+        WHERE h.IS_SEALED = 1
+    )
+    BEGIN
+        THROW 51050, 'Input manifest items are immutable after the manifest is sealed.', 1;
+    END
+END;
+GO
+
+/* Prevent a sealed manifest header from being reopened or having its seal timestamp changed. */
+IF OBJECT_ID(N'ecl_core.trg_RunInputManifest_PreventUnseal', N'TR') IS NOT NULL
+    DROP TRIGGER ecl_core.trg_RunInputManifest_PreventUnseal;
+GO
+CREATE TRIGGER ecl_core.trg_RunInputManifest_PreventUnseal
+ON ecl_core.RunInputManifest
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM deleted d
+        JOIN inserted i ON i.RUN_ID = d.RUN_ID
+        WHERE d.IS_SEALED = 1
+          AND (i.IS_SEALED <> 1 OR i.SEALED_AT <> d.SEALED_AT)
+    )
+        THROW 51051, 'A sealed manifest cannot be reopened or have its seal timestamp changed.', 1;
 END;
 GO
