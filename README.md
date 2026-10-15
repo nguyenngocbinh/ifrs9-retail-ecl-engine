@@ -49,10 +49,14 @@ See:
 - [Open questions and blockers](docs/open-questions.md)
 - [PR #1 implementation log](docs/implementation-log/PR-001.md)
 
+## Source inventory toolkit
+
+PR #2 adds a metadata-only SQL Server catalog script and templates for source data dictionary and lineage. See [Source inventory kit](docs/source-inventory/README.md). The kit has not been executed against the actual source databases; physical source mappings remain unverified.
+
 ## Development sequence
 
 - PR #1: documentation foundation and methodology/open-question register.
-- PR #2: inspect and document real source schemas, keys, grains, and data lineage.
+- PR #2: provide source inventory toolkit and templates; actual source metadata collection remains pending.
 - PR #3: run control, input snapshot, and validation framework.
 - Later PRs: calculation routines, deterministic test fixtures, reconciliation, publication, deployment, and CI.
 

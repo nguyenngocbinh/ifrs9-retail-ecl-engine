@@ -13,7 +13,7 @@ This file is the repository-level overview. Use the linked GitHub Issues for act
 ## Priority 0 — unblock methodology and source mapping
 
 - [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — Stage 3 allocation, EAD/LGD semantics, discounting, PD semantics, horizons, POCI, precision.
-- [ ] [#3 Inventory upstream source schemas and lineage](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/3) — inspect real DDL, keys, grains, lineage, source versions.
+- [ ] [#3 Inventory upstream source schemas and lineage](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/3) — run docs/source-inventory/sqlserver_catalog_inventory.sql in approved source environments, then document actual DDL, keys, grains, lineage, source versions.
 - [ ] [#4 Define physical input contract and mapping](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/4) — map approved logical inputs to verified physical sources.
 
 ## Priority 1 — platform foundation
@@ -38,7 +38,7 @@ This file is the repository-level overview. Use the linked GitHub Issues for act
 | PR | Intended scope | Gate |
 |---|---|---|
 | PR #1 | Documentation foundation, methodology draft, logical contract, open questions, TODO tracking | Review and merge documentation |
-| PR #2 | Source inventory, physical data dictionary, grain/key/lineage map | Actual source definitions available |
+| PR #2 | Source inventory toolkit, catalog query, data dictionary and lineage templates | Toolkit prepared; actual source metadata still required |
 | PR #3 | Run control, input snapshot/versioning, audit and validation design | Operational constraints confirmed |
 | PR #4+ | Calculation, aggregation, tests, publication, deployment | Relevant methodology blockers approved |
 
@@ -48,3 +48,8 @@ This file is the repository-level overview. Use the linked GitHub Issues for act
 - Discounting convention for a period-varying EIR needs approved methodology.
 - Actual source schemas, key/grain relationships, EIR source, and scenario-weight source need inspection.
 - Lifetime horizon, POCI exclusion, LGD/EAD domains, precision, and rounding remain to be confirmed.
+
+
+## Next action
+
+Run docs/source-inventory/sqlserver_catalog_inventory.sql with an approved read-only account on relevant SQL Server source databases. Review results for sensitivity before sharing/committing. For DB2 or other platforms, collect equivalent platform-specific catalog metadata. Then complete the source dictionary and lineage map from verified evidence.
