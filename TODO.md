@@ -1,20 +1,20 @@
 # Project TODO / Roadmap
 
-This file is the repository-level overview. Use the linked GitHub Issues for active tracking, discussion, and closure. Each implementation PR must also have its own log at docs/implementation-log/PR-NNN.md.
+This file is the repository-level overview. Use linked GitHub Issues for active tracking and discussion. Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 
 ## Working rules
 
 - [ ] Do not implement final ECL formulas while methodology blockers remain unresolved.
-- [ ] Do not guess physical source objects, keys, grains, or data types.
+- [x] Logical schema proposal is designed from user decisions; no source-system survey is required for this step.
 - [ ] Keep calculation logic in T-SQL compatible with SQL Server 2016.
 - [ ] Use synthetic, privacy-safe test data only.
-- [ ] Update this roadmap and the per-PR implementation log when scope/status changes.
+- [x] Update this roadmap and per-PR implementation log when scope/status changes.
 
-## Priority 0 — unblock methodology and source mapping
+## Priority 0 — methodology decisions
 
-- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — Stage 3 allocation, EAD/LGD semantics, discounting, PD semantics, horizons, POCI, precision.
-- [ ] [#3 Inventory upstream source schemas and lineage](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/3) — run docs/source-inventory/sqlserver_catalog_inventory.sql in approved source environments, then document actual DDL, keys, grains, lineage, source versions.
-- [ ] [#4 Define physical input contract and mapping](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/4) — map approved logical inputs to verified physical sources.
+- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — partial-final-period treatment is now decided: remaining months / 12 affects only discounting time/exponent; annual PD and EAD remain unchanged. POCI scope is confirmed excluded from v1, with configured validation and no silent calculation.
+- [x] Confirm logical curve grains: PD = account/scenario/period; LGD = account/period; EAD = account/period; EIR = shared/period; summary stores both portfolio and pool totals.
+- [ ] [#4 Define canonical input contract and mapping](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/4) — confirm period semantics, units/currency and input coverage; physical source mapping is not a prerequisite for logical schema design.
 
 ## Priority 1 — platform foundation
 
@@ -24,7 +24,7 @@ This file is the repository-level overview. Use the linked GitHub Issues for act
 
 ## Priority 2 — calculation and controls
 
-- [ ] [#7 Implement scenario-weighted ECL calculation in T-SQL](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/7) — only after methodology and physical contracts are approved.
+- [ ] [#7 Implement scenario-weighted ECL calculation in T-SQL](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/7) — only after methodology and canonical input grains are approved.
 - [ ] [#8 Build account and portfolio aggregation with reconciliation](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/8)
 - [ ] [#9 Create synthetic regression and edge-case test suite](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/9)
 
@@ -37,19 +37,25 @@ This file is the repository-level overview. Use the linked GitHub Issues for act
 
 | PR | Intended scope | Gate |
 |---|---|---|
-| PR #1 | Documentation foundation, methodology draft, logical contract, open questions, TODO tracking | Review and merge documentation |
-| PR #2 | Source inventory toolkit, catalog query, data dictionary and lineage templates | Toolkit prepared; actual source metadata still required |
-| PR #3 | Run control, input snapshot/versioning, audit and validation design | Operational constraints confirmed |
-| PR #4+ | Calculation, aggregation, tests, publication, deployment | Relevant methodology blockers approved |
+| PR #1 | Documentation foundation and methodology/open-question register | Review/merge |
+| PR #2 | Source inventory toolkit and templates | Independent review; no source survey required for logical schema |
+| PR #3 | Logical schema, normalized input contracts, run/audit/output DDL proposal | Review canonical curve grains and SQL deployment safety |
+| PR #4 | Input version binding, validation gates and controlled run lifecycle | Resolve necessary input-grain and validation rules |
+| PR #5+ | Calculation, aggregation, tests, publication, deployment | Relevant methodology decisions approved |
 
 ## Current blockers
 
-- EAD/LGD period semantics and Stage 3 default-loss allocation are unresolved.
-- Discounting convention for a period-varying EIR needs approved methodology.
-- Actual source schemas, key/grain relationships, EIR source, and scenario-weight source need inspection.
-- Lifetime horizon, POCI exclusion, LGD/EAD domains, precision, and rounding remain to be confirmed.
-
+- PD, LGD and EAD logical grains are approved at account level.
+- [x] Lifetime horizon is each account's contractual maturity date.
+- [x] Scenario weights are Downturn 15.68%, Base 68.64%, Upturn 15.68%; scenario ECL is the weighted sum of the three scenario ECLs.
+- [x] Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual discounting/aggregation.
+- [x] Shared EIR discount factor selected: DF(t)=1/(1+EIR(t))^t.
+- [x] Reporting currency is VND; final published ECL rounds to whole VND.
+- [x] Scenario weights are user-confirmed and must be stored as versioned history with VERSION_ID and PROCESS_DATE; external official source/provenance will be added later.
+- [x] Partial final-year convention: remaining months / 12 affects only discounting time/exponent; annual PD and EAD are not changed.
+- [x] POCI is excluded from v1; detection creates a configured validation finding and the account is never calculated as a regular loan. WARN continuation requires exclusion and reconciliation; ERROR/FATAL blocks the run.
+- The DDL is a proposal and has not been executed against SQL Server.
 
 ## Next action
 
-Run docs/source-inventory/sqlserver_catalog_inventory.sql with an approved read-only account on relevant SQL Server source databases. Review results for sensitivity before sharing/committing. For DB2 or other platforms, collect equivalent platform-specific catalog metadata. Then complete the source dictionary and lineage map from verified evidence.
+Review the revised `docs/database-schema-v1.0.md` and DDL. Next, implement input version binding and validation gates, including validation that the account curve stops at maturity and that scenario weights sum to 1.
