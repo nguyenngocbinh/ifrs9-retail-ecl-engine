@@ -12,6 +12,7 @@ Review required before production deployment:
 - Scenario-weighted ECL = ECL_DOWNTURN * 0.1568 + ECL_BASE * 0.6864 + ECL_UPTURN * 0.1568.
 - Currency/reporting unit is VND; retain calculation precision internally and round final published ECL to the nearest whole VND.
 - Lifetime horizon ends at maturity; for a partial final forecast year, FINAL_PERIOD_FRACTION = remaining months / 12. Detailed treatment of this fraction in each curve component must be specified before calculation SQL.
+- POCI is out of v1 scope. If detected, record a configured validation finding; never silently calculate it as a regular account. Regardless of WARN vs ERROR/FATAL severity, exclude POCI from ordinary ECL calculation. ERROR/FATAL blocks the run; WARN may permit the run to continue only with the POCI account excluded and reconciled.
 - Stage 3 uses PD=1 and the same annual EAD/LGD curves as Stage 2; calculate annual losses, discount by EIR, then aggregate. Calculation procedures are not included.
 - Execute in a disposable database first; this script creates schemas/tables/indexes.
 */
