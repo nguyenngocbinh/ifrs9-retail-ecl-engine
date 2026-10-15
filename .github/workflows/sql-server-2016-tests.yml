@@ -1,6 +1,17 @@
-name: SQL Server 2016 compatibility tests
+name: SQL Server 2016 integration tests
 
 on:
+  pull_request:
+    paths:
+      - "database/**"
+      - "tests/sql/**"
+      - ".github/workflows/**"
+  push:
+    branches: [main]
+    paths:
+      - "database/**"
+      - "tests/sql/**"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
@@ -9,6 +20,9 @@ permissions:
 jobs:
   sql-server-2016:
     name: Deploy migrations and run tests on SQL Server 2016
+    # This repository is public: only run PR jobs for branches in this repository,
+    # never for forked PR code on a self-hosted runner.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     # Register a controlled Windows self-hosted runner with these labels.
     # SQL Server 2016 and sqlcmd must already be installed on that runner.
     runs-on: [self-hosted, windows, sql-server-2016]
