@@ -123,8 +123,8 @@ CREATE PROCEDURE ecl_core.usp_RegisterRunInput
     @SOURCE_OBJECT varchar(256),
     @SOURCE_VERSION varchar(100),
     @SNAPSHOT_ROW_COUNT bigint,
-    @CONTENT_HASH varbinary(32) = NULL,
-    @IS_COMPLETE bit
+    @IS_COMPLETE bit,
+    @CONTENT_HASH varbinary(32) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -335,3 +335,57 @@ GO
 
 /* Deployment principal should grant EXECUTE on these procedures and avoid direct DML
    against RunControl/manifest/audit tables. Permissions are deployment-specific. */
+
+
+/* Record controlled reconciliation/publication milestones used by transition gates. */
+IF OBJECT_ID(N'ecl_core.usp_RecordRunMilestone', N'P') IS NOT NULL
+    DROP PROCEDURE ecl_core.usp_RecordRunMilestone;
+GO
+CREATE PROCEDURE ecl_core.usp_RecordRunMilestone
+    @RUN_ID bigint,
+    @MILESTONE varchar(20),
+    @MILESTONE_STATUS varchar(20),
+    @EVENT_MESSAGE nvarchar(2000) = NULL,
+    @ROW_COUNT bigint = NULL,
+    @AMOUNT_VALUE decimal(28,8) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF @MILESTONE NOT IN ('RECONCILIATION','PUBLICATION')
+        THROW 51040, 'Unsupported milestone.', 1;
+    IF @MILESTONE_STATUS NOT IN ('SUCCEEDED','FAILED')
+        THROW 51041, 'Milestone status must be SUCCEEDED or FAILED.', 1;
+    IF @ROW_COUNT < 0 THROW 51042, 'ROW_COUNT cannot be negative.', 1;
+
+    DECLARE @PROCESS_DATE date;
+    DECLARE @RUN_STATUS varchar(20);
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        SELECT @PROCESS_DATE = PROCESS_DATE, @RUN_STATUS = RUN_STATUS
+        FROM ecl_core.RunControl WITH (UPDLOCK, HOLDLOCK)
+        WHERE RUN_ID = @RUN_ID;
+
+        IF @PROCESS_DATE IS NULL THROW 51043, 'Run does not exist.', 1;
+
+        IF @MILESTONE = 'RECONCILIATION' AND @RUN_STATUS <> 'CALCULATING'
+            THROW 51044, 'Reconciliation milestone can only be recorded while CALCULATING.', 1;
+        IF @MILESTONE = 'PUBLICATION' AND @RUN_STATUS <> 'SUCCEEDED'
+            THROW 51045, 'Publication milestone can only be recorded while SUCCEEDED.', 1;
+
+        INSERT INTO ecl_audit.RunEvent
+            (RUN_ID, PROCESS_DATE, EVENT_TYPE, EVENT_STATUS, EVENT_MESSAGE, ROW_COUNT, AMOUNT_VALUE, ACTOR)
+        VALUES
+            (@RUN_ID, @PROCESS_DATE, @MILESTONE, @MILESTONE_STATUS, @EVENT_MESSAGE, @ROW_COUNT, @AMOUNT_VALUE, SUSER_SNAME());
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
