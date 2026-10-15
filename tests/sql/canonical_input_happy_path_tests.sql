@@ -101,7 +101,7 @@ BEGIN TRY
     SELECT @MATCH_COUNT = COUNT(*)
     FROM
     (
-        SELECT INPUT_FAMILY
+        SELECT actual.INPUT_FAMILY
         FROM
         (
             SELECT 'ACCOUNT' AS INPUT_FAMILY, COUNT_BIG(*) AS ACTUAL_ROWS FROM ecl_stg.AccountSnapshot WHERE RUN_ID = @RUN_ID
