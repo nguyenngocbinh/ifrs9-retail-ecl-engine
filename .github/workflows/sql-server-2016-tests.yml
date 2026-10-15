@@ -1,0 +1,81 @@
+name: SQL Server 2016 compatibility tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sql-server-2016:
+    name: Deploy migrations and run tests on SQL Server 2016
+    # Register a controlled Windows self-hosted runner with these labels.
+    # SQL Server 2016 and sqlcmd must already be installed on that runner.
+    runs-on: [self-hosted, windows, sql-server-2016]
+    timeout-minutes: 30
+    env:
+      SQLSERVER_2016_INSTANCE: ${{ secrets.SQLSERVER_2016_INSTANCE }}
+      SQLSERVER_2016_USER: ${{ secrets.SQLSERVER_2016_USER }}
+      SQLSERVER_2016_PASSWORD: ${{ secrets.SQLSERVER_2016_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify server version and prerequisites
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:SQLSERVER_2016_INSTANCE)) {
+            throw 'Set repository secret SQLSERVER_2016_INSTANCE to the test instance.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:SQLSERVER_2016_USER) -or
+              [string]::IsNullOrWhiteSpace($env:SQLSERVER_2016_PASSWORD)) {
+            throw 'Set SQLSERVER_2016_USER and SQLSERVER_2016_PASSWORD secrets for the disposable test instance.'
+          }
+          $sqlcmd = Get-Command sqlcmd -ErrorAction SilentlyContinue
+          if (-not $sqlcmd) { throw 'sqlcmd is not installed or not on PATH on the self-hosted runner.' }
+          $version = & sqlcmd -S $env:SQLSERVER_2016_INSTANCE -U $env:SQLSERVER_2016_USER -P $env:SQLSERVER_2016_PASSWORD -b -h -1 -Q "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)"
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to query SQL Server version.' }
+          if ([int]($version | Select-Object -Last 1) -ne 13) {
+            throw "Expected SQL Server 2016 major version 13; server returned: $version"
+          }
+
+      - name: Create isolated test database
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $db = "IFRS9_ECL_CI_2016_${{ github.run_id }}"
+          "SQLSERVER_TEST_DATABASE=$db" | Out-File -FilePath $env:GITHUB_ENV -Append
+          & sqlcmd -S $env:SQLSERVER_2016_INSTANCE -U $env:SQLSERVER_2016_USER -P $env:SQLSERVER_2016_PASSWORD -b -Q "CREATE DATABASE [$db]"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated test database.' }
+
+      - name: Deploy migrations and run all SQL tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $scripts = @(
+            'database/001_create_logical_schema.sql',
+            'database/002_run_control.sql',
+            'database/003_input_validation.sql',
+            'tests/sql/run_control_smoke_tests.sql',
+            'tests/sql/input_validation_smoke_tests.sql',
+            'database/004_input_reconciliation.sql',
+            'tests/sql/input_reconciliation_smoke_tests.sql',
+            'tests/sql/input_contract_regression_tests.sql',
+            'tests/sql/maturity_curve_coverage_tests.sql'
+          )
+          foreach ($script in $scripts) {
+            Write-Host "Running $script"
+            & sqlcmd -S $env:SQLSERVER_2016_INSTANCE -U $env:SQLSERVER_2016_USER -P $env:SQLSERVER_2016_PASSWORD -b -d $env:SQLSERVER_TEST_DATABASE -i $script
+            if ($LASTEXITCODE -ne 0) { throw "SQL Server 2016 failed on $script" }
+          }
+
+      - name: Clean up isolated test database
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:SQLSERVER_TEST_DATABASE) {
+            & sqlcmd -S $env:SQLSERVER_2016_INSTANCE -U $env:SQLSERVER_2016_USER -P $env:SQLSERVER_2016_PASSWORD -b -Q "IF DB_ID(N'$env:SQLSERVER_TEST_DATABASE') IS NOT NULL BEGIN ALTER DATABASE [$env:SQLSERVER_TEST_DATABASE] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$env:SQLSERVER_TEST_DATABASE]; END"
+            if ($LASTEXITCODE -ne 0) { Write-Warning 'Could not automatically remove the test database; clean it up manually.' }
+          }
