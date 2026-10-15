@@ -9,7 +9,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - Product types share one model and one set of result tables; `PRODUCT_TYPE` distinguishes Mortgage, Auto, Credit Card, Personal Loan, and Other Retail.
 - Primary business grain is `PROCESS_DATE + ACCOUNT_ID`; every execution is isolated by `RUN_ID`.
 - Input rows carry `VERSION_ID` and `IS_ACTIVE`; a run must bind to one immutable set of input versions. `IS_ACTIVE` is selection metadata, not permission to mutate an already captured run.
-- Result detail is account × scenario × forecast period. Account output is one row per account/run. Portfolio output aggregates by product/pool/stage.
+- PD grain is account × scenario × forecast period; LGD and EAD grains are account × forecast period. EIR is shared by forecast period. Result detail is account × scenario × forecast period. Account output is one row per account/run. Portfolio output stores both portfolio and pool totals.
 - No ECL calculation procedure is included. Methodology blockers remain open.
 
 ## Schemas and tables
@@ -22,9 +22,9 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 | ecl_cfg | ScenarioWeight | One row per version/scenario; process-date trace |
 | ecl_core | RunControl | One row per run, including process date, scope, lifecycle, calculation version |
 | ecl_stg | AccountSnapshot | One row per run/account; product, Stage and pool assignment |
-| ecl_stg | PDCurve | One row per run/pool/scenario/forecast period |
-| ecl_stg | LGDCurve | Proposed one row per run/pool/forecast period |
-| ecl_stg | EADCurve | Proposed one row per run/account/forecast period |
+| ecl_stg | PDCurve | One row per run/account/scenario/forecast period |
+| ecl_stg | LGDCurve | One row per run/account/forecast period |
+| ecl_stg | EADCurve | One row per run/account/forecast period |
 | ecl_stg | EIRCurve | One row per run/forecast period; shared EIR curve |
 | ecl_result | ECLDetail | One row per run/account/scenario/forecast period; calculation trace |
 | ecl_result | ECLAccount | One row per run/account; mutually exclusive Stage output fields |
@@ -36,8 +36,8 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 
 - Surrogate execution key: `RUN_ID` (identity bigint).
 - Account snapshot PK: `(RUN_ID, ACCOUNT_ID)`; unique within the run, with PROCESS_DATE repeated for partitioning/reconciliation and explicit lineage.
-- PD curve PK: `(RUN_ID, POOL_ID, SCENARIO_CODE, FORECAST_PERIOD)`.
-- LGD curve PK: `(RUN_ID, POOL_ID, FORECAST_PERIOD)` (provisional pending approval of LGD grain).
+- PD curve PK: `(RUN_ID, ACCOUNT_ID, SCENARIO_CODE, FORECAST_PERIOD)`.
+- LGD curve PK: `(RUN_ID, ACCOUNT_ID, FORECAST_PERIOD)`.
 - EAD curve PK: `(RUN_ID, ACCOUNT_ID, FORECAST_PERIOD)`.
 - EIR curve PK: `(RUN_ID, FORECAST_PERIOD)`.
 - ECL detail PK: `(RUN_ID, ACCOUNT_ID, SCENARIO_CODE, FORECAST_PERIOD)`.
@@ -64,10 +64,10 @@ A run must transition through controlled states. Only a fully validated, calcula
 3. **PD curve grain is provisional.** DDL proposes pool × scenario × period marginal PD, assigned to accounts through the run's pool snapshot. This must match the approved PD methodology.
 4. **EIR curve is shared across pools** as previously requested. Rate basis and discount-factor methodology remain unresolved; no formula is implemented here.
 5. `ScenarioWeight` DDL stores weights by version and scenario. Weight-sum and exact effective-version selection are run-time validation rules, not enforced by a row-level CHECK constraint.
-6. `ECLPortfolioSummary` uses a non-null `AGGREGATION_LEVEL` and `POOL_ID`; portfolio-wide rows use `AGGREGATION_LEVEL='PORTFOLIO'` and `POOL_ID='__ALL_POOLS__'`, while pool rows use `AGGREGATION_LEVEL='POOL'` and a real pool ID.
-7. `IS_ACTIVE` is included on standardized inputs as requested, but each run should snapshot only the selected active version. It is not a substitute for run isolation.
-8. Currency handling is explicit on EAD; all amounts must be in a consistent reporting currency before aggregation. Conversion logic is outside this DDL.
-9. Stage 3 PD=1, EAD/LGD allocation, period-varying EIR discounting, horizon and rounding remain governed methodology decisions. Do not implement the ECL formula until approved.
+4. `ECLPortfolioSummary` uses a non-null `AGGREGATION_LEVEL` and `POOL_ID`; portfolio-wide rows use `AGGREGATION_LEVEL='PORTFOLIO'` and `POOL_ID='__ALL_POOLS__'`, while pool rows use `AGGREGATION_LEVEL='POOL'` and a real pool ID.
+5. `IS_ACTIVE` is included on standardized inputs as requested, but each run should snapshot only the selected active version. It is not a substitute for run isolation.
+6. Currency handling is explicit on EAD; all amounts must be in a consistent reporting currency before aggregation. Conversion logic is outside this DDL.
+7. Stage 3 uses PD=1 as the selected approach, but EAD/LGD allocation and the period-level loss method remain unresolved. Period-varying EIR discounting, lifetime horizon, and rounding also remain open. Do not implement any calculation formula until these methods are approved.
 
 ## Deployment
 
