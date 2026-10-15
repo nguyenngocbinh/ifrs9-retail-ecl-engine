@@ -91,3 +91,11 @@ jobs:
       - name: Run input validation negative-path tests
         run: |
           sqlcmd -b -C -S localhost,1433 -U sa -P "$SQLSERVER_PASSWORD" -d IFRS9_ECL_CI -i tests/sql/input_validation_smoke_tests.sql
+
+      - name: Deploy input reconciliation migration
+        run: |
+          sqlcmd -b -C -S localhost,1433 -U sa -P "$SQLSERVER_PASSWORD" -d IFRS9_ECL_CI -i database/004_input_reconciliation.sql
+
+      - name: Run input reconciliation smoke tests
+        run: |
+          sqlcmd -b -C -S localhost,1433 -U sa -P "$SQLSERVER_PASSWORD" -d IFRS9_ECL_CI -i tests/sql/input_reconciliation_smoke_tests.sql
