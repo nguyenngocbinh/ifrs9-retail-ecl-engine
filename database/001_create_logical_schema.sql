@@ -8,7 +8,10 @@ Review required before production deployment:
 - EAD grain approved: account/forecast period.
 - EIR remains shared by forecast period; selected discount factor is DF(t) = 1 / (1 + EIR(t))^t, with t as forecast year.
 - Lifetime horizon ends at each account's MATURITY_DATE.
+- Scenario weights are user-confirmed: Downturn=15.68%, Base=68.64%, Upturn=15.68%; store them in immutable versioned configuration with VERSION_ID, PROCESS_DATE, effective dates and audit history. Official external source/provenance will be added later.
 - Scenario-weighted ECL = ECL_DOWNTURN * 0.1568 + ECL_BASE * 0.6864 + ECL_UPTURN * 0.1568.
+- Currency/reporting unit is VND; retain calculation precision internally and round final published ECL to the nearest whole VND.
+- Lifetime horizon ends at maturity; for a partial final forecast year, FINAL_PERIOD_FRACTION = remaining months / 12. Detailed treatment of this fraction in each curve component must be specified before calculation SQL.
 - Stage 3 uses PD=1 and the same annual EAD/LGD curves as Stage 2; calculate annual losses, discount by EIR, then aggregate. Calculation procedures are not included.
 - Execute in a disposable database first; this script creates schemas/tables/indexes.
 */
@@ -351,9 +354,10 @@ CREATE INDEX IX_ValidationError_Run_Severity
     INCLUDE (VALIDATION_CODE, PRODUCT_TYPE, ACCOUNT_ID, FORECAST_PERIOD);
 GO
 
-/* Seed logical product/scenario codes only. The approved scenario weights are
-   recorded in the methodology/docs and must be loaded as a versioned config set:
-   DOWNTURN=0.1568, BASE=0.6864, UPTURN=0.1568. */
+/* Seed logical product/scenario codes only. User-confirmed scenario weights must be
+   loaded as an immutable versioned config set with VERSION_ID, PROCESS_DATE,
+   effective dates, and audit history: DOWNTURN=0.1568, BASE=0.6864, UPTURN=0.1568.
+   External official source/provenance is pending and may be added later. */
 INSERT INTO ecl_cfg.ProductType (PRODUCT_TYPE, PRODUCT_NAME)
 VALUES ('MORTGAGE', N'Mortgage'),
        ('AUTO', N'Auto'),
