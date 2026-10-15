@@ -8,11 +8,11 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 - [x] Logical schema proposal is designed from user decisions; no source-system survey is required for this step.
 - [ ] Keep calculation logic in T-SQL compatible with SQL Server 2016.
 - [ ] Use synthetic, privacy-safe test data only.
-- [ ] Update this roadmap and per-PR implementation log when scope/status changes.
+- [x] Update this roadmap and per-PR implementation log when scope/status changes.
 
 ## Priority 0 — methodology decisions
 
-- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — remaining item: partial-final-period application to PD/EAD/discounting; POCI scope is confirmed excluded from v1, with configured validation and no silent calculation.
+- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — partial-final-period treatment is now decided: remaining months / 12 affects only discounting time/exponent; annual PD and EAD remain unchanged. POCI scope is confirmed excluded from v1, with configured validation and no silent calculation.
 - [x] Confirm logical curve grains: PD = account/scenario/period; LGD = account/period; EAD = account/period; EIR = shared/period; summary stores both portfolio and pool totals.
 - [ ] [#4 Define canonical input contract and mapping](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/4) — confirm period semantics, units/currency and input coverage; physical source mapping is not a prerequisite for logical schema design.
 
@@ -52,7 +52,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 - [x] Shared EIR discount factor selected: DF(t)=1/(1+EIR(t))^t.
 - [x] Reporting currency is VND; final published ECL rounds to whole VND.
 - [x] Scenario weights are user-confirmed and must be stored as versioned history with VERSION_ID and PROCESS_DATE; external official source/provenance will be added later.
-- [ ] Specify how remaining months / 12 applies to PD, EAD and discounting in the partial final forecast year.
+- [x] Partial final-year convention: remaining months / 12 affects only discounting time/exponent; annual PD and EAD are not changed.
 - [x] POCI is excluded from v1; detection creates a configured validation finding and the account is never calculated as a regular loan. WARN continuation requires exclusion and reconciliation; ERROR/FATAL blocks the run.
 - The DDL is a proposal and has not been executed against SQL Server.
 
