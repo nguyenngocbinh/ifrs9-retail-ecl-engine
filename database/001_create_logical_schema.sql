@@ -3,9 +3,11 @@ IFRS 9 Retail ECL Engine — logical schema proposal v1.0
 Target: SQL Server 2016
 Scope: DDL foundation only. No ECL calculation procedures.
 Review required before production deployment:
-- Confirm canonical grains for LGD and EAD curves.
-- Confirm scenario-weight source/version selection and rate/decimal conventions.
-- Confirm whether pool-level PD/LGD curves are contractually approved.
+- PD grain approved: account/scenario/forecast period.
+- LGD grain approved: account/forecast period.
+- EAD grain approved: account/forecast period.
+- EIR remains shared by forecast period. Discounting convention is unresolved; no formula is implemented.
+- Stage 3 uses PD=1 as a design rule, but EAD/LGD allocation and loss method remain unresolved; no calculation formula is implemented.
 - Execute in a disposable database first; this script creates schemas/tables/indexes.
 */
 SET ANSI_NULLS ON;
