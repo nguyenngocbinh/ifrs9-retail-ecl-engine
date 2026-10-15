@@ -51,7 +51,9 @@ BEGIN TRY
         (@RUN_ID, @PROCESS_DATE, 'SYN-VALIDATION-001', NULL, 'MORTGAGE', 1, 'POOL-A',
          '20281015', 1, 1, 0),
         (@RUN_ID, @PROCESS_DATE, 'SYN-VALIDATION-002', NULL, 'AUTO', 2, 'POOL-B',
-         '20271015', 1, 1, NULL);
+         '20271015', 1, 1, NULL),
+        (@RUN_ID, @PROCESS_DATE, 'SYN-VALIDATION-003', NULL, 'PERSONALLOAN', 1, 'POOL-C',
+         '20271015', 1, 1, 1);
 
     EXEC ecl_core.usp_ValidateRunInputs @RUN_ID;
 
@@ -79,11 +81,14 @@ BEGIN TRY
     IF NOT EXISTS (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'POCI_CLASSIFICATION_MISSING' AND ACCOUNT_ID = 'SYN-VALIDATION-002')
         THROW 51404, 'Expected explicit POCI classification finding for the unclassified account.', 1;
 
+    IF NOT EXISTS (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'POCI_EXCLUDED' AND SEVERITY = 'ERROR' AND ACCOUNT_ID = 'SYN-VALIDATION-003')
+        THROW 51406, 'Detected POCI must block calculation until explicit exclusion and reconciliation are implemented.', 1;
+
     IF EXISTS (SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID = @RUN_ID)
         THROW 51405, 'Input validation must not produce ECL calculation detail.', 1;
 
     ROLLBACK TRANSACTION;
-    PRINT 'PASS: missing PD/LGD/EAD/EIR coverage and unknown POCI classification are recorded; no ECL calculation is performed.';
+    PRINT 'PASS: missing PD/LGD/EAD/EIR coverage, unknown POCI classification, and detected POCI are blocked; no ECL calculation is performed.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
