@@ -47,6 +47,19 @@ BEGIN TRY
     EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'SCENARIO_WEIGHT', 'TEST', 'synthetic.weights', 'v1', 3, 1, NULL;
 
     EXEC ecl_core.usp_SealRunInputs @RUN_ID;
+
+    SET @EXPECTED_ERROR = NULL;
+    BEGIN TRY
+        UPDATE ecl_core.RunInputManifestItem
+        SET SOURCE_VERSION = 'tampered'
+        WHERE RUN_ID = @RUN_ID AND INPUT_FAMILY = 'ACCOUNT';
+    END TRY
+    BEGIN CATCH
+        SET @EXPECTED_ERROR = ERROR_NUMBER();
+    END CATCH;
+    IF @EXPECTED_ERROR <> 51050
+        THROW 51103, 'Sealed manifest item mutation was not rejected with error 51050.', 1;
+
     EXEC ecl_core.usp_TransitionRunStatus
         @RUN_ID = @RUN_ID, @NEW_STATUS = 'CALCULATING', @EVENT_MESSAGE = N'Smoke test';
 
@@ -82,7 +95,7 @@ BEGIN TRY
         THROW 51102, 'Illegal transition from PUBLISHED was not rejected with error 51033.', 1;
 
     ROLLBACK TRANSACTION;
-    PRINT 'PASS: run creation, manifest registration/sealing, guarded lifecycle, reconciliation/publication gates, and terminal-state rejection.';
+    PRINT 'PASS: run creation, manifest registration/sealing, sealed-item immutability, guarded lifecycle, reconciliation/publication gates, and terminal-state rejection.';
 END TRY
 BEGIN CATCH
     IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
