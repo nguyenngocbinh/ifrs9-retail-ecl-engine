@@ -1,6 +1,6 @@
 # Canonical input contract enforcement matrix
 
-Status: planning and technical-validation matrix after PR #25. This document does not certify any upstream source, FTP rate semantics, Stage 3 suitability, or production deployment.
+Status: planning and technical-validation matrix after PR #26. This document does not certify any upstream source mapping, Stage 3 EAD/LGD source semantics, or production deployment.
 
 ## Structural checks already implemented
 
@@ -11,14 +11,14 @@ Status: planning and technical-validation matrix after PR #25. This document doe
 | Staging rows use the run process date | Input reconciliation | Structural date check only. |
 | Active accounts have annual PD, LGD, EAD and shared EIR coverage | Input validation | Coverage is not evidence of semantic correctness. |
 | Scenario-weight version is effective and has three weights summing to one | Input validation | Uses supplied configuration; does not require approval metadata. |
-| EIR is greater than -1 | Input validation | Does not certify FTP 12-month numeric units or transformation. |
-| Stage 3 calculation semantics | Not implemented as calculation | EAD/LGD timing and discount status remain unresolved. |
+| EIR is greater than -1 | Input validation | EIR is dimensionless and consumed as supplied; no percentage/decimal conversion is applied. |
+| Stage 3 discount convention | Methodology decision documented | Stage 3 uses the same shared EIR curve and `DF(t)=1/(1+EIR(t))^t` as Stage 2. Upstream EAD/LGD timing and pre-discounting still need confirmation. |
 
 ## Required next validation and regression work
 
-1. Add synthetic tests for contract assertions, including effective-date boundaries, missing scenario rows, invalid weight totals, EIR values at and below -1, maturity/coverage boundaries, and rerun idempotence.
-2. Define the FTP input convention only when the intended numeric unit and any transformation are supplied. Keep `DF(t)=1/(1+EIR(t))^t` unchanged unless the user explicitly changes the formula; do not guess percentage-vs-decimal conversion.
-3. Document the Stage 3 EAD/LGD timing and discounting assumptions before enabling Stage 3 calculation.
+1. Expand synthetic tests for contract assertions, including effective-date boundaries, missing scenario rows, invalid weight totals, EIR values at and below -1, maturity/coverage boundaries, and rerun idempotence.
+2. Use the supplied dimensionless EIR value as-is with `DF(t)=1/(1+EIR(t))^t`; do not infer or apply percentage/decimal conversion.
+3. Confirm upstream Stage 3 EAD/LGD timing and discount status before enabling Stage 3 calculation.
 4. Verify migrations and tests on SQL Server 2016. SQL Server 2017 CI is not proof of 2016 compatibility.
 
 ## Out of scope
@@ -31,4 +31,4 @@ Status: planning and technical-validation matrix after PR #25. This document doe
 
 ## Release gate
 
-Structural validation does not certify source semantics or enable publication. Final calculation remains blocked until source mapping, FTP numeric convention, Stage 3 suitability and SQL Server 2016 verification are resolved. No approval workflow is required for scenario-weight data.
+Structural validation does not certify source semantics or enable publication. Final calculation remains blocked until source mapping, Stage 3 EAD/LGD source semantics and SQL Server 2016 verification are resolved. The EIR numeric convention and Stage 3 discount-rate convention are resolved as documented. No approval workflow is required for scenario-weight data.
