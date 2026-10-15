@@ -12,7 +12,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Priority 0 — methodology decisions
 
-- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — core formula decisions are captured; production evidence still required for FTP 12-month numeric units, Stage 3 EAD/LGD suitability, and scenario-weight source/approval provenance.
+- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — core formula decisions are captured; unresolved items are FTP 12-month numeric units/rate basis and Stage 3 EAD/LGD suitability.
 - [x] Confirm logical curve grains: PD = account/scenario/period; LGD = account/period; EAD = account/period; EIR = shared/period; summary stores both portfolio and pool totals.
 - [ ] [#4 Define canonical input contract and mapping](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/4) — logical contract baseline documented in `docs/canonical-input-contract.md`; upstream mapping and owner certification remain open.
 
@@ -24,7 +24,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Priority 2 — calculation and controls
 
-- [ ] [#7 Implement scenario-weighted ECL calculation in T-SQL](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/7) — blocked until input-contract evidence and methodology gates are approved.
+- [ ] [#7 Implement scenario-weighted ECL calculation in T-SQL](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/7) — blocked until input-contract and methodology blockers are resolved.
 - [ ] [#8 Build account and portfolio aggregation with reconciliation](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/8)
 - [ ] [#9 Create synthetic regression and edge-case test suite](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/9) — expand lifecycle/input tests without inventing expected ECL outputs.
 
@@ -44,29 +44,28 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 | PR #5 | Run manifest and guarded lifecycle procedures | Merged |
 | PR #6 | GitHub Actions SQL integration tests | Merged; SQL Server 2017 target |
 | PR #7 | Initial pre-calculation input validation | Merged as PR #20 |
-| PR #8 | Input manifest row-count reconciliation and POCI audit | Merged as PR #21; POCI work is historical and out of scope for the current input-contract PR |
+| PR #8 | Input manifest row-count reconciliation and POCI audit | Merged as PR #21; POCI work is historical and out of scope for the current input-contract |
 | PR #9 | Canonical input contract baseline | Merged as PR #22 |
 | PR #10 | Contract enforcement matrix and evidence-gate roadmap | Merged as PR #23 |
 | PR #11 | Targeted synthetic input-contract regression tests | Merged as PR #24; SQL Server 2017 CI only |
-| PR #12 | Scenario-weight provenance fields and fatal validation gate | Proposed in PR #25; evidence values still must be supplied by owners |
-| PR #13+ | FTP rate-basis contract, additional regression tests, then later calculation | Evidence and methodology gate required before ECL formulas |
+| PR #12 | Remove mandatory approval/provenance gate; use supplied scenario weights with technical validation only | Proposed in PR #25 |
+| PR #13+ | FTP rate-basis contract and additional maturity/curve-coverage regression tests, then later calculation | Methodology blockers must be resolved before ECL formulas |
 
 ## Confirmed methodology and input decisions
 
 - [x] Lifetime horizon ends at each account's contractual maturity date.
 - [x] Scenario weights are Downturn 15.68%, Base 68.64%, Upturn 15.68%; scenario ECL is the weighted sum of the three scenario ECLs.
-- [x] Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual discounting/aggregation; upstream suitability must still be certified.
+- [x] Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual discounting/aggregation; upstream suitability remains an open methodology item.
 - [x] Shared EIR discount factor selected: `DF(t)=1/(1+EIR(t))^t`.
-- [x] EIR input is FTP selling-funds rate for 12 months; Treasury must confirm numeric units and its approved use in the formula before production calculation.
+- [x] EIR input is FTP selling-funds rate for 12 months; numeric units/rate basis still need clarification before production calculation.
 - [x] Reporting currency is VND; final published ECL rounds to whole VND.
 - [x] Partial final-year convention: remaining months / 12 affects only discounting time/exponent; annual PD and EAD are not changed.
-- [x] Scenario weights require VERSION_ID, PROCESS_DATE/effective dates, and retained source/approval history; official source/approval evidence still needs to be supplied.
+- [x] Scenario weights are taken from the supplied configuration data. The engine does not require approval references, approver identity, approval timestamps, or change-reason metadata. It validates that the selected version is effective and that active Downturn/Base/Upturn weights are present and sum to 100%.
 - [ ] SQL Server 2016 deployment and compatibility verification.
 - [ ] Upstream source-to-column mapping and certification.
 - [ ] Treasury rate-unit confirmation.
 - [ ] Written Stage 3 EAD/LGD suitability confirmation.
-- [ ] Scenario-weight source/approval references populated for the applicable version.
 
 ## Next action
 
-Next, formalize the FTP 12-month numeric unit/rate-basis contract and test maturity/curve-coverage boundaries. Do not implement ECL formulas until source mapping, FTP semantics, scenario-weight provenance evidence, Stage 3 suitability, and SQL Server 2016 verification are closed.
+Formalize the FTP 12-month numeric unit/rate-basis contract and test maturity/curve-coverage boundaries. Do not implement ECL formulas until input mapping, FTP semantics, Stage 3 suitability, and SQL Server 2016 verification are resolved.
