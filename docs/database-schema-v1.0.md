@@ -11,10 +11,12 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - Input rows carry `VERSION_ID` and `IS_ACTIVE`; a run must bind to one immutable set of input versions. `IS_ACTIVE` is selection metadata, not permission to mutate an already captured run.
 - PD grain is account × scenario × forecast period; LGD and EAD grains are account × forecast period. EIR is shared by forecast period. Result detail is account × scenario × forecast period. Account output is one row per account/run. Portfolio output stores both portfolio and pool totals.
 - Selected discount factor: `DF(t) = 1 / (1 + EIR(t))^t`, where `t` is the annual forecast period. EIR is shared by period.
-- Lifetime horizon runs through each account's `MATURITY_DATE`.
+- Lifetime horizon runs through each account's `MATURITY_DATE`. If the final forecast year is partial, `FINAL_PERIOD_FRACTION = remaining months / 12`; the detailed allocation of that fraction across PD/EAD/discounting must be defined before calculation SQL.
+- Scenario weights are user-confirmed: Downturn 15.68%, Base 68.64%, Upturn 15.68%. Store them as immutable, versioned configuration with `VERSION_ID`, `PROCESS_DATE`, effective dates and audit history. The official external source/provenance will be added later.
 - Scenario-weighted ECL = `ECL_DOWNTURN × 15.68% + ECL_BASE × 68.64% + ECL_UPTURN × 15.68%`.
+- Reporting currency is VND. Retain internal calculation precision and round final published ECL to whole VND.
 - Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual discounting/aggregation.
-- Calculation procedures are not included; remaining decisions include precision/rounding, currency/unit contract, and source/version governance.
+- Calculation procedures are not included. Partial-final-period component treatment and POCI scope remain open.
 
 ## Schemas and tables
 
