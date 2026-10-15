@@ -400,7 +400,9 @@ BEGIN
 END;
 GO
 
-/* Defense in depth: sealed manifest items cannot be inserted, updated, or deleted. */
+/* Defense in depth: reject sealed manifest item mutations without dooming the caller transaction.
+   RAISERROR (unlike THROW) does not honor XACT_ABORT; the caller can assert the rejection
+   and continue/roll back its disposable test transaction deliberately. */
 IF OBJECT_ID(N'ecl_core.trg_RunInputManifestItem_Sealed', N'TR') IS NOT NULL
     DROP TRIGGER ecl_core.trg_RunInputManifestItem_Sealed;
 GO
@@ -424,7 +426,8 @@ BEGIN
         WHERE h.IS_SEALED = 1
     )
     BEGIN
-        THROW 51050, 'Input manifest items are immutable after the manifest is sealed.', 1;
+        RAISERROR('Input manifest items are immutable after the manifest is sealed.', 16, 1);
+        RETURN;
     END
 END;
 GO
@@ -447,6 +450,9 @@ BEGIN
         WHERE d.IS_SEALED = 1
           AND (i.IS_SEALED <> 1 OR i.SEALED_AT <> d.SEALED_AT)
     )
-        THROW 51051, 'A sealed manifest cannot be reopened or have its seal timestamp changed.', 1;
+    BEGIN
+        RAISERROR('A sealed manifest cannot be reopened or have its seal timestamp changed.', 16, 1);
+        RETURN;
+    END
 END;
 GO
