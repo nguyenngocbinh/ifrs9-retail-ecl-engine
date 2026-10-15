@@ -18,8 +18,8 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Priority 1 — platform foundation
 
-- [x] [#5 Design run control, snapshots, and audit logging](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/5) — documented in `docs/run-control-design.md`.
-- [ ] [#6 Implement input validation and pre-calculation quality gates](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/6) — run lifecycle and manifest primitives are proposed in PR #18; domain/coverage checks remain.
+- [ ] [#5 Design run control, snapshots, and audit logging](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/5)
+- [ ] [#6 Implement input validation and pre-calculation quality gates](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/6)
 - [ ] [#10 Set up SQL deployment and CI for SQL Server 2016](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/10)
 
 ## Priority 2 — calculation and controls
@@ -40,8 +40,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 | PR #1 | Documentation foundation and methodology/open-question register | Review/merge |
 | PR #2 | Source inventory toolkit and templates | Independent review; no source survey required for logical schema |
 | PR #3 | Logical schema, normalized input contracts, run/audit/output DDL proposal | Review canonical curve grains and SQL deployment safety |
-| PR #4 | Run-control design | Document lifecycle, snapshot immutability, and publication gates |
-| PR #5 | Manifest and guarded run lifecycle procedures | SQL smoke tests pass on SQL Server 2016; no ECL formulas |
+| PR #4 | Input version binding, validation gates and controlled run lifecycle | Resolve necessary input-grain and validation rules |
 | PR #5+ | Calculation, aggregation, tests, publication, deployment | Relevant methodology decisions approved |
 
 ## Current blockers
@@ -59,4 +58,4 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Next action
 
-Review PR #17 to bring the run-control design into `main`, then review PR #18 for the manifest and guarded lifecycle procedures. Run `tests/sql/run_control_smoke_tests.sql` on a disposable SQL Server 2016 database before production use. Next, implement pre-calculation validation and reconciliation; do not add final ECL formulas until methodology blockers are approved.
+Review the revised `docs/database-schema-v1.0.md` and DDL. Next, implement input version binding and validation gates, including validation that the account curve stops at maturity and that scenario weights sum to 1.
