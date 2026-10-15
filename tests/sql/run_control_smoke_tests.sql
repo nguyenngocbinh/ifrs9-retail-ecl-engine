@@ -99,7 +99,9 @@ BEGIN TRY
     IF @EXPECTED_ERROR <> 51033
         THROW 51102, 'Illegal transition from PUBLISHED was not rejected with error 51033.', 1;
 
-    ROLLBACK TRANSACTION;
+    /* usp_TransitionRunStatus rolls back its active transaction when the expected illegal transition throws.
+       It may therefore already have rolled back this outer smoke-test transaction. */
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
     PRINT 'PASS: run creation, manifest registration/sealing, sealed-item immutability, guarded lifecycle, reconciliation/publication gates, and terminal-state rejection.';
 END TRY
 BEGIN CATCH
