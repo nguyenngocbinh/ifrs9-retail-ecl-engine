@@ -12,7 +12,7 @@ Input reconciliation currently compares manifest counts with physical staging co
 
 | Family | Logical grain / key | Required semantics |
 |---|---|---|
-| ACCOUNT | `RUN_ID + ACCOUNT_ID` | One account snapshot; `PROCESS_DATE`, product, Stage, pool, maturity, source version, active flag and explicit POCI classification. |
+| ACCOUNT | `RUN_ID + ACCOUNT_ID` | One account snapshot; `PROCESS_DATE`, product, Stage, pool, maturity, source version and active flag. |
 | PD | `RUN_ID + ACCOUNT_ID + SCENARIO_CODE + FORECAST_PERIOD` | Scenario-specific unconditional marginal annual PD for the original cohort; periods are full annual periods. Values are supplied upstream; do not derive PD from PD FWL ± 1 SE. |
 | LGD | `RUN_ID + ACCOUNT_ID + FORECAST_PERIOD` | Undiscounted loss-given-default ratio for each full annual period. Flat across scenarios in v1. |
 | EAD | `RUN_ID + ACCOUNT_ID + FORECAST_PERIOD` | Exposure at expected default under the agreed year-end annual-period convention; VND in v1. No partial-year prorating. |
@@ -31,13 +31,12 @@ The agreed discount formula remains:
 
 For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplied annual-period values; only the discount-time exponent is `t = 3.5`. The applicable shared FTP 12-month rate is selected from the configured forecast-period mapping. This is the agreed simplified v1 convention, not a claim that FTP 12-month is economically equivalent to an effective annual EIR. Treasury/model governance should confirm the rate's numeric unit and transformation (if any) before production calculation is enabled.
 
-## 4. Stage and POCI contract
+## 4. Stage contract
 
 - Stage 1 output category: `ECL_12_MONTH`.
 - Stage 2 output category: `ECL_LIFETIME`.
 - Stage 3 output category: `ECL_DEFAULT`; use PD = 1 and the same annual EAD/LGD curves as Stage 2, then discount annual losses and aggregate.
 - Stage 3 compatibility is a source-contract assertion, not inferable from column types alone. Upstream owners must certify that EAD timing and LGD are suitable for the Stage 3 convention and are not already discounted.
-- POCI is excluded from v1. Unknown POCI status is an error. Any detected POCI must remain blocked until downstream exclusion and exclusion reconciliation are implemented; no silent ordinary-loan calculation is permitted.
 
 ## 5. Scenario-weight provenance and immutability
 
@@ -54,7 +53,7 @@ Never update a historical version in place to reflect a changed decision. Create
 
 1. All six manifest families are complete and reconcile to the physical staged row counts.
 2. All staged rows match the run's `PROCESS_DATE`; account keys and curve grains are unique.
-3. Active accounts have an explicit POCI classification and required curve coverage through maturity.
+3. Active accounts have required curve coverage through maturity.
 4. PD values are in [0,1]; LGD values are in [0,1]; EAD is non-negative and denominated in VND.
 5. One shared EIR value exists per required full forecast period, its value is greater than -1 under the selected formula, and its numeric units/rate convention are certified.
 6. The selected scenario-weight version is effective on `PROCESS_DATE`, contains all three scenarios, sums to 1 within the configured tolerance, and has source/approval provenance.
