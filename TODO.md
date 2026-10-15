@@ -1,71 +1,49 @@
 # Project TODO / Roadmap
 
-This file is the repository-level overview. Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
+Each implementation PR has its own log at \`docs/implementation-log/PR-NNN.md\`.
 
 ## Working rules
-
-- [ ] Do not implement final ECL formulas until canonical input validation/reconciliation tests pass and SQL Server 2016 compatibility is verified.
-- [x] Canonical schema and input forms are the agreed interface; the user will load production data into these tables.
-- [x] Use synthetic, privacy-safe test data only. No production source survey or source-system mapping is required for this test scope.
+- [ ] Do not implement final ECL formulas until synthetic input regression tests pass and SQL Server 2016 compatibility is verified.
+- [x] Canonical schema and input forms are the agreed interface; the user will populate these tables.
+- [x] Use synthetic, privacy-safe test data only. No production source survey or source mapping is required for this phase.
 - [ ] Keep calculation logic in T-SQL compatible with SQL Server 2016.
 - [x] Update this roadmap and per-PR implementation log when scope/status changes.
 
-## Priority 0 — canonical input contract
+## Current gates
+- [x] Canonical happy-path input test validates and reconciles all six manifest families without producing ECL output.
+- [x] SQL Server 2017 CI passed after PR #28 was merged.
+- [ ] Scenario-weight effective-date and required-scenario boundary tests pass in CI.
+- [ ] SQL Server 2016 migrations/tests pass on a controlled SQL Server 2016 runner.
 
-- [x] Canonical staging/configuration targets and required fields are defined in `database/001_create_logical_schema.sql` and `docs/canonical-input-contract.md`.
-- [ ] Exercise the canonical table forms with synthetic positive-path data and verify validation plus six-family manifest reconciliation.
-- [x] Confirm calculation methodology: Stage 3 follows Stage 2 calculation, with only PD=1 changed; EIR is consumed as supplied and the same discount formula applies.
-
-## Priority 1 — platform foundation
-
-- [x] Run-control design, guarded lifecycle, input validation and pre-calculation reconciliation migrations are implemented.
-- [x] SQL Server 2017 CI runs lifecycle, validation, reconciliation and regression tests.
-- [ ] SQL Server 2016 deployment and compatibility verification — manual workflow added; actual runtime test is pending a configured self-hosted runner.
-
-## Priority 2 — calculation and controls
-
-- [ ] Implement scenario-weighted ECL calculation in T-SQL — wait until canonical positive-path/negative-path tests pass and SQL Server 2016 compatibility is verified.
-- [ ] Build account and portfolio aggregation with reconciliation.
-- [ ] Expand synthetic regression and edge-case tests, including rerun/idempotence and publication safety.
-
-## Priority 3 — production readiness
-
-- [ ] Define production publication, monitoring, and operations.
-- [ ] Maintain PR implementation logs and release checklist.
+## Confirmed methodology
+- [x] Lifetime horizon ends at contractual maturity.
+- [x] Scenario weights: Downturn 15.68%, Base 68.64%, Upturn 15.68%; weighted ECL is the sum of scenario ECLs times weights.
+- [x] Stage 3 follows Stage 2 logic with only PD=1 changed; same annual EAD/LGD curves and shared EIR discount convention.
+- [x] Stage 1/2/3 use shared EIR and \`DF(t)=1/(1+EIR(t))^t\`.
+- [x] EIR is the supplied FTP 12-month value, consumed as-is without percentage/decimal conversion.
+- [x] Partial final-year fraction changes only discount-time exponent; annual PD and EAD are not prorated.
+- [x] VND output; final published ECL rounded to whole VND.
+- [x] No mandatory approval metadata for scenario weights.
 
 ## PR roadmap
-
-| PR | Intended scope | Gate |
-|---|---|---|
-| PR #1 | Documentation foundation and methodology/open-question register | Merged |
-| PR #2 | Source inventory toolkit and templates | Merged; no source survey run |
-| PR #3 | Logical schema and normalized input contracts | Merged |
-| PR #4 | Run-control design and lifecycle procedures | Integrated into main |
-| PR #5 | Run manifest and guarded lifecycle procedures | Merged |
-| PR #6 | GitHub Actions SQL integration tests | Merged; SQL Server 2017 target |
-| PR #7 | Initial pre-calculation input validation | Merged as PR #20 |
-| PR #8 | Input manifest row-count reconciliation and POCI audit | Merged as PR #21; POCI is outside the current calculation scope |
-| PR #9 | Canonical input contract baseline | Merged as PR #22 |
-| PR #10 | Contract enforcement matrix and evidence-gate roadmap | Merged as PR #23 |
-| PR #11 | Targeted synthetic input-contract regression tests | Merged as PR #24 |
-| PR #12 | Remove mandatory scenario-weight approval gate | Merged as PR #25 |
-| PR #13 | Maturity and curve-coverage boundary tests | Merged as PR #26 |
-| PR #14 | Dimensionless EIR and shared Stage 3 calculation convention | Merged as PR #27 |
-| PR #15 | Canonical input happy-path test and SQL Server 2016 harness | Open in PR #28; canonical happy-path test passed per user confirmation, SQL Server 2016 runtime remains pending |
-
-## Confirmed methodology and input decisions
-
-- [x] Lifetime horizon ends at each account's contractual maturity date.
-- [x] Scenario weights are Downturn 15.68%, Base 68.64%, Upturn 15.68%; scenario ECL is the weighted sum of the three scenario ECLs.
-- [x] Stage 3 follows Stage 2 calculation logic with only PD changed to 1.
-- [x] Stage 1, Stage 2 and Stage 3 use the same shared EIR curve and `DF(t)=1/(1+EIR(t))^t`.
-- [x] EIR is the supplied FTP selling-funds rate for 12 months; it has no unit and is consumed as supplied without percentage/decimal conversion.
-- [x] Reporting currency is VND; final published ECL rounds to whole VND.
-- [x] Partial final-year convention: remaining months / 12 affects only discounting time/exponent; annual PD and EAD are not changed.
-- [x] Scenario weights are taken from supplied configuration data; the engine validates effectivity, all three scenarios and sum to 100%; approval metadata is not required.
-- [x] Canonical happy-path integration test passed (user confirmed after the latest SQL fix).
-- [ ] SQL Server 2016 deployment and compatibility verification.
+| GitHub PR | Project PR | Scope | Status |
+|---|---:|---|---|
+| #1 | #1 | Documentation foundation | Merged |
+| #13 | #2 | Source inventory toolkit | Merged; no source survey |
+| #15 | #3 | Logical schema | Merged |
+| #16–17 | #4 | Run-control design | Integrated |
+| #18 | #5 | Run lifecycle and manifest | Merged |
+| #19 | #6 | SQL Server 2017 CI | Merged |
+| #20 | #7 | Input validation | Merged |
+| #21 | #8 | Input reconciliation | Merged; legacy POCI code is historical and out of scope |
+| #22 | #9 | Canonical input contract | Merged |
+| #23 | #10 | Contract enforcement matrix | Merged |
+| #24 | #11 | Input regression tests | Merged |
+| #25 | #12 | Remove approval gate | Merged |
+| #26 | #13 | Maturity/coverage tests | Merged |
+| #27 | #14 | EIR and Stage 3 convention | Merged |
+| #28 | #15 | Canonical happy-path test and SQL Server 2016 harness | Merged; SQL Server 2017 CI passed |
+| Next | #16 | Scenario-weight effectivity/missing-scenario regression and roadmap alignment | Proposed in PR #29 |
 
 ## Next action
-
-Run the expanded synthetic SQL integration suite. If it passes, configure and dispatch the SQL Server 2016 workflow when a controlled runner is available. Do not implement final ECL formulas until these test/platform gates are satisfied.
+Keep the SQL Server 2017 regression suite green, then verify all migrations/tests on SQL Server 2016 using the controlled runner. Do not implement final ECL formulas before both gates pass. Upstream mapping is not a gate for the canonical-table phase; do not run a production source survey.

@@ -66,7 +66,8 @@ jobs:
             'tests/sql/input_reconciliation_smoke_tests.sql',
             'tests/sql/input_contract_regression_tests.sql',
             'tests/sql/maturity_curve_coverage_tests.sql',
-            'tests/sql/canonical_input_happy_path_tests.sql'
+            'tests/sql/canonical_input_happy_path_tests.sql',
+            'tests/sql/scenario_weight_boundary_tests.sql'
           )
           foreach ($script in $scripts) {
             Write-Host "Running $script"
