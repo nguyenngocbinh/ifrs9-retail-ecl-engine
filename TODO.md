@@ -1,6 +1,6 @@
 # Project TODO / Roadmap
 
-Each implementation PR has its own log at \`docs/implementation-log/PR-NNN.md\`.
+Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 
 ## Working rules
 - [ ] Do not implement final ECL formulas until synthetic input regression tests pass and SQL Server 2016 compatibility is verified.
@@ -19,7 +19,7 @@ Each implementation PR has its own log at \`docs/implementation-log/PR-NNN.md\`.
 - [x] Lifetime horizon ends at contractual maturity.
 - [x] Scenario weights: Downturn 15.68%, Base 68.64%, Upturn 15.68%; weighted ECL is the sum of scenario ECLs times weights.
 - [x] Stage 3 follows Stage 2 logic with only PD=1 changed; same annual EAD/LGD curves and shared EIR discount convention.
-- [x] Stage 1/2/3 use shared EIR and \`DF(t)=1/(1+EIR(t))^t\`.
+- [x] Stage 1/2/3 use shared EIR and `DF(t)=1/(1+EIR(t))^t`.
 - [x] EIR is the supplied FTP 12-month value, consumed as-is without percentage/decimal conversion.
 - [x] Partial final-year fraction changes only discount-time exponent; annual PD and EAD are not prorated.
 - [x] VND output; final published ECL rounded to whole VND.
