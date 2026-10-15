@@ -103,3 +103,7 @@ jobs:
       - name: Run canonical input regression tests
         run: |
           sqlcmd -b -C -S localhost,1433 -U sa -P "$SQLSERVER_PASSWORD" -d IFRS9_ECL_CI -i tests/sql/input_contract_regression_tests.sql
+
+      - name: Run maturity and curve-coverage boundary tests
+        run: |
+          sqlcmd -b -C -S localhost,1433 -U sa -P "$SQLSERVER_PASSWORD" -d IFRS9_ECL_CI -i tests/sql/maturity_curve_coverage_tests.sql
