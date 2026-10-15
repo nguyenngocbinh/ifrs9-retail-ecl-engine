@@ -45,8 +45,9 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 | PR #6 | GitHub Actions SQL integration tests | Merged; SQL Server 2017 target |
 | PR #7 | Initial pre-calculation input validation | Merged as PR #20 |
 | PR #8 | Input manifest row-count reconciliation and POCI audit | Merged as PR #21; POCI work is historical and out of scope for the current input-contract PR |
-| PR #9 | Canonical input contract baseline | Review in PR #22 |
-| PR #10+ | Enforce provenance/rate-basis contract, expand regression tests, then later calculation | Evidence and methodology gate required before ECL formulas |
+| PR #9 | Canonical input contract baseline | Merged as PR #22 |
+| PR #10 | Contract enforcement matrix and evidence-gate roadmap | Proposed in PR #23; documentation only |
+| PR #11+ | Implement provenance/rate-basis contract and expand regression tests, then later calculation | Evidence and methodology gate required before ECL formulas |
 
 ## Confirmed methodology and input decisions
 
@@ -66,4 +67,4 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Next action
 
-Review PR #22. After it merges, enforce the canonical contract with targeted validation and regression tests, including FTP_12M semantics and scenario-weight provenance. Do not implement ECL formulas until the evidence gates are closed.
+Use `docs/contract-enforcement-matrix.md` to implement targeted synthetic regression tests and close the remaining evidence gates. Keep FTP_12M semantics and scenario-weight provenance explicit; do not implement ECL formulas until the evidence gates are closed.
