@@ -1,8 +1,8 @@
 # Upstream source-to-canonical mapping register
 
-Status: **partially specified — upstream source objects and source columns have not been supplied or inspected**. This document maps the agreed logical input families to the engine's canonical staging/configuration columns. It deliberately does not invent upstream table or column names.
+Status: **reference only — canonical table forms are the agreed interface for this project phase**. This document maps logical input families to the engine's canonical staging/configuration columns. The user will populate these canonical tables directly; upstream source object/column mapping is not a prerequisite for testing them.
 
-This is a mapping specification, not a claim that source-to-column mapping is complete. Fill the upstream columns and evidence references only from approved source DDL, data dictionary, interface specification, or source-owner confirmation. No production data survey is required for this document.
+This is a logical-to-canonical reference, not a requirement to inspect upstream systems. Do not block canonical input testing on source-to-column mapping, and do not perform a production data survey.
 
 ## 1. Family-level mapping
 
@@ -88,8 +88,6 @@ For every family, record:
 | Evidence/owner | Link/path to approved DDL or data dictionary and accountable source owner |
 | Status | `UNMAPPED`, `DRAFT`, `CONFIRMED`, or `BLOCKED`; only evidence-backed `CONFIRMED` closes the mapping gate |
 
-## 5. Outstanding inputs needed to finish mapping
+## 5. Current project scope
 
-Provide an approved source DDL/data dictionary or interface specification for the six families above, plus code/domain mappings for product, Stage, pool and scenario. Source object names and column names cannot be recovered from the engine's logical schema alone.
-
-Until those source definitions are available, keep source-to-column mapping open and do not implement final ECL calculation formulas.
+The current test scope starts at the canonical tables. Use synthetic fixtures to prove that rows matching these table definitions can be loaded, validated, and reconciled. Upstream mapping can be documented later if an ingestion layer is added; it is not a blocker for canonical-table testing.
