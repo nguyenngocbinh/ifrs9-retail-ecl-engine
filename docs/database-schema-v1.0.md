@@ -10,7 +10,11 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - Primary business grain is `PROCESS_DATE + ACCOUNT_ID`; every execution is isolated by `RUN_ID`.
 - Input rows carry `VERSION_ID` and `IS_ACTIVE`; a run must bind to one immutable set of input versions. `IS_ACTIVE` is selection metadata, not permission to mutate an already captured run.
 - PD grain is account × scenario × forecast period; LGD and EAD grains are account × forecast period. EIR is shared by forecast period. Result detail is account × scenario × forecast period. Account output is one row per account/run. Portfolio output stores both portfolio and pool totals.
-- No ECL calculation procedure is included. Methodology blockers remain open.
+- Selected discount factor: `DF(t) = 1 / (1 + EIR(t))^t`, where `t` is the annual forecast period. EIR is shared by period.
+- Lifetime horizon runs through each account's `MATURITY_DATE`.
+- Scenario-weighted ECL = `ECL_DOWNTURN × 15.68% + ECL_BASE × 68.64% + ECL_UPTURN × 15.68%`.
+- Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual discounting/aggregation.
+- Calculation procedures are not included; remaining decisions include precision/rounding, currency/unit contract, and source/version governance.
 
 ## Schemas and tables
 
@@ -21,7 +25,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 | ecl_cfg | ScenarioWeightVersion | Version/effective period for scenario weights |
 | ecl_cfg | ScenarioWeight | One row per version/scenario; process-date trace |
 | ecl_core | RunControl | One row per run, including process date, scope, lifecycle, calculation version |
-| ecl_stg | AccountSnapshot | One row per run/account; product, Stage and pool assignment |
+| ecl_stg | AccountSnapshot | One row per run/account; product, Stage, pool assignment and contractual maturity date |
 | ecl_stg | PDCurve | One row per run/account/scenario/forecast period |
 | ecl_stg | LGDCurve | One row per run/account/forecast period |
 | ecl_stg | EADCurve | One row per run/account/forecast period |
@@ -60,14 +64,14 @@ A run must transition through controlled states. Only a fully validated, calcula
 ## Important implementation caveats
 
 1. **PD/LGD/EAD grains are approved at account level.** PD is account × scenario × period; LGD and EAD are account × period. Validate period semantics, units and curve coverage before calculation.
-2. EAD interpretation remains open: confirm whether each period contains EAD-at-default or a marginal/period loss input.
+2. EAD is annual EAD at expected default using the year-end convention, as selected. The lifetime curve is used through each account's maturity date.
 3. PD is account × scenario × period, as selected by the user.
-4. **EIR curve is shared across pools** as previously requested. Rate basis and discount-factor methodology remain unresolved; no formula is implemented here.
+4. **EIR curve is shared across pools**. The selected discount factor is `DF(t) = 1 / (1 + EIR(t))^t`, where `t` is forecast year. The formula is recorded as a design decision; no calculation procedure is implemented here.
 5. `ScenarioWeight` DDL stores weights by version and scenario. Weight-sum and exact effective-version selection are run-time validation rules, not enforced by a row-level CHECK constraint.
 4. `ECLPortfolioSummary` uses a non-null `AGGREGATION_LEVEL` and `POOL_ID`; portfolio-wide rows use `AGGREGATION_LEVEL='PORTFOLIO'` and `POOL_ID='__ALL_POOLS__'`, while pool rows use `AGGREGATION_LEVEL='POOL'` and a real pool ID.
 5. `IS_ACTIVE` is included on standardized inputs as requested, but each run should snapshot only the selected active version. It is not a substitute for run isolation.
 6. Currency handling is explicit on EAD; all amounts must be in a consistent reporting currency before aggregation. Conversion logic is outside this DDL.
-7. Stage 3 uses PD=1 as the selected approach, but EAD/LGD allocation and the period-level loss method remain unresolved. Period-varying EIR discounting, lifetime horizon, and rounding also remain open. Do not implement any calculation formula until these methods are approved.
+7. Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual discounting/aggregation. Lifetime horizon is each account's MATURITY_DATE. Scenario weights are Downturn 15.68%, Base 68.64%, Upturn 15.68%. Remaining open controls include currency/unit consistency, precision/rounding and recording the governed scenario-weight version.
 
 ## Deployment
 
