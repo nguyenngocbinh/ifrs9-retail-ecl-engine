@@ -11,9 +11,9 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 
 ## Current gates
 - [x] Canonical happy-path input test validates and reconciles all six manifest families without producing ECL output.
-- [x] SQL Server 2017 CI passed after PR #28 was merged.
-- [ ] Scenario-weight effective-date and required-scenario boundary tests pass in CI.
-- [ ] SQL Server 2016 migrations/tests pass on a controlled SQL Server 2016 runner.
+- [x] SQL Server 2017 CI was used historically, but its workflow is now removed and replaced by SQL Server 2016 integration testing.
+- [ ] Scenario-weight effective-date and required-scenario boundary tests pass on SQL Server 2016.
+- [ ] All migrations/tests pass on a controlled SQL Server 2016 runner.
 
 ## Confirmed methodology
 - [x] Lifetime horizon ends at contractual maturity.
@@ -33,7 +33,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #15 | #3 | Logical schema | Merged |
 | #16–17 | #4 | Run-control design | Integrated |
 | #18 | #5 | Run lifecycle and manifest | Merged |
-| #19 | #6 | SQL Server 2017 CI | Merged |
+| #19 | #6 | Initial SQL Server 2017 CI | Merged historically; workflow superseded by SQL Server 2016 CI |
 | #20 | #7 | Input validation | Merged |
 | #21 | #8 | Input reconciliation | Merged; legacy POCI code is historical and out of scope |
 | #22 | #9 | Canonical input contract | Merged |
@@ -42,8 +42,8 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #25 | #12 | Remove approval gate | Merged |
 | #26 | #13 | Maturity/coverage tests | Merged |
 | #27 | #14 | EIR and Stage 3 convention | Merged |
-| #28 | #15 | Canonical happy-path test and SQL Server 2016 harness | Merged; SQL Server 2017 CI passed |
-| Next | #16 | Scenario-weight effectivity/missing-scenario regression and roadmap alignment | Proposed in PR #29 |
+| #28 | #15 | Canonical happy-path test and SQL Server 2016 harness | Merged |
+| #29 | #16 | Scenario-weight boundary regression; replace SQL Server 2017 CI with SQL Server 2016 | Open; awaiting SQL Server 2016 runner CI |
 
 ## Next action
-Keep the SQL Server 2017 regression suite green, then verify all migrations/tests on SQL Server 2016 using the controlled runner. Do not implement final ECL formulas before both gates pass. Upstream mapping is not a gate for the canonical-table phase; do not run a production source survey.
+Configure the controlled Windows self-hosted SQL Server 2016 runner and repository secrets, then verify the entire suite on SQL Server 2016. Do not implement final ECL formulas before the synthetic regression suite and SQL Server 2016 compatibility gates pass. Upstream mapping is not a gate for the canonical-table phase; do not run a production source survey.
