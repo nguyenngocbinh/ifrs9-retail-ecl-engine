@@ -286,12 +286,16 @@ BEGIN
                CONCAT(N'Missing or inactive ', f.CURVE_FAMILY, N' curve coverage for required forecast period.')
         FROM ExpectedPeriod e
         CROSS JOIN (VALUES ('LGD'), ('EAD')) f(CURVE_FAMILY)
-        WHERE (f.CURVE_FAMILY = 'LGD' AND NOT EXISTS
+        WHERE
+          (
+            (f.CURVE_FAMILY = 'LGD' AND NOT EXISTS
                (SELECT 1 FROM ecl_stg.LGDCurve c WHERE c.RUN_ID = @RUN_ID AND c.ACCOUNT_ID = e.ACCOUNT_ID
                 AND c.FORECAST_PERIOD = e.FORECAST_PERIOD AND c.IS_ACTIVE = 1))
-           OR (f.CURVE_FAMILY = 'EAD' AND NOT EXISTS
+            OR
+            (f.CURVE_FAMILY = 'EAD' AND NOT EXISTS
                (SELECT 1 FROM ecl_stg.EADCurve c WHERE c.RUN_ID = @RUN_ID AND c.ACCOUNT_ID = e.ACCOUNT_ID
                 AND c.FORECAST_PERIOD = e.FORECAST_PERIOD AND c.IS_ACTIVE = 1))
+          )
           AND NOT EXISTS
           (
             SELECT 1 FROM ecl_audit.ValidationError v
@@ -349,7 +353,12 @@ BEGIN
 
         IF EXISTS
         (
-            SELECT 1 FROM Numbers n
+            SELECT 1
+            FROM
+            (
+                SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+                FROM sys.all_objects a CROSS JOIN sys.all_objects b
+            ) n
             WHERE n.N <= @MAX_HORIZON
               AND NOT EXISTS
               (SELECT 1 FROM ecl_stg.EIRCurve r
@@ -360,7 +369,11 @@ BEGIN
                 (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, FORECAST_PERIOD, ERROR_MESSAGE)
             SELECT @RUN_ID, @PROCESS_DATE, 'EIR_COVERAGE_MISSING', 'ERROR', n.N,
                    N'Missing or inactive shared EIR curve for required forecast period.'
-            FROM Numbers n
+            FROM
+            (
+                SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+                FROM sys.all_objects a CROSS JOIN sys.all_objects b
+            ) n
             WHERE n.N <= @MAX_HORIZON
               AND NOT EXISTS (SELECT 1 FROM ecl_stg.EIRCurve r
                               WHERE r.RUN_ID = @RUN_ID AND r.FORECAST_PERIOD = n.N AND r.IS_ACTIVE = 1)
