@@ -16,7 +16,8 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - Scenario-weighted ECL = `ECL_DOWNTURN × 15.68% + ECL_BASE × 68.64% + ECL_UPTURN × 15.68%`.
 - Reporting currency is VND. Retain internal calculation precision and round final published ECL to whole VND.
 - Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual discounting/aggregation.
-- Calculation procedures are not included. Partial-final-period component treatment and POCI scope remain open.
+- POCI is excluded from v1. If a POCI account is detected, persist a configured validation finding and never process it as a regular account. Severity controls run handling: ERROR/FATAL blocks the run; WARN may allow continuation only when the POCI account is excluded from calculation and its exclusion is visible in reconciliation.
+- Calculation procedures are not included. Partial-final-period component treatment remains open.
 
 ## Schemas and tables
 
@@ -59,6 +60,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - `RUN_ID`: isolated execution and immutable snapshot namespace.
 - `VERSION_ID`: source/logical dataset version; for scenario weights it points to an explicit version record.
 - `IS_ACTIVE`: candidate version selection flag at load/configuration time. Deactivating a version must not rewrite old snapshots or change the results of prior runs.
+- POCI validation is configuration-driven. The configured severity is recorded in `ecl_audit.ValidationError`; regardless of severity, POCI is never included in ordinary ECL calculation in v1. ERROR/FATAL stops the run, while WARN allows continuation only after excluding and reconciling the account.
 - `CALCULATION_VERSION`: explicit algorithm/schema release identity.
 
 A run must transition through controlled states. Only a fully validated, calculated and reconciled run can become `SUCCEEDED`; publication is a separate state. A rerun receives a new RUN_ID. Do not overwrite previous result rows. A transaction and/or publish pointer should be added when publication procedures are implemented.
