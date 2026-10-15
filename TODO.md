@@ -51,7 +51,7 @@ This file is the repository-level overview. Each implementation PR has its own l
 | PR #12 | Remove mandatory scenario-weight approval gate | Merged as PR #25 |
 | PR #13 | Maturity and curve-coverage boundary tests | Merged as PR #26 |
 | PR #14 | Dimensionless EIR and shared Stage 3 calculation convention | Merged as PR #27 |
-| PR #15 | Canonical input happy-path test and SQL Server 2016 harness | Proposed in PR #28; test result and SQL Server 2016 runtime remain pending |
+| PR #15 | Canonical input happy-path test and SQL Server 2016 harness | Open in PR #28; canonical happy-path test passed per user confirmation, SQL Server 2016 runtime remains pending |
 
 ## Confirmed methodology and input decisions
 
@@ -63,7 +63,7 @@ This file is the repository-level overview. Each implementation PR has its own l
 - [x] Reporting currency is VND; final published ECL rounds to whole VND.
 - [x] Partial final-year convention: remaining months / 12 affects only discounting time/exponent; annual PD and EAD are not changed.
 - [x] Scenario weights are taken from supplied configuration data; the engine validates effectivity, all three scenarios and sum to 100%; approval metadata is not required.
-- [ ] Canonical happy-path integration test passes in CI.
+- [x] Canonical happy-path integration test passed (user confirmed after the latest SQL fix).
 - [ ] SQL Server 2016 deployment and compatibility verification.
 
 ## Next action
