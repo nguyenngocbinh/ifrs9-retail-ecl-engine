@@ -6,10 +6,12 @@ DECLARE @V1 int=2147482994, @V2 int=2147482993;
 BEGIN TRY
  BEGIN TRANSACTION;
  INSERT ecl_cfg.ScenarioWeightVersion(VERSION_ID,VERSION_NAME,EFFECTIVE_FROM,EFFECTIVE_TO,IS_ACTIVE)
- VALUES(@V1,N'Ineffective boundary',DATEADD(day,1,@D),DATEADD(year,1,@D),1);
+ VALUES(@V1,N'Ineffective boundary',@D,DATEADD(year,1,@D),1);
  INSERT ecl_cfg.ScenarioWeight(VERSION_ID,SCENARIO_CODE,SCENARIO_WEIGHT,PROCESS_DATE,IS_ACTIVE)
  VALUES(@V1,'DOWNTURN',0.15680000,@D,1),(@V1,'BASE',0.68640000,@D,1),(@V1,'UPTURN',0.15680000,@D,1);
  EXEC ecl_core.usp_CreateRun @PROCESS_DATE=@D,@RUN_TYPE='FULL',@SCENARIO_WEIGHT_VERSION_ID=@V1,@CALCULATION_VERSION='WEIGHT-EFFECTIVITY-TEST',@RUN_ID=@R1 OUTPUT;
+ /* CreateRun correctly blocks initially ineffective versions; move the version out of range after run creation to exercise validation. */
+ UPDATE ecl_cfg.ScenarioWeightVersion SET EFFECTIVE_FROM=DATEADD(day,1,@D) WHERE VERSION_ID=@V1;
  EXEC ecl_core.usp_TransitionRunStatus @RUN_ID=@R1,@NEW_STATUS='VALIDATING',@EVENT_MESSAGE=N'Scenario-weight effective-date boundary';
  EXEC ecl_core.usp_RegisterRunInput @R1,'ACCOUNT','TEST','synthetic.account','v1',0,1,NULL;
  EXEC ecl_core.usp_RegisterRunInput @R1,'PD','TEST','synthetic.pd','v1',0,1,NULL;
