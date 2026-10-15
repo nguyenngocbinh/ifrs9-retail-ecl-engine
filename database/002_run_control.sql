@@ -412,6 +412,8 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
     SET NOCOUNT ON;
+    /* Triggers default XACT_ABORT to ON; disable it so the expected RAISERROR does not doom caller transaction. */
+    SET XACT_ABORT OFF;
 
     IF EXISTS (
         SELECT 1
@@ -442,6 +444,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
+    SET XACT_ABORT OFF;
 
     IF EXISTS (
         SELECT 1
