@@ -19,7 +19,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 ## Priority 1 — platform foundation
 
 - [x] [#5 Design run control, snapshots, and audit logging](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/5) — design and guarded run lifecycle are implemented.
-- [x] [#6 Implement input validation and pre-calculation quality gates](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/6) — initial validation checks manifest, input families, scope, maturity, scenario weights, POCI classification, and curve coverage.
+- [x] [#6 Implement input validation and pre-calculation quality gates](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/6) — initial validation checks manifest, input families, scope, maturity, scenario weights, and curve coverage.
 - [ ] [#10 Set up SQL deployment and CI for SQL Server 2016](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/10) — CI currently targets SQL Server 2017; SQL Server 2016 verification remains required.
 
 ## Priority 2 — calculation and controls
@@ -44,7 +44,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 | PR #5 | Run manifest and guarded lifecycle procedures | Merged |
 | PR #6 | GitHub Actions SQL integration tests | Merged; SQL Server 2017 target |
 | PR #7 | Initial pre-calculation input validation | Merged as PR #20 |
-| PR #8 | Input manifest row-count reconciliation and POCI audit | Merged as PR #21 |
+| PR #8 | Input manifest row-count reconciliation and POCI audit | Merged as PR #21; POCI work is historical and out of scope for the current input-contract PR |
 | PR #9 | Canonical input contract baseline | Review in PR #22 |
 | PR #10+ | Enforce provenance/rate-basis contract, expand regression tests, then later calculation | Evidence and methodology gate required before ECL formulas |
 
@@ -57,7 +57,6 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 - [x] EIR input is FTP selling-funds rate for 12 months; Treasury must confirm numeric units and its approved use in the formula before production calculation.
 - [x] Reporting currency is VND; final published ECL rounds to whole VND.
 - [x] Partial final-year convention: remaining months / 12 affects only discounting time/exponent; annual PD and EAD are not changed.
-- [x] POCI is excluded from v1; unknown POCI classification is an error and detected POCI blocks calculation until exclusion/reconciliation is enforced.
 - [x] Scenario weights require VERSION_ID, PROCESS_DATE/effective dates, and retained source/approval history; official source/approval evidence still needs to be supplied.
 - [ ] SQL Server 2016 deployment and compatibility verification.
 - [ ] Upstream source-to-column mapping and certification.
