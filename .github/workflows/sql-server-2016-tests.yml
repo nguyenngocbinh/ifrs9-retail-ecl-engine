@@ -33,11 +33,13 @@ jobs:
               [string]::IsNullOrWhiteSpace($env:SQLSERVER_2016_PASSWORD)) {
             throw 'Set SQLSERVER_2016_USER and SQLSERVER_2016_PASSWORD secrets for the disposable test instance.'
           }
-          $sqlcmd = Get-Command sqlcmd -ErrorAction SilentlyContinue
-          if (-not $sqlcmd) { throw 'sqlcmd is not installed or not on PATH on the self-hosted runner.' }
-          $version = & sqlcmd -S $env:SQLSERVER_2016_INSTANCE -U $env:SQLSERVER_2016_USER -P $env:SQLSERVER_2016_PASSWORD -b -h -1 -Q "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)"
+          if (-not (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {
+            throw 'sqlcmd is not installed or not on PATH on the self-hosted runner.'
+          }
+          $version = & sqlcmd -S $env:SQLSERVER_2016_INSTANCE -U $env:SQLSERVER_2016_USER -P $env:SQLSERVER_2016_PASSWORD -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)"
           if ($LASTEXITCODE -ne 0) { throw 'Unable to query SQL Server version.' }
-          if ([int]($version | Select-Object -Last 1) -ne 13) {
+          $versionNumberText = $version | Where-Object { $_.Trim() -match '^\d+$' } | Select-Object -First 1
+          if (-not $versionNumberText -or [int]$versionNumberText -ne 13) {
             throw "Expected SQL Server 2016 major version 13; server returned: $version"
           }
 
