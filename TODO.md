@@ -12,7 +12,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Priority 0 — methodology decisions
 
-- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — Stage 3 allocation, EAD/LGD semantics, discounting, PD semantics, horizons, POCI, precision.
+- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — remaining items: annual period/maturity alignment, POCI policy, currency/units, precision and rounding.
 - [x] Confirm logical curve grains: PD = account/scenario/period; LGD = account/period; EAD = account/period; EIR = shared/period; summary stores both portfolio and pool totals.
 - [ ] [#4 Define canonical input contract and mapping](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/4) — confirm period semantics, units/currency and input coverage; physical source mapping is not a prerequisite for logical schema design.
 
@@ -46,11 +46,13 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 ## Current blockers
 
 - PD, LGD and EAD logical grains are approved at account level.
-- Stage 3 PD=1 is selected, but EAD/LGD allocation and period-level loss treatment remain unresolved.
-- Discounting convention for a period-varying EIR needs approved methodology.
-- Lifetime horizon, POCI exclusion, domains, units, precision and rounding remain to be confirmed.
+- [x] Lifetime horizon is each account's contractual maturity date.
+- [x] Scenario weights are Downturn 15.68%, Base 68.64%, Upturn 15.68%; scenario ECL is the weighted sum of the three scenario ECLs.
+- [x] Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual discounting/aggregation.
+- [x] Shared EIR discount factor selected: DF(t)=1/(1+EIR(t))^t.
+- [ ] Confirm annual period alignment to maturity date, POCI policy, currency/units, precision and rounding; record scenario-weight source/version.
 - The DDL is a proposal and has not been executed against SQL Server.
 
 ## Next action
 
-Review the revised `docs/database-schema-v1.0.md` and DDL. Next, finalize period semantics, EIR discounting and Stage 3 loss allocation before any calculation SQL; implement input version binding and validation gates in the next PR.
+Review the revised `docs/database-schema-v1.0.md` and DDL. Next, implement input version binding and validation gates, including validation that the account curve stops at maturity and that scenario weights sum to 1.
