@@ -189,12 +189,15 @@ BEGIN
 
     DECLARE @PROCESS_DATE date;
     DECLARE @LOCK_RESULT int;
+    DECLARE @LOCK_RESOURCE nvarchar(255);
+
+    SET @LOCK_RESOURCE = CONCAT('ECL_RUN_INPUT_SEAL_', @RUN_ID);
 
     BEGIN TRY
         BEGIN TRANSACTION;
 
         EXEC @LOCK_RESULT = sys.sp_getapplock
-            @Resource = CONCAT('ECL_RUN_INPUT_SEAL_', @RUN_ID),
+            @Resource = @LOCK_RESOURCE,
             @LockMode = 'Exclusive',
             @LockOwner = 'Transaction',
             @LockTimeout = 10000;
@@ -256,6 +259,9 @@ BEGIN
     DECLARE @PROCESS_DATE date;
     DECLARE @ALLOWED bit = 0;
     DECLARE @LOCK_RESULT int;
+    DECLARE @LOCK_RESOURCE nvarchar(255);
+
+    SET @LOCK_RESOURCE = CONCAT('ECL_RUN_STATUS_', @RUN_ID);
 
     IF @NEW_STATUS NOT IN ('VALIDATING','VALIDATION_FAILED','CALCULATING','RECONCILIATION_FAILED','SUCCEEDED','PUBLISHED','FAILED','CANCELLED')
         THROW 51030, 'Unsupported target run status.', 1;
@@ -264,7 +270,7 @@ BEGIN
         BEGIN TRANSACTION;
 
         EXEC @LOCK_RESULT = sys.sp_getapplock
-            @Resource = CONCAT('ECL_RUN_STATUS_', @RUN_ID),
+            @Resource = @LOCK_RESOURCE,
             @LockMode = 'Exclusive',
             @LockOwner = 'Transaction',
             @LockTimeout = 10000;
@@ -311,8 +317,8 @@ BEGIN
 
         UPDATE ecl_core.RunControl
         SET RUN_STATUS = @NEW_STATUS,
-            FINISHED_AT = CASE WHEN @NEW_STATUS IN ('VALIDATION_FAILED','RECONCILIATION_FAILED','SUCCEEDED','PUBLISHED','FAILED','CANCELLED')
-                               THEN SYSUTCDATETIME() ELSE FINISHED_AT END
+            FINISHED_AT = CASE WHEN @NEW_STATUS IN ('VALIDATION_FAILED','RECONCILIATION_FAILED','SUCCEEDED','FAILED','CANCELLED')
+                               THEN COALESCE(FINISHED_AT, SYSUTCDATETIME()) ELSE FINISHED_AT END
         WHERE RUN_ID = @RUN_ID AND RUN_STATUS = @OLD_STATUS;
 
         IF @@ROWCOUNT <> 1 THROW 51038, 'Run status changed concurrently; retry after re-reading state.', 1;
