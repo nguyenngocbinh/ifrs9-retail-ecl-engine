@@ -12,7 +12,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Priority 0 — methodology decisions
 
-- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — remaining items: partial-final-period application to PD/EAD/discounting and POCI policy.
+- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — remaining item: partial-final-period application to PD/EAD/discounting; POCI scope is confirmed excluded from v1, with configured validation and no silent calculation.
 - [x] Confirm logical curve grains: PD = account/scenario/period; LGD = account/period; EAD = account/period; EIR = shared/period; summary stores both portfolio and pool totals.
 - [ ] [#4 Define canonical input contract and mapping](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/4) — confirm period semantics, units/currency and input coverage; physical source mapping is not a prerequisite for logical schema design.
 
@@ -53,7 +53,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 - [x] Reporting currency is VND; final published ECL rounds to whole VND.
 - [x] Scenario weights are user-confirmed and must be stored as versioned history with VERSION_ID and PROCESS_DATE; external official source/provenance will be added later.
 - [ ] Specify how remaining months / 12 applies to PD, EAD and discounting in the partial final forecast year.
-- [ ] Confirm POCI policy for v1.
+- [x] POCI is excluded from v1; detection creates a configured validation finding and the account is never calculated as a regular loan. WARN continuation requires exclusion and reconciliation; ERROR/FATAL blocks the run.
 - The DDL is a proposal and has not been executed against SQL Server.
 
 ## Next action
