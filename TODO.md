@@ -44,8 +44,8 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Current blockers
 
-- LGD and PD curve grain must be approved against the logical model.
-- EAD period semantics and Stage 3 default-loss allocation remain unresolved.
+- PD, LGD and EAD logical grains are approved at account level.
+- Stage 3 PD=1 is selected, but EAD/LGD allocation and period-level loss treatment remain unresolved.
 - Discounting convention for a period-varying EIR needs approved methodology.
 - Lifetime horizon, POCI exclusion, domains, units, precision and rounding remain to be confirmed.
 - The DDL is a proposal and has not been executed against SQL Server.
