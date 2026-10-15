@@ -28,7 +28,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 | ecl_stg | EIRCurve | One row per run/forecast period; shared EIR curve |
 | ecl_result | ECLDetail | One row per run/account/scenario/forecast period; calculation trace |
 | ecl_result | ECLAccount | One row per run/account; mutually exclusive Stage output fields |
-| ecl_result | ECLPortfolioSummary | One row per run/product/Stage and optional pool |
+| ecl_result | ECLPortfolioSummary | One row per run/product/Stage/aggregation level/pool key |
 | ecl_audit | RunEvent | Append-only run lifecycle and reconciliation events |
 | ecl_audit | ValidationError | Persisted validation findings by run and optional business key |
 
@@ -42,7 +42,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - EIR curve PK: `(RUN_ID, FORECAST_PERIOD)`.
 - ECL detail PK: `(RUN_ID, ACCOUNT_ID, SCENARIO_CODE, FORECAST_PERIOD)`.
 - Account output PK: `(RUN_ID, ACCOUNT_ID)`.
-- Portfolio summary PK: `(RUN_ID, PRODUCT_TYPE, STAGE, POOL_ID)`. SQL Server unique keys treat NULL specially for uniqueness; if multiple NULL-pool rows are required, replace this design with an explicit all-pools key/level column or normalized summary grain before implementation.
+- Portfolio summary PK: `(RUN_ID, PRODUCT_TYPE, STAGE, AGGREGATION_LEVEL, POOL_ID)`. `AGGREGATION_LEVEL` is `PORTFOLIO` or `POOL`; portfolio-wide rows use the non-null sentinel `POOL_ID='__ALL_POOLS__'`, while pool-level rows must use a real pool ID. This avoids nullable columns in the primary key.
 - FKs enforce product/scenario/run lineage and result-to-input account existence.
 - Check constraints reject invalid Stage, PD/LGD/weight ranges, negative EAD/ECL and invalid run states.
 - Indexes target run-first access patterns, account/pool joins, product/Stage aggregation and audit lookup.
@@ -64,7 +64,7 @@ A run must transition through controlled states. Only a fully validated, calcula
 3. **PD curve grain is provisional.** DDL proposes pool × scenario × period marginal PD, assigned to accounts through the run's pool snapshot. This must match the approved PD methodology.
 4. **EIR curve is shared across pools** as previously requested. Rate basis and discount-factor methodology remain unresolved; no formula is implemented here.
 5. `ScenarioWeight` DDL stores weights by version and scenario. Weight-sum and exact effective-version selection are run-time validation rules, not enforced by a row-level CHECK constraint.
-6. `ECLPortfolioSummary` uses nullable POOL_ID to allow portfolio-wide rollups; because nullable columns in unique constraints can create a single NULL key collision, use a separate `AGGREGATION_LEVEL`/normalized pool key before implementing multiple portfolio-wide rows.
+6. `ECLPortfolioSummary` uses a non-null `AGGREGATION_LEVEL` and `POOL_ID`; portfolio-wide rows use `AGGREGATION_LEVEL='PORTFOLIO'` and `POOL_ID='__ALL_POOLS__'`, while pool rows use `AGGREGATION_LEVEL='POOL'` and a real pool ID.
 7. `IS_ACTIVE` is included on standardized inputs as requested, but each run should snapshot only the selected active version. It is not a substitute for run isolation.
 8. Currency handling is explicit on EAD; all amounts must be in a consistent reporting currency before aggregation. Conversion logic is outside this DDL.
 9. Stage 3 PD=1, EAD/LGD allocation, period-varying EIR discounting, horizon and rounding remain governed methodology decisions. Do not implement the ECL formula until approved.
