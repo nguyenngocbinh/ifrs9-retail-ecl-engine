@@ -152,7 +152,7 @@ BEGIN
 
     INSERT INTO ecl_audit.ValidationError
         (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
-    SELECT @RUN_ID, @PROCESS_DATE, 'POCI_EXCLUDED', 'WARN',
+    SELECT @RUN_ID, @PROCESS_DATE, 'POCI_EXCLUDED', 'ERROR',
            a.PRODUCT_TYPE, a.ACCOUNT_ID, a.POOL_ID,
            N'POCI account is out of v1 calculation scope and must be excluded from ordinary ECL calculation and reconciled.'
     FROM ecl_stg.AccountSnapshot a
