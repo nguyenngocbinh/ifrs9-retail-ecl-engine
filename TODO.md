@@ -47,8 +47,9 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 | PR #8 | Input manifest row-count reconciliation and POCI audit | Merged as PR #21; POCI work is historical and out of scope for the current input-contract PR |
 | PR #9 | Canonical input contract baseline | Merged as PR #22 |
 | PR #10 | Contract enforcement matrix and evidence-gate roadmap | Merged as PR #23 |
-| PR #11 | Targeted synthetic input-contract regression tests | Proposed in PR #24; SQL Server 2017 CI only |
-| PR #12+ | Implement provenance/rate-basis contract and expand regression tests, then later calculation | Evidence and methodology gate required before ECL formulas |
+| PR #11 | Targeted synthetic input-contract regression tests | Merged as PR #24; SQL Server 2017 CI only |
+| PR #12 | Scenario-weight provenance fields and fatal validation gate | Proposed in PR #25; evidence values still must be supplied by owners |
+| PR #13+ | FTP rate-basis contract, additional regression tests, then later calculation | Evidence and methodology gate required before ECL formulas |
 
 ## Confirmed methodology and input decisions
 
@@ -68,4 +69,4 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Next action
 
-Expand synthetic regression coverage for effective-date boundaries, missing scenario rows, maturity/curve coverage, and safe reruns. Keep FTP_12M semantics and scenario-weight provenance explicit; do not implement ECL formulas until the evidence gates are closed.
+Next, formalize the FTP 12-month numeric unit/rate-basis contract and test maturity/curve-coverage boundaries. Do not implement ECL formulas until source mapping, FTP semantics, scenario-weight provenance evidence, Stage 3 suitability, and SQL Server 2016 verification are closed.
