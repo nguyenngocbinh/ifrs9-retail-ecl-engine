@@ -59,9 +59,9 @@ A run must transition through controlled states. Only a fully validated, calcula
 
 ## Important implementation caveats
 
-1. **LGD grain is provisional.** DDL proposes pool-level LGD. If LGD is account-level or product-level, adjust PK/FK and join keys before calculation.
-2. **EAD grain is provisional.** DDL proposes account-level annual EAD. Confirm whether upstream EAD is a per-period EAD-at-default curve or a marginal/period loss input.
-3. **PD curve grain is provisional.** DDL proposes pool × scenario × period marginal PD, assigned to accounts through the run's pool snapshot. This must match the approved PD methodology.
+1. **PD/LGD/EAD grains are approved at account level.** PD is account × scenario × period; LGD and EAD are account × period. Validate period semantics, units and curve coverage before calculation.
+2. EAD interpretation remains open: confirm whether each period contains EAD-at-default or a marginal/period loss input.
+3. PD is account × scenario × period, as selected by the user.
 4. **EIR curve is shared across pools** as previously requested. Rate basis and discount-factor methodology remain unresolved; no formula is implemented here.
 5. `ScenarioWeight` DDL stores weights by version and scenario. Weight-sum and exact effective-version selection are run-time validation rules, not enforced by a row-level CHECK constraint.
 4. `ECLPortfolioSummary` uses a non-null `AGGREGATION_LEVEL` and `POOL_ID`; portfolio-wide rows use `AGGREGATION_LEVEL='PORTFOLIO'` and `POOL_ID='__ALL_POOLS__'`, while pool rows use `AGGREGATION_LEVEL='POOL'` and a real pool ID.
