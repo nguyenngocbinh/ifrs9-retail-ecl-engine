@@ -18,7 +18,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Priority 1 — platform foundation
 
-- [ ] [#5 Design run control, snapshots, and audit logging](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/5)
+- [x] [#5 Design run control, snapshots, and audit logging](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/5) — design recorded in `docs/run-control-design.md`; guarded SQL procedures and a run-to-input-version manifest remain next.
 - [ ] [#6 Implement input validation and pre-calculation quality gates](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/6)
 - [ ] [#10 Set up SQL deployment and CI for SQL Server 2016](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/10)
 
@@ -58,4 +58,4 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Next action
 
-Review the revised `docs/database-schema-v1.0.md` and DDL. Next, implement input version binding and validation gates, including validation that the account curve stops at maturity and that scenario weights sum to 1.
+Review the revised `docs/database-schema-v1.0.md` and DDL. Next, implement a run-to-input-version manifest and guarded run-state procedures, then add deterministic tests for lifecycle transitions, scope, and publication blocking. Keep calculation formulas blocked until methodology approvals are complete.
