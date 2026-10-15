@@ -29,7 +29,7 @@ Stage outputs are mutually exclusive at account/reporting-date grain. Do not add
 
 ## Database design
 
-The proposed functional schemas are `ecl_cfg`, `ecl_stg`, `ecl_core`, `ecl_result`, and `ecl_audit`. Inputs are normalized into separate tables; results use a shared product discriminator and are stored at account/run grain with a scenario-period detail layer.
+The proposed functional schemas are `ecl_cfg`, `ecl_stg`, `ecl_core`, `ecl_result`, and `ecl_audit`. Inputs are normalized into separate tables: PD at account/scenario/period, LGD and EAD at account/period, and shared EIR at period grain. Results use a shared product discriminator and are stored at account/run grain with a scenario-period detail layer.
 
 See [Logical database schema v1.0](docs/database-schema-v1.0.md) and [initial SQL Server 2016 DDL](database/001_create_logical_schema.sql). The DDL is a review proposal and has not been deployed to a live SQL Server instance.
 
@@ -37,7 +37,7 @@ See [Logical database schema v1.0](docs/database-schema-v1.0.md) and [initial SQ
 
 Three scenario PD curves are supplied upstream; the engine must not derive scenario PD from `PD FWL ± 1 SE`. Standard error, if present in source data, is audit/control information only.
 
-The recorded discounting proposal is `DF(t) = 1 / (1 + EIR(t))^t`, where `t` is forecast year and period-specific EIR is read from an existing source. This is a verification blocker: if EIR varies by period, this formula is not generally equivalent to cumulative discounting. Do not silently change it; reconcile it with approved accounting methodology.
+The recorded discounting proposal is `DF(t) = 1 / (1 + EIR(t))^t`, where `t` is forecast year and period-specific EIR is read from an existing source. This is a verification blocker: if EIR varies by period, this formula is not generally equivalent to cumulative discounting. Do not silently change it; reconcile it with approved accounting methodology. Stage 3 EAD/LGD allocation is also unresolved. No calculation formula will be implemented until both decisions are approved.
 
 ## Development sequence
 
