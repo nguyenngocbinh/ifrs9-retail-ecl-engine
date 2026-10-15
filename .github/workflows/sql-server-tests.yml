@@ -5,13 +5,13 @@ on:
     paths:
       - "database/**"
       - "tests/sql/**"
-      - ".github/workflows/sql-server-tests.yml"
+      - ".github/workflows/**"
   push:
     branches: [main]
     paths:
       - "database/**"
       - "tests/sql/**"
-      - ".github/workflows/sql-server-tests.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
