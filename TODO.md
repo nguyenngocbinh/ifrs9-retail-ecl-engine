@@ -12,7 +12,7 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Priority 0 — methodology decisions
 
-- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — remaining items: annual period/maturity alignment, POCI policy, currency/units, precision and rounding.
+- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — remaining items: partial-final-period application to PD/EAD/discounting and POCI policy.
 - [x] Confirm logical curve grains: PD = account/scenario/period; LGD = account/period; EAD = account/period; EIR = shared/period; summary stores both portfolio and pool totals.
 - [ ] [#4 Define canonical input contract and mapping](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/4) — confirm period semantics, units/currency and input coverage; physical source mapping is not a prerequisite for logical schema design.
 
@@ -50,7 +50,10 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 - [x] Scenario weights are Downturn 15.68%, Base 68.64%, Upturn 15.68%; scenario ECL is the weighted sum of the three scenario ECLs.
 - [x] Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual discounting/aggregation.
 - [x] Shared EIR discount factor selected: DF(t)=1/(1+EIR(t))^t.
-- [ ] Confirm annual period alignment to maturity date, POCI policy, currency/units, precision and rounding; record scenario-weight source/version.
+- [x] Reporting currency is VND; final published ECL rounds to whole VND.
+- [x] Scenario weights are user-confirmed and must be stored as versioned history with VERSION_ID and PROCESS_DATE; external official source/provenance will be added later.
+- [ ] Specify how remaining months / 12 applies to PD, EAD and discounting in the partial final forecast year.
+- [ ] Confirm POCI policy for v1.
 - The DDL is a proposal and has not been executed against SQL Server.
 
 ## Next action
