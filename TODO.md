@@ -1,32 +1,32 @@
 # Project TODO / Roadmap
 
-This file is the repository-level overview. Use linked GitHub Issues for active tracking and discussion. Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
+This file is the repository-level overview. Use linked GitHub Issues for active tracking and discussion. Each implementation PR has its own log at \`docs/implementation-log/PR-NNN.md\`.
 
 ## Working rules
 
 - [ ] Do not implement final ECL formulas while methodology blockers remain unresolved.
 - [x] Logical schema proposal is designed from user decisions; no source-system survey is required for this step.
 - [ ] Keep calculation logic in T-SQL compatible with SQL Server 2016.
-- [ ] Use synthetic, privacy-safe test data only.
+- [x] Use synthetic, privacy-safe test data only.
 - [x] Update this roadmap and per-PR implementation log when scope/status changes.
 
 ## Priority 0 — methodology decisions
 
-- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — partial-final-period treatment is now decided: remaining months / 12 affects only discounting time/exponent; annual PD and EAD remain unchanged. POCI scope is confirmed excluded from v1, with configured validation and no silent calculation.
+- [ ] [#2 Confirm ECL methodology blockers](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/2) — partial-final-period treatment is decided: remaining months / 12 affects only discounting time/exponent; annual PD and EAD remain unchanged. POCI scope is excluded from v1 with configured validation and no silent calculation.
 - [x] Confirm logical curve grains: PD = account/scenario/period; LGD = account/period; EAD = account/period; EIR = shared/period; summary stores both portfolio and pool totals.
 - [ ] [#4 Define canonical input contract and mapping](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/4) — confirm period semantics, units/currency and input coverage; physical source mapping is not a prerequisite for logical schema design.
 
 ## Priority 1 — platform foundation
 
-- [x] [#5 Design run control, snapshots, and audit logging](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/5) — design recorded in `docs/run-control-design.md`; guarded SQL procedures and a run-to-input-version manifest remain next.
-- [ ] [#6 Implement input validation and pre-calculation quality gates](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/6)
-- [ ] [#10 Set up SQL deployment and CI for SQL Server 2016](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/10)
+- [x] [#5 Design run control, snapshots, and audit logging](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/5) — design and guarded run lifecycle are implemented.
+- [x] [#6 Implement input validation and pre-calculation quality gates](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/6) — initial validation procedure checks manifest, input families, scope, maturity, scenario weights, POCI classification, and PD/LGD/EAD/EIR curve coverage. Extend as the canonical input contract is finalized.
+- [ ] [#10 Set up SQL deployment and CI for SQL Server 2016](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/10) — CI currently targets SQL Server 2017; SQL Server 2016 verification remains required.
 
 ## Priority 2 — calculation and controls
 
-- [ ] [#7 Implement scenario-weighted ECL calculation in T-SQL](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/7) — only after methodology and canonical input grains are approved.
+- [ ] [#7 Implement scenario-weighted ECL calculation in T-SQL](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/7) — blocked until methodology and canonical input contracts are approved.
 - [ ] [#8 Build account and portfolio aggregation with reconciliation](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/8)
-- [ ] [#9 Create synthetic regression and edge-case test suite](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/9)
+- [ ] [#9 Create synthetic regression and edge-case test suite](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/9) — start with validation and lifecycle regression cases; do not invent expected ECL outputs.
 
 ## Priority 3 — production readiness
 
@@ -37,11 +37,14 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 | PR | Intended scope | Gate |
 |---|---|---|
-| PR #1 | Documentation foundation and methodology/open-question register | Review/merge |
-| PR #2 | Source inventory toolkit and templates | Independent review; no source survey required for logical schema |
-| PR #3 | Logical schema, normalized input contracts, run/audit/output DDL proposal | Review canonical curve grains and SQL deployment safety |
-| PR #4 | Input version binding, validation gates and controlled run lifecycle | Resolve necessary input-grain and validation rules |
-| PR #5+ | Calculation, aggregation, tests, publication, deployment | Relevant methodology decisions approved |
+| PR #1 | Documentation foundation and methodology/open-question register | Merged |
+| PR #2 | Source inventory toolkit and templates | Merged; no source survey run |
+| PR #3 | Logical schema and normalized input contracts | Merged |
+| PR #4 | Run-control design and lifecycle procedures | Integrated into main |
+| PR #5 | Run manifest and guarded lifecycle procedures | Merged |
+| PR #6 | GitHub Actions SQL integration tests | Merged; SQL Server 2017 target |
+| PR #7 | Initial pre-calculation input validation | Review CI; then merge by explicit authorization |
+| PR #8+ | Reconciliation controls, expanded synthetic regression tests, and later calculation | Methodology/input-contract gate required before ECL formulas |
 
 ## Current blockers
 
@@ -53,9 +56,10 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 - [x] Reporting currency is VND; final published ECL rounds to whole VND.
 - [x] Scenario weights are user-confirmed and must be stored as versioned history with VERSION_ID and PROCESS_DATE; external official source/provenance will be added later.
 - [x] Partial final-year convention: remaining months / 12 affects only discounting time/exponent; annual PD and EAD are not changed.
-- [x] POCI is excluded from v1; detection creates a configured validation finding and the account is never calculated as a regular loan. WARN continuation requires exclusion and reconciliation; ERROR/FATAL blocks the run.
-- The DDL is a proposal and has not been executed against SQL Server.
+- [x] POCI is excluded from v1; unknown POCI classification is an error, and detected POCI accounts generate a warning that must be paired with exclusion and reconciliation before any future calculation.
+- SQL Server 2017 CI is not proof of SQL Server 2016 compatibility.
+- Input rate-basis/source-period details and official scenario-weight provenance remain open in the canonical input contract.
 
 ## Next action
 
-Review the revised `docs/database-schema-v1.0.md` and DDL. Next, implement a run-to-input-version manifest and guarded run-state procedures, then add deterministic tests for lifecycle transitions, scope, and publication blocking. Keep calculation formulas blocked until methodology approvals are complete.
+Add reconciliation and input-quality regression coverage using synthetic data. Keep final ECL formulas blocked until methodology and canonical input-contract blockers are resolved.
