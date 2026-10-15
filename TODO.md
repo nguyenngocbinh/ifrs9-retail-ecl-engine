@@ -1,6 +1,6 @@
 # Project TODO / Roadmap
 
-This file is the repository-level overview. Use linked GitHub Issues for active tracking and discussion. Each implementation PR has its own log at \`docs/implementation-log/PR-NNN.md\`.
+This file is the repository-level overview. Use linked GitHub Issues for active tracking and discussion. Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 
 ## Working rules
 
@@ -43,8 +43,9 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 | PR #4 | Run-control design and lifecycle procedures | Integrated into main |
 | PR #5 | Run manifest and guarded lifecycle procedures | Merged |
 | PR #6 | GitHub Actions SQL integration tests | Merged; SQL Server 2017 target |
-| PR #7 | Initial pre-calculation input validation | Review CI; then merge by explicit authorization |
-| PR #8+ | Reconciliation controls, expanded synthetic regression tests, and later calculation | Methodology/input-contract gate required before ECL formulas |
+| PR #7 | Initial pre-calculation input validation | Merged as PR #20 |
+| PR #8 | Input manifest row-count reconciliation and POCI audit | PR #21; review CI before merge |
+| PR #9+ | Final ECL reconciliation, expanded synthetic regression tests, and later calculation | Methodology/input-contract gate required before ECL formulas |
 
 ## Current blockers
 
@@ -62,4 +63,4 @@ This file is the repository-level overview. Use linked GitHub Issues for active 
 
 ## Next action
 
-Add reconciliation and input-quality regression coverage using synthetic data. Keep final ECL formulas blocked until methodology and canonical input-contract blockers are resolved.
+Review PR #21 CI, then implement final ECL reconciliation design and expand synthetic regression tests. Keep final ECL formulas blocked until methodology and canonical input-contract blockers are resolved. Keep final ECL formulas blocked until methodology and canonical input-contract blockers are resolved.
