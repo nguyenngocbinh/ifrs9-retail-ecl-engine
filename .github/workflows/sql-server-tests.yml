@@ -80,6 +80,14 @@ jobs:
         run: |
           sqlcmd -b -C -S localhost,1433 -U sa -P "$SQLSERVER_PASSWORD" -d IFRS9_ECL_CI -i database/002_run_control.sql
 
+      - name: Deploy input validation migration
+        run: |
+          sqlcmd -b -C -S localhost,1433 -U sa -P "$SQLSERVER_PASSWORD" -d IFRS9_ECL_CI -i database/003_input_validation.sql
+
       - name: Run transactional lifecycle smoke tests
         run: |
           sqlcmd -b -C -S localhost,1433 -U sa -P "$SQLSERVER_PASSWORD" -d IFRS9_ECL_CI -i tests/sql/run_control_smoke_tests.sql
+
+      - name: Run input validation negative-path tests
+        run: |
+          sqlcmd -b -C -S localhost,1433 -U sa -P "$SQLSERVER_PASSWORD" -d IFRS9_ECL_CI -i tests/sql/input_validation_smoke_tests.sql
