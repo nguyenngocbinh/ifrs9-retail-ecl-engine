@@ -6,8 +6,10 @@ Review required before production deployment:
 - PD grain approved: account/scenario/forecast period.
 - LGD grain approved: account/forecast period.
 - EAD grain approved: account/forecast period.
-- EIR remains shared by forecast period. Discounting convention is unresolved; no formula is implemented.
-- Stage 3 uses PD=1 as a design rule, but EAD/LGD allocation and loss method remain unresolved; no calculation formula is implemented.
+- EIR remains shared by forecast period; selected discount factor is DF(t) = 1 / (1 + EIR(t))^t, with t as forecast year.
+- Lifetime horizon ends at each account's MATURITY_DATE.
+- Scenario-weighted ECL = ECL_DOWNTURN * 0.1568 + ECL_BASE * 0.6864 + ECL_UPTURN * 0.1568.
+- Stage 3 uses PD=1 and the same annual EAD/LGD curves as Stage 2; calculate annual losses, discount by EIR, then aggregate. Calculation procedures are not included.
 - Execute in a disposable database first; this script creates schemas/tables/indexes.
 */
 SET ANSI_NULLS ON;
@@ -110,6 +112,7 @@ CREATE TABLE ecl_stg.AccountSnapshot (
     PRODUCT_TYPE varchar(30) NOT NULL,
     STAGE tinyint NOT NULL,
     POOL_ID varchar(100) NOT NULL,
+    MATURITY_DATE date NOT NULL,
     VERSION_ID int NOT NULL,
     IS_ACTIVE bit NOT NULL CONSTRAINT DF_AccountSnapshot_IsActive DEFAULT (1),
     SOURCE_REFERENCE nvarchar(200) NULL,
@@ -348,8 +351,9 @@ CREATE INDEX IX_ValidationError_Run_Severity
     INCLUDE (VALIDATION_CODE, PRODUCT_TYPE, ACCOUNT_ID, FORECAST_PERIOD);
 GO
 
-/* Seed logical product/scenario codes only. Weights are deliberately not seeded:
-   load the approved, versioned scenario weights after governance confirmation. */
+/* Seed logical product/scenario codes only. The approved scenario weights are
+   recorded in the methodology/docs and must be loaded as a versioned config set:
+   DOWNTURN=0.1568, BASE=0.6864, UPTURN=0.1568. */
 INSERT INTO ecl_cfg.ProductType (PRODUCT_TYPE, PRODUCT_NAME)
 VALUES ('MORTGAGE', N'Mortgage'),
        ('AUTO', N'Auto'),
