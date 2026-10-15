@@ -26,7 +26,7 @@ The engine consumes approved upstream data. It does not build PD, LGD, EAD, pool
 | Stage 2 | Lifetime ECL | `ECL_LIFETIME` |
 | Stage 3 | Lifetime/default ECL using PD = 1 | `ECL_DEFAULT` |
 
-Stage outputs are mutually exclusive at account/reporting-date grain. Do not add `ECL_DEFAULT` again into `ECL_LIFETIME` when aggregating the portfolio. Stage 2 and Stage 3 lifetime calculations run through each account's contractual maturity date. POCI is excluded from the initial scope.
+Stage outputs are mutually exclusive at account/reporting-date grain. Do not add `ECL_DEFAULT` again into `ECL_LIFETIME` when aggregating the portfolio. Stage 2 and Stage 3 lifetime calculations run through each account's contractual maturity date. POCI is excluded from v1. If a POCI account is detected, persist a validation finding at the configured severity; never silently calculate it as a regular loan. ERROR/FATAL blocks the run. WARN may allow continuation only after excluding the POCI account from calculation and explicitly reconciling the exclusion.
 
 ## Database design
 
