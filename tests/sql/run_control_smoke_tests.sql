@@ -11,6 +11,7 @@ DECLARE @TEST_WEIGHT_VERSION int = 2147483000;
 DECLARE @RUN_ID bigint;
 DECLARE @PROCESS_DATE date = '20261015';
 DECLARE @EXPECTED_ERROR int;
+DECLARE @EXPECTED_ERROR_MESSAGE nvarchar(2048);
 
 BEGIN TRY
     BEGIN TRANSACTION;
@@ -49,6 +50,7 @@ BEGIN TRY
     EXEC ecl_core.usp_SealRunInputs @RUN_ID;
 
     SET @EXPECTED_ERROR = NULL;
+    SET @EXPECTED_ERROR_MESSAGE = NULL;
     BEGIN TRY
         UPDATE ecl_core.RunInputManifestItem
         SET SOURCE_VERSION = 'tampered'
@@ -56,9 +58,12 @@ BEGIN TRY
     END TRY
     BEGIN CATCH
         SET @EXPECTED_ERROR = ERROR_NUMBER();
+        SET @EXPECTED_ERROR_MESSAGE = ERROR_MESSAGE();
     END CATCH;
-    IF @EXPECTED_ERROR <> 51050
-        THROW 51103, 'Sealed manifest item mutation was not rejected with error 51050.', 1;
+    IF @EXPECTED_ERROR_MESSAGE <> 'Input manifest items are immutable after the manifest is sealed.'
+        THROW 51103, 'Sealed manifest item mutation was not rejected with the expected message.', 1;
+    IF XACT_STATE() <> 1
+        THROW 51104, 'Rejected manifest mutation left the caller transaction uncommittable.', 1;
 
     EXEC ecl_core.usp_TransitionRunStatus
         @RUN_ID = @RUN_ID, @NEW_STATUS = 'CALCULATING', @EVENT_MESSAGE = N'Smoke test';
@@ -94,10 +99,12 @@ BEGIN TRY
     IF @EXPECTED_ERROR <> 51033
         THROW 51102, 'Illegal transition from PUBLISHED was not rejected with error 51033.', 1;
 
-    ROLLBACK TRANSACTION;
+    /* usp_TransitionRunStatus rolls back its active transaction when the expected illegal transition throws.
+       It may therefore already have rolled back this outer smoke-test transaction. */
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
     PRINT 'PASS: run creation, manifest registration/sealing, sealed-item immutability, guarded lifecycle, reconciliation/publication gates, and terminal-state rejection.';
 END TRY
 BEGIN CATCH
-    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
     THROW;
 END CATCH;
