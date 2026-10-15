@@ -12,9 +12,10 @@ The engine consumes approved upstream data. It does not build PD, LGD, EAD, pool
 
 - PD: annual unconditional marginal PD on the original cohort, supplied upstream for Downturn, Base, and Upturn scenarios.
 - LGD: supplied upstream; currently assumed flat across scenarios.
-- EAD: supplied upstream as annual EAD at expected default, using a year-end convention; use the annual curve through each account's contractual maturity date.
+- EAD: supplied upstream as annual EAD at expected default, using a year-end convention; use the annual curve through each account's contractual maturity date. For a partial final forecast year, use remaining months / 12 as the period fraction; exact component-level application remains to be specified before calculation SQL.
+- Currency: VND; retain internal precision and round final published ECL to whole VND.
 - Stage / SICR and pool: supplied upstream.
-- Scenario weights: Downturn 15.68%, Base 68.64%, Upturn 15.68%. Scenario-weighted ECL = `ECL_DOWNTURN × 15.68% + ECL_BASE × 68.64% + ECL_UPTURN × 15.68%`. Record the governed source/version in run metadata.
+- Scenario weights are user-confirmed: Downturn 15.68%, Base 68.64%, Upturn 15.68%. Store immutable weight sets by `VERSION_ID`, `PROCESS_DATE`, effective dates and audit history; official external source/provenance will be added later. Scenario-weighted ECL = `ECL_DOWNTURN × 15.68% + ECL_BASE × 68.64% + ECL_UPTURN × 15.68%`.
 - SQL runtime: SQL Server 2016, T-SQL only. Python is not part of the calculation engine.
 
 ## Stage mapping
