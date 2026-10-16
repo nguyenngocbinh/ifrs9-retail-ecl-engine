@@ -1,4 +1,4 @@
-name: SQL Server 2017 integration tests
+name: SQL Server 2022 integration tests
 
 on:
   pull_request:
@@ -18,28 +18,28 @@ permissions:
   contents: read
 
 jobs:
-  sql-server-2017:
-    name: Deploy migrations and run tests on SQL Server 2017
+  sql-server-2022:
+    name: Deploy migrations and run tests on SQL Server 2022
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     services:
       sqlserver:
-        image: mcr.microsoft.com/mssql/server:2017-latest
+        image: mcr.microsoft.com/mssql/server:2022-latest
         env:
           ACCEPT_EULA: "Y"
           MSSQL_PID: "Developer"
-          SA_PASSWORD: "CI_SQL_2017_Test!Only2026"
+          SA_PASSWORD: "CI_SQL_2022_Test!Only2026"
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'CI_SQL_2017_Test!Only2026' -Q 'SELECT 1' || exit 1"
+          --health-cmd "bash -c '</dev/tcp/localhost/1433' || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 18
           --health-start-period 60s
 
     env:
-      SQLSERVER_TEST_PASSWORD: "CI_SQL_2017_Test!Only2026"
+      SQLSERVER_TEST_PASSWORD: "CI_SQL_2022_Test!Only2026"
       SQLSERVER_TEST_DATABASE: IFRS9_ECL_CI_${{ github.run_id }}
 
     steps:
@@ -71,8 +71,8 @@ jobs:
             sleep 10
           done
           version=$(sqlcmd -S localhost,1433 -U sa -P "$SQLSERVER_TEST_PASSWORD" -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)" | tr -d '[:space:]')
-          if [ "$version" != "14" ]; then
-            echo "Expected SQL Server 2017 major version 14; got: $version"
+          if [ "$version" != "16" ]; then
+            echo "Expected SQL Server 2022 major version 16; got: $version"
             exit 1
           fi
 
