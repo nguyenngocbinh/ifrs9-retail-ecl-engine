@@ -34,8 +34,9 @@ BEGIN
        OR EXISTS (SELECT 1 FROM ecl_result.ECLAccount WHERE RUN_ID=@RUN_ID)
        OR EXISTS (SELECT 1 FROM ecl_result.ECLPortfolioSummary WHERE RUN_ID=@RUN_ID)
     BEGIN
-        RAISERROR('This RUN_ID already has calculation output; use a new RUN_ID for reruns.',16,1);
-        RETURN;
+        /* Return a nonzero status without raising an error: callers may own an
+           outer transaction, and a rejected retry must not poison that transaction. */
+        RETURN 51515;
     END;
 
     BEGIN TRY
