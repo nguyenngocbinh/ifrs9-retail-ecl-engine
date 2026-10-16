@@ -12,8 +12,8 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 ## Current gates
 - [x] Canonical happy-path input test validates and reconciles all six manifest families without producing ECL output.
 - [x] Use an ephemeral SQL Server 2022 container on GitHub-hosted runners; no self-hosted runner or external SQL Server secrets required.
-- [ ] Scenario-weight effective-date and required-scenario boundary tests pass on SQL Server 2017 CI; rerun on SQL Server 2022 CI.
-- [ ] All migrations/tests passed on SQL Server 2017 CI; SQL Server 2022 CI verification is pending.
+- [x] Scenario-weight effective-date and required-scenario boundary tests pass on SQL Server 2022 CI.
+- [x] All migrations/tests in the current suite passed on SQL Server 2022 CI after PR #30 merge; PR #31 adds lifecycle gate regression coverage.
 - [ ] SQL Server 2016 compatibility remains a separate deferred gate; do not claim it based on SQL Server 2017 results.
 
 ## Confirmed methodology
@@ -45,7 +45,8 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #27 | #14 | EIR and Stage 3 convention | Merged |
 | #28 | #15 | Canonical happy-path test and SQL Server 2016 harness | Merged |
 | #29 | #16 | Scenario-weight boundary regression; temporary SQL Server 2017 container CI | Merged; SQL Server 2017 suite passed |
-| #30 | #17 | Switch hosted integration CI to SQL Server 2022 container | Open; CI pending |
+| #30 | #17 | Switch hosted integration CI to SQL Server 2022 container | Merged; SQL Server 2022 CI passed |
+| #31 | #18 | Add lifecycle gate regression tests | Open; CI pending |
 
 ## Next action
-Run the SQL Server 2022 container workflow in PR #30 and resolve any test failures. SQL Server 2016 compatibility remains a separate gate; do not claim it from SQL Server 2017 results. Do not implement final ECL formulas before the synthetic regression suite and the required runtime gate pass. Upstream mapping is not a gate for the canonical-table phase; do not run a production source survey.
+Complete PR #31 lifecycle gate regression tests. SQL Server 2022 CI is now verified for the existing suite; SQL Server 2016 compatibility remains a separate deferred gate. Do not implement final ECL formulas until the lifecycle/input regression suite is green and the supported runtime decision is explicitly closed. Upstream mapping is not a gate for the canonical-table phase; do not run a production source survey.
