@@ -94,6 +94,7 @@ jobs:
             "tests/sql/input_validation_smoke_tests.sql"
             "database/004_input_reconciliation.sql"
             "tests/sql/input_reconciliation_smoke_tests.sql"
+            "database/005_ecl_calculation.sql"
             "tests/sql/input_contract_regression_tests.sql"
             "tests/sql/maturity_curve_coverage_tests.sql"
             "tests/sql/canonical_input_happy_path_tests.sql"
@@ -103,6 +104,7 @@ jobs:
             "tests/sql/publication_gate_tests.sql"
             "tests/sql/selective_run_scope_tests.sql"
             "tests/sql/input_data_quality_tests.sql"
+            "tests/sql/ecl_calculation_tests.sql"
           )
           for script in "${scripts[@]}"; do
             echo "Running $script"

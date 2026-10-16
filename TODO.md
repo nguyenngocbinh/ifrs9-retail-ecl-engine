@@ -3,7 +3,7 @@
 Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 
 ## Working rules
-- [ ] Do not implement final ECL formulas until the synthetic regression suite for pre-calculation safety, publication lifecycle gating, and selective-run scope is green. True output-write atomicity must wait for the publisher procedure.
+- [x] Pre-calculation safety, publication lifecycle gating, and selective-run scope gates are green. ECL formulas are implemented in PR #39; keep them gated by the full SQL Server 2022 regression suite.
 - [x] Canonical schema and input forms are the agreed interface; the user will populate these tables.
 - [x] Use synthetic, privacy-safe test data only. No production source survey or source mapping is required for this phase.
 - [x] SQL Server 2022 is the CI runtime for this phase; SQL Server 2016 compatibility verification is not required.
@@ -19,9 +19,10 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - [x] PR #34 publication lifecycle gate regression is merged; true output-write atomicity remains untestable until a publisher procedure exists.
 - [x] PR #35 selective-run scope regression passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38845986311.
 - [x] PR #36 input data-quality gates merged; SQL Server 2022 CI passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38846860879.
-- [ ] PR #38 extends synthetic data-quality coverage for wrong-date PD/LGD/EAD/EIR/SCENARIO_WEIGHT rows and duplicate LGD/EAD/EIR grains; full CI status pending.
-- [ ] Add result-level calculation rerun idempotency tests after the calculation procedure exists.
-- [ ] Add true transactional atomicity/partial-write rollback tests after the output publication procedure exists.
+- [x] PR #38 wrong-date and duplicate-grain data-quality coverage merged; full SQL Server 2022 CI passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38847716284.
+- [ ] PR #39 ECL calculation formulas and publication procedures; SQL Server 2022 CI pending.
+- [x] Calculation rerun rejection test added in PR #39; result writes are in one transaction.
+- [ ] Add explicit fault-injection test proving partial calculation/publication writes roll back after a forced mid-write failure.
 
 ## Existing test coverage audit (2026-10-16)
 - `run_control_smoke_tests.sql`: lifecycle happy path, manifest sealing/immutability, successful reconciliation/publication milestones, and rejection of a transition out of PUBLISHED.
@@ -36,7 +37,8 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - `publication_gate_tests.sql`: rejects invalid lifecycle transitions after failed reconciliation/publication milestones; does not test output-write atomicity.
 - `selective_run_scope_tests.sql`: accepts in-scope synthetic rows and blocks product/pool mismatches.
 - `input_data_quality_tests.sql`: PR #36 covered ACCOUNT wrong-date handling and duplicate ACCOUNT/PD grains; PR #38 adds wrong-date coverage for PD/LGD/EAD/EIR/SCENARIO_WEIGHT and duplicate LGD/EAD/EIR grain rejection.
-- Gap confirmed: result-level calculation rerun idempotency and transactional publication atomicity require their respective procedures to exist.
+- `ecl_calculation_tests.sql`: PR #39 synthetic calculation coverage for Stage 1/2/3, scenario weighting, fractional discount time, retry rejection and publication rounding.
+- Gap remaining: explicit fault-injection rollback regression for a forced mid-write failure.
 
 ## Confirmed methodology
 - [x] Lifetime horizon ends at contractual maturity.
@@ -76,7 +78,8 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #35 | #22 | Selective-run scope regression | Merged; CI passed |
 | #36 | #23 | Input data-quality gates | Merged; SQL Server 2022 CI passed |
 | #37 | #24 | Reconcile roadmap and canonical contract | Merged |
-| Current | #25 | Complete input data-quality regression coverage | In review |
+| #38 | #25 | Complete input data-quality regression coverage | Merged; CI passed |
+| Current | #26 | Implement ECL calculation and publication v1 | In review |
 
 ## Next action
-Run the full SQL Server 2022 integration suite with PR #38 and inspect the test output. If green, the wrong-date and duplicate-grain coverage items are complete. Keep final ECL formulas blocked until the pre-calculation safety, publication lifecycle, and selective-scope gates are reviewed and green. Add result-level idempotency and true publication atomicity tests only after the corresponding procedures exist.
+Run the full SQL Server 2022 integration suite with PR #39. If green, review formula outputs against the synthetic expected values before merge. Add fault-injection rollback coverage for a forced mid-write failure; do not merge without the user's explicit authorization.
