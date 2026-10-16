@@ -72,7 +72,7 @@ jobs:
           done
           version=$(sqlcmd -S localhost,1433 -U sa -P "$SQLSERVER_TEST_PASSWORD" -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)" | tr -d '[:space:]')
           if [ "$version" != "16" ]; then
-            echo "Expected SQL Server 2022 major version 14; got: $version"
+            echo "Expected SQL Server 2022 major version 16; got: $version"
             exit 1
           fi
 
