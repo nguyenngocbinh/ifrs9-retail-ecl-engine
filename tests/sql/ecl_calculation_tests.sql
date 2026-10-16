@@ -92,10 +92,11 @@ BEGIN TRY
 
  /* Same RUN_ID must not be calculated twice; rejected retry leaves output unchanged. */
  SET @ERR=NULL;
- BEGIN TRY EXEC ecl_core.usp_CalculateECL @R; END TRY BEGIN CATCH SET @ERR=ERROR_NUMBER(); END CATCH;
- IF @ERR IS NULL THROW 52508,'Calculation retry on completed RUN_ID should be rejected.',1;
+ EXEC @ERR=ecl_core.usp_CalculateECL @R;
+ IF @ERR<>51515 THROW 52508,'Calculation retry on completed RUN_ID should return rejection status 51515.',1;
+ IF XACT_STATE()<>1 THROW 52509,'Rejected calculation retry must leave the caller transaction committable.',1;
  IF (SELECT COUNT(*) FROM ecl_result.ECLDetail WHERE RUN_ID=@R)<>15
-   THROW 52509,'Rejected calculation retry changed detail output.',1;
+   THROW 52513,'Rejected calculation retry changed detail output.',1;
 
  EXEC ecl_core.usp_PublishECL @R;
  SELECT @STATUS=RUN_STATUS FROM ecl_core.RunControl WHERE RUN_ID=@R;
