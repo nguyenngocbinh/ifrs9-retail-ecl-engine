@@ -1,5 +1,5 @@
 SET NOCOUNT ON;
-SET XACT_ABORT ON;
+SET XACT_ABORT OFF; -- Expected duplicate-key errors must not doom the fixture transaction.
 /* Synthetic-only input data-quality regression; requires migrations 001..004. */
 DECLARE @RUN_ID bigint, @PROCESS_DATE date='20261016', @WRONG_DATE date='20261015';
 DECLARE @WEIGHT_VERSION int=2147482991, @ERR int;
@@ -40,7 +40,7 @@ BEGIN TRY
    (RUN_ID,PROCESS_DATE,ACCOUNT_ID,CUSTOMER_ID,PRODUCT_TYPE,STAGE,POOL_ID,MATURITY_DATE,VERSION_ID,IS_ACTIVE,IS_POCI)
   VALUES(@RUN_ID,@PROCESS_DATE,'SYN-DQ-OK','SYN-CUST-DUP','MORTGAGE',1,'POOL-DQ','20271016',2,1,0);
  END TRY BEGIN CATCH SET @ERR=ERROR_NUMBER(); END CATCH;
- IF @ERR NOT IN(2601,2627) THROW 52400,'Duplicate account grain was not rejected by the canonical key.',1;
+ IF ISNULL(@ERR,-1) NOT IN(2601,2627) THROW 52400,'Duplicate account grain was not rejected by the canonical key.',1;
 
  SET @ERR=NULL;
  BEGIN TRY
