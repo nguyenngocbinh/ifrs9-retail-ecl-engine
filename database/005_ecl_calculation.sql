@@ -23,6 +23,21 @@ BEGIN
             @REQUESTED_PRODUCT_TYPE varchar(30), @REQUESTED_POOL_ID varchar(100),
             @DETAIL_COUNT bigint = 0, @ACCOUNT_COUNT bigint = 0;
 
+    /*
+       Fast rejection for a completed RUN_ID must happen before opening a transaction.
+       RAISERROR (unlike THROW with XACT_ABORT ON) does not doom a caller-owned
+       transaction, so an expected retry rejection cannot roll back the caller's
+       surrounding test/orchestration transaction. The locked in-transaction check
+       below remains as the concurrency guard.
+    */
+    IF EXISTS (SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID=@RUN_ID)
+       OR EXISTS (SELECT 1 FROM ecl_result.ECLAccount WHERE RUN_ID=@RUN_ID)
+       OR EXISTS (SELECT 1 FROM ecl_result.ECLPortfolioSummary WHERE RUN_ID=@RUN_ID)
+    BEGIN
+        RAISERROR('This RUN_ID already has calculation output; use a new RUN_ID for reruns.',16,1);
+        RETURN;
+    END;
+
     BEGIN TRY
         BEGIN TRANSACTION;
 
