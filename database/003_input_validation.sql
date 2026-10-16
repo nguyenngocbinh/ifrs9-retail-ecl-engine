@@ -51,6 +51,98 @@ BEGIN
     IF @RUN_STATUS <> 'VALIDATING'
         THROW 51301, 'Input validation requires run status VALIDATING.', 1;
 
+    /* Every staged input row must use the run's reporting date. The keys intentionally
+       exclude PROCESS_DATE, so a wrong-date row can otherwise coexist in a valid RUN_ID. */
+    INSERT INTO ecl_audit.ValidationError
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID,
+         SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE)
+    SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
+           a.PRODUCT_TYPE, a.ACCOUNT_ID, a.POOL_ID, NULL, NULL,
+           N'ACCOUNT input row PROCESS_DATE differs from the run reporting date.'
+    FROM ecl_stg.AccountSnapshot a
+    WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE <> @PROCESS_DATE
+      AND NOT EXISTS (
+          SELECT 1 FROM ecl_audit.ValidationError e
+          WHERE e.RUN_ID = @RUN_ID AND e.VALIDATION_CODE = 'INPUT_PROCESS_DATE_MISMATCH'
+            AND e.ACCOUNT_ID = a.ACCOUNT_ID AND e.ERROR_MESSAGE = N'ACCOUNT input row PROCESS_DATE differs from the run reporting date.'
+      );
+
+    INSERT INTO ecl_audit.ValidationError
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID,
+         SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE)
+    SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
+           a.PRODUCT_TYPE, p.ACCOUNT_ID, a.POOL_ID, p.SCENARIO_CODE, p.FORECAST_PERIOD,
+           N'PD input row PROCESS_DATE differs from the run reporting date.'
+    FROM ecl_stg.PDCurve p
+    JOIN ecl_stg.AccountSnapshot a ON a.RUN_ID = p.RUN_ID AND a.ACCOUNT_ID = p.ACCOUNT_ID
+    WHERE p.RUN_ID = @RUN_ID AND p.PROCESS_DATE <> @PROCESS_DATE
+      AND NOT EXISTS (
+          SELECT 1 FROM ecl_audit.ValidationError e
+          WHERE e.RUN_ID = @RUN_ID AND e.VALIDATION_CODE = 'INPUT_PROCESS_DATE_MISMATCH'
+            AND e.ACCOUNT_ID = p.ACCOUNT_ID AND e.SCENARIO_CODE = p.SCENARIO_CODE
+            AND e.FORECAST_PERIOD = p.FORECAST_PERIOD
+            AND e.ERROR_MESSAGE = N'PD input row PROCESS_DATE differs from the run reporting date.'
+      );
+
+    INSERT INTO ecl_audit.ValidationError
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID,
+         SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE)
+    SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
+           a.PRODUCT_TYPE, c.ACCOUNT_ID, a.POOL_ID, NULL, c.FORECAST_PERIOD,
+           N'LGD input row PROCESS_DATE differs from the run reporting date.'
+    FROM ecl_stg.LGDCurve c
+    JOIN ecl_stg.AccountSnapshot a ON a.RUN_ID = c.RUN_ID AND a.ACCOUNT_ID = c.ACCOUNT_ID
+    WHERE c.RUN_ID = @RUN_ID AND c.PROCESS_DATE <> @PROCESS_DATE
+      AND NOT EXISTS (
+          SELECT 1 FROM ecl_audit.ValidationError e
+          WHERE e.RUN_ID = @RUN_ID AND e.VALIDATION_CODE = 'INPUT_PROCESS_DATE_MISMATCH'
+            AND e.ACCOUNT_ID = c.ACCOUNT_ID AND e.FORECAST_PERIOD = c.FORECAST_PERIOD
+            AND e.ERROR_MESSAGE = N'LGD input row PROCESS_DATE differs from the run reporting date.'
+      );
+
+    INSERT INTO ecl_audit.ValidationError
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID,
+         SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE)
+    SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
+           a.PRODUCT_TYPE, c.ACCOUNT_ID, a.POOL_ID, NULL, c.FORECAST_PERIOD,
+           N'EAD input row PROCESS_DATE differs from the run reporting date.'
+    FROM ecl_stg.EADCurve c
+    JOIN ecl_stg.AccountSnapshot a ON a.RUN_ID = c.RUN_ID AND a.ACCOUNT_ID = c.ACCOUNT_ID
+    WHERE c.RUN_ID = @RUN_ID AND c.PROCESS_DATE <> @PROCESS_DATE
+      AND NOT EXISTS (
+          SELECT 1 FROM ecl_audit.ValidationError e
+          WHERE e.RUN_ID = @RUN_ID AND e.VALIDATION_CODE = 'INPUT_PROCESS_DATE_MISMATCH'
+            AND e.ACCOUNT_ID = c.ACCOUNT_ID AND e.FORECAST_PERIOD = c.FORECAST_PERIOD
+            AND e.ERROR_MESSAGE = N'EAD input row PROCESS_DATE differs from the run reporting date.'
+      );
+
+    INSERT INTO ecl_audit.ValidationError
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, FORECAST_PERIOD, ERROR_MESSAGE)
+    SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
+           NULL, N'EIR input row PROCESS_DATE differs from the run reporting date.'
+    FROM ecl_stg.EIRCurve c
+    WHERE c.RUN_ID = @RUN_ID AND c.PROCESS_DATE <> @PROCESS_DATE
+      AND NOT EXISTS (
+          SELECT 1 FROM ecl_audit.ValidationError e
+          WHERE e.RUN_ID = @RUN_ID AND e.VALIDATION_CODE = 'INPUT_PROCESS_DATE_MISMATCH'
+            AND e.ERROR_MESSAGE = N'EIR input row PROCESS_DATE differs from the run reporting date.'
+      );
+
+    INSERT INTO ecl_audit.ValidationError
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, ERROR_MESSAGE)
+    SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
+           N'SCENARIO_WEIGHT input row PROCESS_DATE differs from the run reporting date.'
+    WHERE EXISTS (
+        SELECT 1 FROM ecl_cfg.ScenarioWeight w
+        WHERE w.VERSION_ID = @WEIGHT_VERSION_ID AND w.IS_ACTIVE = 1
+          AND w.PROCESS_DATE <> @PROCESS_DATE
+    )
+      AND NOT EXISTS (
+          SELECT 1 FROM ecl_audit.ValidationError e
+          WHERE e.RUN_ID = @RUN_ID AND e.VALIDATION_CODE = 'INPUT_PROCESS_DATE_MISMATCH'
+            AND e.ERROR_MESSAGE = N'SCENARIO_WEIGHT input row PROCESS_DATE differs from the run reporting date.'
+      );
+
     IF NOT EXISTS (SELECT 1 FROM ecl_core.RunInputManifest WHERE RUN_ID = @RUN_ID AND IS_SEALED = 1)
     BEGIN
         INSERT INTO ecl_audit.ValidationError
