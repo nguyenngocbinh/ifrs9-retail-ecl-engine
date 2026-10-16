@@ -3,18 +3,33 @@
 Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 
 ## Working rules
-- [ ] Do not implement final ECL formulas until synthetic input regression tests pass and the supported SQL Server runtime gate is verified.
+- [ ] Do not implement final ECL formulas until the synthetic regression suite for rerun safety, publication gating/atomicity, and selective-run scope passes.
 - [x] Canonical schema and input forms are the agreed interface; the user will populate these tables.
 - [x] Use synthetic, privacy-safe test data only. No production source survey or source mapping is required for this phase.
-- [ ] Keep calculation logic in T-SQL compatible with SQL Server 2016.
+- [x] SQL Server 2022 is the CI runtime for this phase; SQL Server 2016 compatibility verification is not required.
 - [x] Update this roadmap and per-PR implementation log when scope/status changes.
 
 ## Current gates
 - [x] Canonical happy-path input test validates and reconciles all six manifest families without producing ECL output.
-- [x] Use an ephemeral SQL Server 2022 container on GitHub-hosted runners; no self-hosted runner or external SQL Server secrets required.
+- [x] SQL Server 2022 integration suite runs on an ephemeral container on GitHub-hosted runners.
 - [x] Scenario-weight effective-date and required-scenario boundary tests pass on SQL Server 2022 CI.
-- [x] All migrations/tests in the current suite passed on SQL Server 2022 CI after PR #30 merge; PR #31 adds lifecycle gate regression coverage.
-- [ ] SQL Server 2016 compatibility remains a separate deferred gate; do not claim it based on SQL Server 2017 results.
+- [x] Existing input validation, reconciliation, maturity/curve-coverage, and lifecycle regression tests pass on SQL Server 2022 CI.
+- [x] PR #31 lifecycle gate regression tests are merged; CI passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38843997785.
+- [ ] Add and pass explicit rerun-safety tests for result/output idempotency and audit side effects.
+- [ ] Add and pass publication-gate tests proving failed reconciliation cannot publish and no partial outputs remain.
+- [ ] Add and pass selective-run tests for valid requested scope and rejection of out-of-scope accounts.
+- [ ] Review whether remaining input data-quality cases (duplicate keys, invalid grain, and wrong-date rows) are covered before calculation implementation.
+
+## Existing test coverage audit (2026-10-16)
+- `run_control_smoke_tests.sql`: lifecycle happy path, manifest sealing/immutability, successful reconciliation/publication milestones, and rejection of a transition out of PUBLISHED.
+- `run_lifecycle_gate_tests.sql`: rejects CREATED -> CALCULATING and rejects calculation with an unsealed manifest; verifies status remains unchanged and no ECL detail is created.
+- `input_validation_smoke_tests.sql`: missing PD/LGD/EAD/EIR coverage and legacy POCI-related cases; no ECL detail on validation failure.
+- `input_reconciliation_smoke_tests.sql`: manifest count mismatch, blocked reconciliation, no ECL detail, and idempotence for a repeated mismatch finding.
+- `input_contract_regression_tests.sql`: invalid scenario-weight sum, EIR = -1, no ECL detail, and no duplicate selected validation findings on rerun.
+- `maturity_curve_coverage_tests.sql`: maturity boundary and period-2 curve coverage.
+- `scenario_weight_boundary_tests.sql`: ineffective scenario-weight version and missing required scenario.
+- `canonical_input_happy_path_tests.sql`: positive-path validation/reconciliation of all six input families without ECL output.
+- Gap confirmed: current tests do not explicitly prove result-level rerun idempotency, failed-reconciliation publication blocking/atomicity, or selective-run scope acceptance/rejection. These are the next test additions; do not duplicate the cases above.
 
 ## Confirmed methodology
 - [x] Lifetime horizon ends at contractual maturity.
@@ -34,7 +49,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #15 | #3 | Logical schema | Merged |
 | #16–17 | #4 | Run-control design | Integrated |
 | #18 | #5 | Run lifecycle and manifest | Merged |
-| #19 | #6 | Initial SQL Server 2017 CI | Merged historically; workflow superseded by SQL Server 2016 CI |
+| #19 | #6 | Initial SQL Server 2017 CI | Merged historically |
 | #20 | #7 | Input validation | Merged |
 | #21 | #8 | Input reconciliation | Merged; legacy POCI code is historical and out of scope |
 | #22 | #9 | Canonical input contract | Merged |
@@ -43,10 +58,11 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #25 | #12 | Remove approval gate | Merged |
 | #26 | #13 | Maturity/coverage tests | Merged |
 | #27 | #14 | EIR and Stage 3 convention | Merged |
-| #28 | #15 | Canonical happy-path test and SQL Server 2016 harness | Merged |
-| #29 | #16 | Scenario-weight boundary regression; temporary SQL Server 2017 container CI | Merged; SQL Server 2017 suite passed |
-| #30 | #17 | Switch hosted integration CI to SQL Server 2022 container | Merged; SQL Server 2022 CI passed |
-| #31 | #18 | Add lifecycle gate regression tests | Open; CI pending |
+| #28 | #15 | Canonical happy-path test and SQL Server 2016 harness | Merged; SQL Server 2016 verification not required |
+| #29 | #16 | Scenario-weight boundary regression | Merged |
+| #30 | #17 | Switch hosted integration CI to SQL Server 2022 container | Merged; CI passed |
+| #31 | #18 | Add lifecycle gate regression tests | Merged; CI passed |
+| — | #19 | Audit existing test coverage and reconcile roadmap | In review |
 
 ## Next action
-Complete PR #31 lifecycle gate regression tests. SQL Server 2022 CI is now verified for the existing suite; SQL Server 2016 compatibility remains a separate deferred gate. Do not implement final ECL formulas until the lifecycle/input regression suite is green and the supported runtime decision is explicitly closed. Upstream mapping is not a gate for the canonical-table phase; do not run a production source survey.
+Implement only the missing synthetic regression tests, in this order: (1) rerun safety, (2) publication gating/atomicity, (3) selective-run scope. Run the complete SQL Server 2022 CI suite. Do not implement final ECL formulas until these tests pass. Canonical-table input is the agreed interface; do not require upstream mapping or conduct a production source survey.
