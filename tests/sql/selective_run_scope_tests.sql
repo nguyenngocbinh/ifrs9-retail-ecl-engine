@@ -120,6 +120,9 @@ BEGIN TRY
     IF @SCOPE_FINDINGS <> 2
         THROW 52302, 'Expected exactly two selective scope findings: product mismatch and pool mismatch.', 1;
 
+    /* Commit fixtures before invoking a guarded procedure that rolls back its own transaction on rejection. */
+    COMMIT TRANSACTION;
+
     SET @EXPECTED_ERROR = NULL;
     BEGIN TRY
         EXEC ecl_core.usp_TransitionRunStatus @RUN_INVALID, 'CALCULATING', N'Scope violations must block calculation';
@@ -139,7 +142,6 @@ BEGIN TRY
        OR EXISTS (SELECT 1 FROM ecl_result.ECLPortfolioSummary WHERE RUN_ID IN (@RUN_VALID, @RUN_INVALID))
         THROW 52305, 'Selective-run scope tests must not generate ECL output rows.', 1;
 
-    ROLLBACK TRANSACTION;
     PRINT 'PASS: valid product/pool selective scope is accepted; product and pool mismatches are flagged and block calculation; no ECL outputs.';
 END TRY
 BEGIN CATCH
