@@ -92,7 +92,7 @@ BEGIN
              WHERE a.RUN_ID=@RUN_ID AND a.PROCESS_DATE=@PROCESS_DATE AND a.IS_ACTIVE=1
                AND (@RUN_TYPE='FULL' OR
                     (@REQUESTED_PRODUCT_TYPE IS NULL OR a.PRODUCT_TYPE=@REQUESTED_PRODUCT_TYPE)
-                    AND (@REQUESTED_POOL_ID IS NULL OR a.POOL_ID=@REQUESTED_POOL_ID));
+                    AND (@REQUESTED_POOL_ID IS NULL OR a.POOL_ID=@REQUESTED_POOL_ID)));
 
         IF @MAX_HORIZON > 120 THROW 51519, 'Forecast horizon exceeds the supported 120 annual periods.', 1;
 
