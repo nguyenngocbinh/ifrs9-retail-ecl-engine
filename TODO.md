@@ -3,7 +3,7 @@
 Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 
 ## Working rules
-- [ ] Do not implement final ECL formulas until the synthetic regression suite for rerun safety, publication gating/atomicity, and selective-run scope passes.
+- [ ] Do not implement final ECL formulas until the synthetic regression suite for rerun safety, publication lifecycle gating and selective-run scope tests pass; true output-write atomicity must wait for the publisher procedure.
 - [x] Canonical schema and input forms are the agreed interface; the user will populate these tables.
 - [x] Use synthetic, privacy-safe test data only. No production source survey or source mapping is required for this phase.
 - [x] SQL Server 2022 is the CI runtime for this phase; SQL Server 2016 compatibility verification is not required.
@@ -17,8 +17,8 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - [x] PR #31 lifecycle gate regression tests are merged; CI passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38843997785.
 - [x] PR #33 pre-calculation replay safety regression merged; SQL Server 2022 CI passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38845145233.
 - [ ] Add result-level calculation rerun idempotency tests after the calculation procedure exists; current suite cannot verify output replay before calculation is implemented.
-- [ ] Publication lifecycle regression added in PR #34: latest FAILED reconciliation blocks SUCCEEDED; failed publication blocks PUBLISHED; rejected transitions preserve status. Await CI/review. True output-write atomicity remains untestable until a publication procedure exists.
-- [ ] Add and pass selective-run tests for valid requested scope and rejection of out-of-scope accounts.
+- [x] PR #34 publication lifecycle gate regression merged; lifecycle rejection behavior is covered. True output-write atomicity remains untestable until a publication procedure exists.
+- [ ] PR #35 adds selective-run tests for accepted product/pool scope and rejection of product/pool mismatches; awaiting SQL Server 2022 CI and review.
 - [ ] Review whether remaining input data-quality cases (duplicate keys, invalid grain, and wrong-date rows) are covered before calculation implementation.
 
 ## Existing test coverage audit (2026-10-16)
@@ -30,7 +30,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - `maturity_curve_coverage_tests.sql`: maturity boundary and period-2 curve coverage.
 - `scenario_weight_boundary_tests.sql`: ineffective scenario-weight version and missing required scenario.
 - `canonical_input_happy_path_tests.sql`: positive-path validation/reconciliation of all six input families without ECL output.
-- Gap confirmed: result-level rerun idempotency cannot be verified until a calculation procedure exists. Publication lifecycle gate regression is now added in PR #34; true transactional atomicity of an output writer remains untestable until such a procedure exists. Selective-run scope acceptance/rejection remains untested. The pre-calculation replay test now covers combined successful validation/reconciliation replay without duplicating the existing single-finding idempotency cases.
+- Gap confirmed: result-level rerun idempotency cannot be verified until a calculation procedure exists. PR #34 publication lifecycle gate regression is merged. True transactional atomicity of an output writer remains untestable until such a procedure exists. Selective-run scope regression is added in PR #35 and awaits CI/review. The pre-calculation replay test now covers combined successful validation/reconciliation replay without duplicating the existing single-finding idempotency cases.
 
 ## Confirmed methodology
 - [x] Lifetime horizon ends at contractual maturity.
@@ -64,7 +64,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #30 | #17 | Switch hosted integration CI to SQL Server 2022 container | Merged; CI passed |
 | #31 | #18 | Add lifecycle gate regression tests | Merged; CI passed |
 | #32 | #19 | Audit existing test coverage and reconcile roadmap | Merged |
-| #33 | #20 | Pre-calculation replay safety regression | Merged; SQL Server 2022 CI passed |\n| #34 | #21 | Publication lifecycle gate regression | In review |
+| #33 | #20 | Pre-calculation replay safety regression | Merged; SQL Server 2022 CI passed |\n| #34 | #21 | Publication lifecycle gate regression | Merged; CI status to be confirmed |\n| #35 | #22 | Selective-run scope regression | In review |
 
 ## Next action
-Next: review/merge PR #34 after CI passes; then (1) selective-run scope tests. True publication transaction atomicity and result-level rerun idempotency must be tested once their respective procedures exist. Result-level calculation rerun idempotency must be tested once the calculation procedure exists. Run the complete SQL Server 2022 CI suite. Do not implement final ECL formulas until the pre-calculation safety, publication, and selective-scope gates pass. Canonical-table input is the agreed interface; do not require upstream mapping or conduct a production source survey.
+Next: review/merge PR #35 after CI passes. True publication transaction atomicity and result-level rerun idempotency must be tested once their respective procedures exist. Result-level calculation rerun idempotency must be tested once the calculation procedure exists. Run the complete SQL Server 2022 CI suite. Do not implement final ECL formulas until the pre-calculation safety, publication, and selective-scope gates pass. Canonical-table input is the agreed interface; do not require upstream mapping or conduct a production source survey.
