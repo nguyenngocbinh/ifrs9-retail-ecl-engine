@@ -114,7 +114,6 @@ BEGIN TRY
   THROW 52409,'Wrong-date EAD row was not recorded as a fatal input contract violation.',1;
  IF NOT EXISTS(SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID=@RUN_ID
    AND VALIDATION_CODE='INPUT_PROCESS_DATE_MISMATCH' AND SEVERITY='FATAL'
-   AND FORECAST_PERIOD=1
    AND ERROR_MESSAGE=N'EIR input row PROCESS_DATE differs from the run reporting date.')
   THROW 52410,'Wrong-date EIR row was not recorded as a fatal input contract violation.',1;
  IF NOT EXISTS(SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID=@RUN_ID
