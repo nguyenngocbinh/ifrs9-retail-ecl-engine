@@ -3,7 +3,7 @@
 Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 
 ## Working rules
-- [ ] Do not implement final ECL formulas until synthetic input regression tests pass and SQL Server 2016 compatibility is verified.
+- [ ] Do not implement final ECL formulas until synthetic input regression tests pass and the supported SQL Server runtime gate is verified.
 - [x] Canonical schema and input forms are the agreed interface; the user will populate these tables.
 - [x] Use synthetic, privacy-safe test data only. No production source survey or source mapping is required for this phase.
 - [ ] Keep calculation logic in T-SQL compatible with SQL Server 2016.
@@ -11,9 +11,10 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 
 ## Current gates
 - [x] Canonical happy-path input test validates and reconciles all six manifest families without producing ECL output.
-- [x] SQL Server 2017 CI was used historically, but its workflow is now removed and replaced by SQL Server 2016 integration testing.
-- [ ] Scenario-weight effective-date and required-scenario boundary tests pass on SQL Server 2016.
-- [ ] All migrations/tests pass on a controlled SQL Server 2016 runner.
+- [x] Temporarily use an ephemeral SQL Server 2017 container on GitHub-hosted runners; no self-hosted runner or external SQL Server secrets required.
+- [ ] Scenario-weight effective-date and required-scenario boundary tests pass on SQL Server 2017 CI.
+- [ ] All migrations/tests pass on SQL Server 2017 CI.
+- [ ] SQL Server 2016 compatibility remains a separate deferred gate; do not claim it based on SQL Server 2017 results.
 
 ## Confirmed methodology
 - [x] Lifetime horizon ends at contractual maturity.
@@ -43,7 +44,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #26 | #13 | Maturity/coverage tests | Merged |
 | #27 | #14 | EIR and Stage 3 convention | Merged |
 | #28 | #15 | Canonical happy-path test and SQL Server 2016 harness | Merged |
-| #29 | #16 | Scenario-weight boundary regression; replace SQL Server 2017 CI with SQL Server 2016 | Open; awaiting SQL Server 2016 runner CI |
+| #29 | #16 | Scenario-weight boundary regression; temporary SQL Server 2017 container CI | Open; CI pending |
 
 ## Next action
-Configure the controlled Windows self-hosted SQL Server 2016 runner and repository secrets, then verify the entire suite on SQL Server 2016. Do not implement final ECL formulas before the synthetic regression suite and SQL Server 2016 compatibility gates pass. Upstream mapping is not a gate for the canonical-table phase; do not run a production source survey.
+Run the SQL Server 2017 container workflow and resolve any test failures. SQL Server 2016 compatibility remains a separate gate; do not claim it from SQL Server 2017 results. Do not implement final ECL formulas before the synthetic regression suite and the required runtime gate pass. Upstream mapping is not a gate for the canonical-table phase; do not run a production source survey.
