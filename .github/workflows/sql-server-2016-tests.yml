@@ -1,84 +1,113 @@
-name: SQL Server 2016 compatibility tests
+name: SQL Server 2017 integration tests
 
 on:
+  pull_request:
+    paths:
+      - "database/**"
+      - "tests/sql/**"
+      - ".github/workflows/**"
+  push:
+    branches: [main]
+    paths:
+      - "database/**"
+      - "tests/sql/**"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  sql-server-2016:
-    name: Deploy migrations and run tests on SQL Server 2016
-    # Register a controlled Windows self-hosted runner with these labels.
-    # SQL Server 2016 and sqlcmd must already be installed on that runner.
-    runs-on: [self-hosted, windows, sql-server-2016]
+  sql-server-2017:
+    name: Deploy migrations and run tests on SQL Server 2017
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2017-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_PID: "Developer"
+          SA_PASSWORD: "CI_SQL_2017_Test!Only2026"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'CI_SQL_2017_Test!Only2026' -Q 'SELECT 1' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 18
+          --health-start-period 60s
+
     env:
-      SQLSERVER_2016_INSTANCE: ${{ secrets.SQLSERVER_2016_INSTANCE }}
-      SQLSERVER_2016_USER: ${{ secrets.SQLSERVER_2016_USER }}
-      SQLSERVER_2016_PASSWORD: ${{ secrets.SQLSERVER_2016_PASSWORD }}
+      SQLSERVER_TEST_PASSWORD: "CI_SQL_2017_Test!Only2026"
+      SQLSERVER_TEST_DATABASE: IFRS9_ECL_CI_${{ github.run_id }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify server version and prerequisites
-        shell: pwsh
+      - name: Install sqlcmd
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          if ([string]::IsNullOrWhiteSpace($env:SQLSERVER_2016_INSTANCE)) {
-            throw 'Set repository secret SQLSERVER_2016_INSTANCE to the test instance.'
-          }
-          if ([string]::IsNullOrWhiteSpace($env:SQLSERVER_2016_USER) -or
-              [string]::IsNullOrWhiteSpace($env:SQLSERVER_2016_PASSWORD)) {
-            throw 'Set SQLSERVER_2016_USER and SQLSERVER_2016_PASSWORD secrets for the disposable test instance.'
-          }
-          if (-not (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {
-            throw 'sqlcmd is not installed or not on PATH on the self-hosted runner.'
-          }
-          $version = & sqlcmd -S $env:SQLSERVER_2016_INSTANCE -U $env:SQLSERVER_2016_USER -P $env:SQLSERVER_2016_PASSWORD -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)"
-          if ($LASTEXITCODE -ne 0) { throw 'Unable to query SQL Server version.' }
-          $versionNumberText = $version | Where-Object { $_.Trim() -match '^\d+$' } | Select-Object -First 1
-          if (-not $versionNumberText -or [int]$versionNumberText -ne 13) {
-            throw "Expected SQL Server 2016 major version 13; server returned: $version"
-          }
+          set -euo pipefail
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/22.04/prod jammy main" | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
+          echo "/opt/mssql-tools18/bin" >> "$GITHUB_PATH"
+
+      - name: Wait for SQL Server and verify version
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if sqlcmd -S localhost,1433 -U sa -P "$SQLSERVER_TEST_PASSWORD" -C -b -Q "SET NOCOUNT ON; SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)" -h -1 -W; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "SQL Server did not become ready in time."
+              exit 1
+            fi
+            sleep 10
+          done
+          version=$(sqlcmd -S localhost,1433 -U sa -P "$SQLSERVER_TEST_PASSWORD" -C -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)" | tr -d '[:space:]')
+          if [ "$version" != "14" ]; then
+            echo "Expected SQL Server 2017 major version 14; got: $version"
+            exit 1
+          fi
 
       - name: Create isolated test database
-        shell: pwsh
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          $db = "IFRS9_ECL_CI_2016_${{ github.run_id }}"
-          "SQLSERVER_TEST_DATABASE=$db" | Out-File -FilePath $env:GITHUB_ENV -Append
-          & sqlcmd -S $env:SQLSERVER_2016_INSTANCE -U $env:SQLSERVER_2016_USER -P $env:SQLSERVER_2016_PASSWORD -b -Q "CREATE DATABASE [$db]"
-          if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated test database.' }
+          set -euo pipefail
+          sqlcmd -S localhost,1433 -U sa -P "$SQLSERVER_TEST_PASSWORD" -C -b -Q "CREATE DATABASE [$SQLSERVER_TEST_DATABASE]"
 
       - name: Deploy migrations and run all SQL tests
-        shell: pwsh
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          $scripts = @(
-            'database/001_create_logical_schema.sql',
-            'database/002_run_control.sql',
-            'database/003_input_validation.sql',
-            'tests/sql/run_control_smoke_tests.sql',
-            'tests/sql/input_validation_smoke_tests.sql',
-            'database/004_input_reconciliation.sql',
-            'tests/sql/input_reconciliation_smoke_tests.sql',
-            'tests/sql/input_contract_regression_tests.sql',
-            'tests/sql/maturity_curve_coverage_tests.sql',
-            'tests/sql/canonical_input_happy_path_tests.sql'
+          set -euo pipefail
+          scripts=(
+            "database/001_create_logical_schema.sql"
+            "database/002_run_control.sql"
+            "database/003_input_validation.sql"
+            "tests/sql/run_control_smoke_tests.sql"
+            "tests/sql/input_validation_smoke_tests.sql"
+            "database/004_input_reconciliation.sql"
+            "tests/sql/input_reconciliation_smoke_tests.sql"
+            "tests/sql/input_contract_regression_tests.sql"
+            "tests/sql/maturity_curve_coverage_tests.sql"
+            "tests/sql/canonical_input_happy_path_tests.sql"
+            "tests/sql/scenario_weight_boundary_tests.sql"
           )
-          foreach ($script in $scripts) {
-            Write-Host "Running $script"
-            & sqlcmd -S $env:SQLSERVER_2016_INSTANCE -U $env:SQLSERVER_2016_USER -P $env:SQLSERVER_2016_PASSWORD -b -d $env:SQLSERVER_TEST_DATABASE -i $script
-            if ($LASTEXITCODE -ne 0) { throw "SQL Server 2016 failed on $script" }
-          }
+          for script in "${scripts[@]}"; do
+            echo "Running $script"
+            sqlcmd -S localhost,1433 -U sa -P "$SQLSERVER_TEST_PASSWORD" -C -b -d "$SQLSERVER_TEST_DATABASE" -i "$script"
+          done
 
-      - name: Clean up isolated test database
+      - name: Drop isolated test database
         if: always()
-        shell: pwsh
+        shell: bash
         run: |
-          if ($env:SQLSERVER_TEST_DATABASE) {
-            & sqlcmd -S $env:SQLSERVER_2016_INSTANCE -U $env:SQLSERVER_2016_USER -P $env:SQLSERVER_2016_PASSWORD -b -Q "IF DB_ID(N'$env:SQLSERVER_TEST_DATABASE') IS NOT NULL BEGIN ALTER DATABASE [$env:SQLSERVER_TEST_DATABASE] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$env:SQLSERVER_TEST_DATABASE]; END"
-            if ($LASTEXITCODE -ne 0) { Write-Warning 'Could not automatically remove the test database; clean it up manually.' }
-          }
+          if [ -n "${SQLSERVER_TEST_DATABASE:-}" ] && command -v sqlcmd >/dev/null 2>&1; then
+            sqlcmd -S localhost,1433 -U sa -P "$SQLSERVER_TEST_PASSWORD" -C -b -Q "IF DB_ID(N'$SQLSERVER_TEST_DATABASE') IS NOT NULL BEGIN ALTER DATABASE [$SQLSERVER_TEST_DATABASE] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$SQLSERVER_TEST_DATABASE]; END" || echo "::warning::Could not drop the CI database; it will be removed with the disposable service container."
+          fi
