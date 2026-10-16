@@ -99,6 +99,7 @@ jobs:
             "tests/sql/canonical_input_happy_path_tests.sql"
             "tests/sql/scenario_weight_boundary_tests.sql"
             "tests/sql/run_lifecycle_gate_tests.sql"
+            "tests/sql/precalculation_rerun_safety_tests.sql"
           )
           for script in "${scripts[@]}"; do
             echo "Running $script"
