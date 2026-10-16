@@ -11,9 +11,9 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 
 ## Current gates
 - [x] Canonical happy-path input test validates and reconciles all six manifest families without producing ECL output.
-- [x] Temporarily use an ephemeral SQL Server 2017 container on GitHub-hosted runners; no self-hosted runner or external SQL Server secrets required.
-- [ ] Scenario-weight effective-date and required-scenario boundary tests pass on SQL Server 2017 CI.
-- [ ] All migrations/tests pass on SQL Server 2017 CI.
+- [x] Use an ephemeral SQL Server 2022 container on GitHub-hosted runners; no self-hosted runner or external SQL Server secrets required.
+- [ ] Scenario-weight effective-date and required-scenario boundary tests pass on SQL Server 2017 CI; rerun on SQL Server 2022 CI.
+- [ ] All migrations/tests passed on SQL Server 2017 CI; SQL Server 2022 CI verification is pending.
 - [ ] SQL Server 2016 compatibility remains a separate deferred gate; do not claim it based on SQL Server 2017 results.
 
 ## Confirmed methodology
@@ -44,7 +44,8 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #26 | #13 | Maturity/coverage tests | Merged |
 | #27 | #14 | EIR and Stage 3 convention | Merged |
 | #28 | #15 | Canonical happy-path test and SQL Server 2016 harness | Merged |
-| #29 | #16 | Scenario-weight boundary regression; temporary SQL Server 2017 container CI | Open; CI pending |
+| #29 | #16 | Scenario-weight boundary regression; temporary SQL Server 2017 container CI | Merged; SQL Server 2017 suite passed |
+| #30 | #17 | Switch hosted integration CI to SQL Server 2022 container | Open; CI pending |
 
 ## Next action
-Run the SQL Server 2017 container workflow and resolve any test failures. SQL Server 2016 compatibility remains a separate gate; do not claim it from SQL Server 2017 results. Do not implement final ECL formulas before the synthetic regression suite and the required runtime gate pass. Upstream mapping is not a gate for the canonical-table phase; do not run a production source survey.
+Run the SQL Server 2022 container workflow in PR #30 and resolve any test failures. SQL Server 2016 compatibility remains a separate gate; do not claim it from SQL Server 2017 results. Do not implement final ECL formulas before the synthetic regression suite and the required runtime gate pass. Upstream mapping is not a gate for the canonical-table phase; do not run a production source survey.
