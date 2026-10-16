@@ -16,11 +16,10 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - [x] Existing input validation, reconciliation, maturity/curve-coverage, lifecycle, and selective-scope regression tests are integrated into CI.
 - [x] PR #31 lifecycle gate regression passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38843997785.
 - [x] PR #33 pre-calculation replay safety regression passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38845145233.
-- [x] PR #34 publication lifecycle gate regression is merged; CI/atomic output writes are distinct concerns. True output-write atomicity remains untestable until a publisher procedure exists.
+- [x] PR #34 publication lifecycle gate regression is merged; true output-write atomicity remains untestable until a publisher procedure exists.
 - [x] PR #35 selective-run scope regression passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38845986311.
 - [x] PR #36 input data-quality gates merged; SQL Server 2022 CI passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38846860879.
-- [ ] Extend synthetic data-quality regression: wrong reporting dates for PD, LGD, EAD, EIR, and scenario-weight rows; duplicate logical-grain tests for LGD, EAD, and EIR. ACCOUNT/PD duplicate-grain coverage and an ACCOUNT wrong-date case already exist.
-- [ ] Run the full SQL Server 2022 suite after the next test-coverage PR and confirm all tests remain green.
+- [ ] PR #38 extends synthetic data-quality coverage for wrong-date PD/LGD/EAD/EIR/SCENARIO_WEIGHT rows and duplicate LGD/EAD/EIR grains; full CI status pending.
 - [ ] Add result-level calculation rerun idempotency tests after the calculation procedure exists.
 - [ ] Add true transactional atomicity/partial-write rollback tests after the output publication procedure exists.
 
@@ -36,7 +35,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - `precalculation_rerun_safety_tests.sql`: repeated validation/reconciliation keeps manifest and run state stable, creates no ECL output, and records one reconciliation event per attempt.
 - `publication_gate_tests.sql`: rejects invalid lifecycle transitions after failed reconciliation/publication milestones; does not test output-write atomicity.
 - `selective_run_scope_tests.sql`: accepts in-scope synthetic rows and blocks product/pool mismatches.
-- `input_data_quality_tests.sql`: ACCOUNT reporting-date mismatch and duplicate ACCOUNT/PD grains. Remaining coverage gaps are wrong-date rows for the other curve/config families and duplicate LGD/EAD/EIR grains.
+- `input_data_quality_tests.sql`: PR #36 covered ACCOUNT wrong-date handling and duplicate ACCOUNT/PD grains; PR #38 adds wrong-date coverage for PD/LGD/EAD/EIR/SCENARIO_WEIGHT and duplicate LGD/EAD/EIR grain rejection.
 - Gap confirmed: result-level calculation rerun idempotency and transactional publication atomicity require their respective procedures to exist.
 
 ## Confirmed methodology
@@ -76,7 +75,8 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #34 | #21 | Publication lifecycle gate regression | Merged |
 | #35 | #22 | Selective-run scope regression | Merged; CI passed |
 | #36 | #23 | Input data-quality gates | Merged; SQL Server 2022 CI passed |
-| Current | #24 | Correct stale roadmap and contract documentation | Proposed in this PR |
+| #37 | #24 | Reconcile roadmap and canonical contract | Merged |
+| Current | #25 | Complete input data-quality regression coverage | In review |
 
 ## Next action
-Next: add the remaining wrong-date and duplicate-grain synthetic tests for canonical input families, then run the full SQL Server 2022 suite. Keep calculation formulas blocked until the pre-calculation safety, publication lifecycle, and selective-scope regression gates are green. Add result-level idempotency and true publication atomicity tests only after the corresponding procedures exist. Do not add upstream source mapping/survey or SQL Server 2016 verification as gates.
+Run the full SQL Server 2022 integration suite with PR #38 and inspect the test output. If green, the wrong-date and duplicate-grain coverage items are complete. Keep final ECL formulas blocked until the pre-calculation safety, publication lifecycle, and selective-scope gates are reviewed and green. Add result-level idempotency and true publication atomicity tests only after the corresponding procedures exist.
