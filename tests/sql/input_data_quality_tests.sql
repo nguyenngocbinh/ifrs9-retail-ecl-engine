@@ -34,6 +34,7 @@ BEGIN TRY
  INSERT INTO ecl_stg.EIRCurve(RUN_ID,PROCESS_DATE,FORECAST_PERIOD,EIR,RATE_BASIS,VERSION_ID,IS_ACTIVE)
  VALUES(@RUN_ID,@PROCESS_DATE,1,0.05,'OTHER',1,1);
 
+ /* Duplicate logical-grain attempts: PROCESS_DATE/VERSION differences must not bypass the key. */
  SET @ERR=NULL;
  BEGIN TRY
   INSERT INTO ecl_stg.AccountSnapshot
@@ -47,7 +48,40 @@ BEGIN TRY
   INSERT INTO ecl_stg.PDCurve(RUN_ID,PROCESS_DATE,ACCOUNT_ID,SCENARIO_CODE,FORECAST_PERIOD,MARGINAL_PD,VERSION_ID,IS_ACTIVE)
   VALUES(@RUN_ID,@WRONG_DATE,'SYN-DQ-OK','BASE',1,0.025,2,1);
  END TRY BEGIN CATCH SET @ERR=ERROR_NUMBER(); END CATCH;
- IF @ERR NOT IN(2601,2627) THROW 52401,'Duplicate PD grain was not rejected by the canonical key.',1;
+ IF ISNULL(@ERR,-1) NOT IN(2601,2627) THROW 52401,'Duplicate PD grain was not rejected by the canonical key.',1;
+
+ SET @ERR=NULL;
+ BEGIN TRY
+  INSERT INTO ecl_stg.LGDCurve(RUN_ID,PROCESS_DATE,ACCOUNT_ID,FORECAST_PERIOD,LGD,VERSION_ID,IS_ACTIVE)
+  VALUES(@RUN_ID,@WRONG_DATE,'SYN-DQ-OK',1,0.45,2,1);
+ END TRY BEGIN CATCH SET @ERR=ERROR_NUMBER(); END CATCH;
+ IF ISNULL(@ERR,-1) NOT IN(2601,2627) THROW 52404,'Duplicate LGD grain was not rejected by the canonical key.',1;
+
+ SET @ERR=NULL;
+ BEGIN TRY
+  INSERT INTO ecl_stg.EADCurve(RUN_ID,PROCESS_DATE,ACCOUNT_ID,FORECAST_PERIOD,EAD,CURRENCY_CODE,VERSION_ID,IS_ACTIVE)
+  VALUES(@RUN_ID,@WRONG_DATE,'SYN-DQ-OK',1,1100000,'VND',2,1);
+ END TRY BEGIN CATCH SET @ERR=ERROR_NUMBER(); END CATCH;
+ IF ISNULL(@ERR,-1) NOT IN(2601,2627) THROW 52405,'Duplicate EAD grain was not rejected by the canonical key.',1;
+
+ SET @ERR=NULL;
+ BEGIN TRY
+  INSERT INTO ecl_stg.EIRCurve(RUN_ID,PROCESS_DATE,FORECAST_PERIOD,EIR,RATE_BASIS,VERSION_ID,IS_ACTIVE)
+  VALUES(@RUN_ID,@WRONG_DATE,1,0.06,'OTHER',2,1);
+ END TRY BEGIN CATCH SET @ERR=ERROR_NUMBER(); END CATCH;
+ IF ISNULL(@ERR,-1) NOT IN(2601,2627) THROW 52406,'Duplicate EIR grain was not rejected by the canonical key.',1;
+
+ /* Wrong-date rows use unique logical grains, so date validation is tested independently of PK rejection. */
+ UPDATE ecl_stg.PDCurve SET PROCESS_DATE=@WRONG_DATE
+ WHERE RUN_ID=@RUN_ID AND ACCOUNT_ID='SYN-DQ-OK' AND SCENARIO_CODE='BASE' AND FORECAST_PERIOD=1;
+ UPDATE ecl_stg.LGDCurve SET PROCESS_DATE=@WRONG_DATE
+ WHERE RUN_ID=@RUN_ID AND ACCOUNT_ID='SYN-DQ-OK' AND FORECAST_PERIOD=1;
+ UPDATE ecl_stg.EADCurve SET PROCESS_DATE=@WRONG_DATE
+ WHERE RUN_ID=@RUN_ID AND ACCOUNT_ID='SYN-DQ-OK' AND FORECAST_PERIOD=1;
+ UPDATE ecl_stg.EIRCurve SET PROCESS_DATE=@WRONG_DATE
+ WHERE RUN_ID=@RUN_ID AND FORECAST_PERIOD=1;
+ UPDATE ecl_cfg.ScenarioWeight SET PROCESS_DATE=@WRONG_DATE
+ WHERE VERSION_ID=@WEIGHT_VERSION AND SCENARIO_CODE='BASE';
 
  EXEC ecl_core.usp_RegisterRunInput @RUN_ID,'ACCOUNT','TEST','synthetic.account','v1',2,1,NULL;
  EXEC ecl_core.usp_RegisterRunInput @RUN_ID,'PD','TEST','synthetic.pd','v1',3,1,NULL;
@@ -60,15 +94,40 @@ BEGIN TRY
 
  IF NOT EXISTS(SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID=@RUN_ID
    AND VALIDATION_CODE='INPUT_PROCESS_DATE_MISMATCH' AND SEVERITY='FATAL'
-   AND ACCOUNT_ID='SYN-DQ-WRONG-DATE')
-  THROW 52402,'Wrong-date account row was not recorded as a fatal input contract violation.',1;
+   AND ACCOUNT_ID='SYN-DQ-WRONG-DATE'
+   AND ERROR_MESSAGE=N'ACCOUNT input row PROCESS_DATE differs from the run reporting date.')
+  THROW 52402,'Wrong-date ACCOUNT row was not recorded as a fatal input contract violation.',1;
+ IF NOT EXISTS(SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID=@RUN_ID
+   AND VALIDATION_CODE='INPUT_PROCESS_DATE_MISMATCH' AND SEVERITY='FATAL'
+   AND ACCOUNT_ID='SYN-DQ-OK' AND SCENARIO_CODE='BASE' AND FORECAST_PERIOD=1
+   AND ERROR_MESSAGE=N'PD input row PROCESS_DATE differs from the run reporting date.')
+  THROW 52407,'Wrong-date PD row was not recorded as a fatal input contract violation.',1;
+ IF NOT EXISTS(SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID=@RUN_ID
+   AND VALIDATION_CODE='INPUT_PROCESS_DATE_MISMATCH' AND SEVERITY='FATAL'
+   AND ACCOUNT_ID='SYN-DQ-OK' AND FORECAST_PERIOD=1
+   AND ERROR_MESSAGE=N'LGD input row PROCESS_DATE differs from the run reporting date.')
+  THROW 52408,'Wrong-date LGD row was not recorded as a fatal input contract violation.',1;
+ IF NOT EXISTS(SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID=@RUN_ID
+   AND VALIDATION_CODE='INPUT_PROCESS_DATE_MISMATCH' AND SEVERITY='FATAL'
+   AND ACCOUNT_ID='SYN-DQ-OK' AND FORECAST_PERIOD=1
+   AND ERROR_MESSAGE=N'EAD input row PROCESS_DATE differs from the run reporting date.')
+  THROW 52409,'Wrong-date EAD row was not recorded as a fatal input contract violation.',1;
+ IF NOT EXISTS(SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID=@RUN_ID
+   AND VALIDATION_CODE='INPUT_PROCESS_DATE_MISMATCH' AND SEVERITY='FATAL'
+   AND ERROR_MESSAGE=N'EIR input row PROCESS_DATE differs from the run reporting date.')
+  THROW 52410,'Wrong-date EIR row was not recorded as a fatal input contract violation.',1;
+ IF NOT EXISTS(SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID=@RUN_ID
+   AND VALIDATION_CODE='INPUT_PROCESS_DATE_MISMATCH' AND SEVERITY='FATAL'
+   AND ERROR_MESSAGE=N'SCENARIO_WEIGHT input row PROCESS_DATE differs from the run reporting date.')
+  THROW 52411,'Wrong-date SCENARIO_WEIGHT row was not recorded as a fatal input contract violation.',1;
+
  IF EXISTS(SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID=@RUN_ID)
     OR EXISTS(SELECT 1 FROM ecl_result.ECLAccount WHERE RUN_ID=@RUN_ID)
     OR EXISTS(SELECT 1 FROM ecl_result.ECLPortfolioSummary WHERE RUN_ID=@RUN_ID)
   THROW 52403,'Data-quality validation must not generate ECL output rows.',1;
 
  ROLLBACK TRANSACTION;
- PRINT 'PASS: wrong reporting date is fatal; duplicate account and PD grains are rejected; no ECL outputs.';
+ PRINT 'PASS: wrong dates for ACCOUNT/PD/LGD/EAD/EIR/SCENARIO_WEIGHT are fatal; duplicate ACCOUNT/PD/LGD/EAD/EIR grains are rejected; no ECL outputs.';
 END TRY
 BEGIN CATCH
  IF XACT_STATE()<>0 ROLLBACK TRANSACTION;
