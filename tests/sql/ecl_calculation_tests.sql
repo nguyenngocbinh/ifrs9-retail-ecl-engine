@@ -79,7 +79,12 @@ BEGIN TRY
  SELECT @ST2=ECL_LIFETIME FROM ecl_result.ECLAccount WHERE RUN_ID=@R AND ACCOUNT_ID='SYN-CALC-S2';
  SELECT @ST3=ECL_DEFAULT FROM ecl_result.ECLAccount WHERE RUN_ID=@R AND ACCOUNT_ID='SYN-CALC-S3';
  IF ABS(CONVERT(float,@ST1)-@EXPECTED1)>2 THROW 52503,'Stage 1 weighted 12-month ECL formula mismatch.',1;
- IF ABS(CONVERT(float,@ST2)-@EXPECTED2)>2 THROW 52504,'Stage 2 lifetime ECL or fractional final discount time mismatch.',1;
+ IF ABS(CONVERT(float,@ST2)-@EXPECTED2)>2
+ BEGIN
+   SELECT 'DEBUG_STAGE2' AS DIAGNOSTIC,@ST2 AS ACTUAL_ECL,@EXPECTED2 AS EXPECTED_ECL,
+          @ST2-@EXPECTED2 AS DIFFERENCE;
+   THROW 52504,'Stage 2 lifetime ECL or fractional final discount time mismatch.',1;
+ END;
  IF ABS(CONVERT(float,@ST3)-@EXPECTED3)>2 THROW 52505,'Stage 3 must use PD=1 and Stage 2 EAD/LGD/EIR discount logic.',1;
 
  SELECT @DF=DISCOUNT_FACTOR FROM ecl_result.ECLDetail
