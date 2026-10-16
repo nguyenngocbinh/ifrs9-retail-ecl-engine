@@ -98,6 +98,7 @@ jobs:
             "tests/sql/maturity_curve_coverage_tests.sql"
             "tests/sql/canonical_input_happy_path_tests.sql"
             "tests/sql/scenario_weight_boundary_tests.sql"
+            "tests/sql/run_lifecycle_gate_tests.sql"
           )
           for script in "${scripts[@]}"; do
             echo "Running $script"
