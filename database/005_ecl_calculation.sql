@@ -107,10 +107,10 @@ BEGIN
                    (@REQUESTED_PRODUCT_TYPE IS NULL OR a.PRODUCT_TYPE=@REQUESTED_PRODUCT_TYPE)
                    AND (@REQUESTED_POOL_ID IS NULL OR a.POOL_ID=@REQUESTED_POOL_ID))
               AND (
-                NOT EXISTS (SELECT 1 FROM ecl_stg.PDCurve p
+                (SELECT COUNT(DISTINCT p.SCENARIO_CODE) FROM ecl_stg.PDCurve p
                   WHERE p.RUN_ID=a.RUN_ID AND p.ACCOUNT_ID=a.ACCOUNT_ID AND p.FORECAST_PERIOD=n.N
                     AND p.PROCESS_DATE=@PROCESS_DATE AND p.IS_ACTIVE=1
-                    AND p.SCENARIO_CODE IN ('DOWNTURN','BASE','UPTURN'))
+                    AND p.SCENARIO_CODE IN ('DOWNTURN','BASE','UPTURN')) <> 3
                 OR NOT EXISTS (SELECT 1 FROM ecl_stg.LGDCurve l
                   WHERE l.RUN_ID=a.RUN_ID AND l.ACCOUNT_ID=a.ACCOUNT_ID AND l.FORECAST_PERIOD=n.N
                     AND l.PROCESS_DATE=@PROCESS_DATE AND l.IS_ACTIVE=1)
