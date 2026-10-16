@@ -1,6 +1,6 @@
 # Canonical input contract — v1
 
-Status: logical interface baseline. It does not claim that upstream source mappings or source-system evidence have been certified.
+Status: agreed logical interface baseline for the current implementation phase. Canonical tables and their forms are the input interface; the user will populate them. This document does not require production source surveys or upstream source-to-column mapping for this phase.
 
 ## 1. Run-wide invariants
 
@@ -35,9 +35,9 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 
 - Stage 1 output category: `ECL_12_MONTH`.
 - Stage 2 output category: `ECL_LIFETIME`.
-- Stage 3 output category: `ECL_DEFAULT`; use PD = 1 and the same annual EAD/LGD curves as Stage 2, then discount annual losses and aggregate.
+- Stage 3 output category: `ECL_DEFAULT`; follow the same calculation logic as Stage 2 with the only change being PD = 1. Use the same annual EAD/LGD curves, shared EIR, discount-time convention, discounting, and aggregation.
 - Stage 1, Stage 2 and Stage 3 use the same shared EIR curve and the same discount formula `DF(t)=1/(1+EIR(t))^t`. Stage 3 does not have a separate EIR curve or discount-rate rule.
-- The user's decision resolves the Stage 3 discount-rate convention. It does not independently certify upstream Stage 3 EAD/LGD timing or confirm that those curves are undiscounted; those source semantics must still be confirmed before Stage 3 calculation is enabled.
+- LGD inputs are defined as undiscounted in the canonical contract. No additional unresolved Stage 3 source-mapping or source-survey gate is imposed in this phase.
 
 ## 5. Scenario-weight configuration
 
@@ -54,11 +54,13 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 4. PD values are in [0,1]; LGD values are in [0,1]; EAD is non-negative and denominated in VND.
 5. One shared EIR value exists per required full forecast period and its supplied value is greater than -1 under the selected discount formula. Do not transform the value.
 6. The selected scenario-weight version is effective on `PROCESS_DATE`, contains all three scenarios and sums to 1 within the configured tolerance.
-7. Stage 3 uses the same EIR curve and discount formula as Stage 2. Confirm upstream EAD/LGD timing and discount status before enabling Stage 3 calculation.
+7. Stage 3 uses the same EAD/LGD curves and EIR discount convention as Stage 2, with PD=1 as the only calculation difference.
 8. No ECL formula or publication is enabled merely because structural checks pass.
 
-## 7. Explicitly unresolved items
+## 7. Current phase boundaries
 
-- Upstream source-to-column mapping and source owner confirmation.
-- Confirmation that upstream Stage 3 EAD/LGD curves have the agreed timing and are not pre-discounted.
-- Deployment and compatibility verification on SQL Server 2016. Current CI uses SQL Server 2017 and is not proof of SQL Server 2016 compatibility.
+- Canonical input tables/forms are the agreed interface. The user populates them; synthetic data is used for automated regression.
+- Upstream source-to-column mapping, source-owner evidence, and production database surveys are not required gates for this phase.
+- SQL Server 2022 is the CI target. SQL Server 2016 compatibility verification is not required.
+- POCI is outside the current canonical contract. Historical migrations/tests may retain legacy POCI behavior; do not alter those historical behaviors without a separate cleanup decision.
+- ECL calculation formulas and publication remain blocked until the safety regression gates are reviewed and green. Result-level rerun idempotency and transactional publication atomicity can only be tested after their respective procedures exist.
