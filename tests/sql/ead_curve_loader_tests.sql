@@ -43,7 +43,7 @@ BEGIN TRY
     VALUES
         (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-AUTO-001', NULL, 'AUTO', 2,
          'POOL-AUTO', '20271015', 1, 1, 0),
-        (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-PL-001', NULL, 'PERSONAL_LOAN', 2,
+        (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-PL-001', NULL, 'PERSONALLOAN', 2,
          'POOL-PL', '20281015', 1, 1, 0);
 
     INSERT INTO ecl_stg.EADCurveInput
