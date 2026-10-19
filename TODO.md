@@ -22,7 +22,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - [x] PR #38 wrong-date and duplicate-grain data-quality coverage merged; full SQL Server 2022 CI passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38847716284.
 - [x] PR #39 ECL calculation and publication v1 merged; keep the formula regression suite in SQL Server 2022 CI. Production deployment remains unverified.
 - [x] Calculation rerun rejection test added in PR #39; result writes are in one transaction.
-- [x] PR #41 adds a synthetic fault-injection regression for atomic rollback after a forced mid-write calculation failure; verify the linked Actions run before relying on its runtime result.
+- [x] PR #41 fault-injection rollback regression merged; SQL Server 2022 GitHub Actions run #39215971117 completed successfully: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/39215971117.
 
 ## Existing test coverage audit (2026-10-16)
 - `run_control_smoke_tests.sql`: lifecycle happy path, manifest sealing/immutability, successful reconciliation/publication milestones, and rejection of a transition out of PUBLISHED.
@@ -80,7 +80,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #37 | #24 | Reconcile roadmap and canonical contract | Merged |
 | #38 | #25 | Complete input data-quality regression coverage | Merged; CI passed |
 | #39 | #26 | Implement ECL calculation and publication v1 | Merged |
-| #41 | #27 | Fault-injection rollback regression | Merged; confirm Actions result before citing runtime validation |
+| #41 | #27 | Fault-injection rollback regression | Merged; SQL Server 2022 CI passed |
 | #42 | #28 | Reconcile README, roadmap, and implementation logs | In progress |
 
 ## Current next actions
