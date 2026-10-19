@@ -20,9 +20,9 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - [x] PR #35 selective-run scope regression passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38845986311.
 - [x] PR #36 input data-quality gates merged; SQL Server 2022 CI passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38846860879.
 - [x] PR #38 wrong-date and duplicate-grain data-quality coverage merged; full SQL Server 2022 CI passed: https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/actions/runs/38847716284.
-- [ ] PR #39 ECL calculation formulas and publication procedures; SQL Server 2022 CI pending.
+- [x] PR #39 ECL calculation and publication v1 merged; keep the formula regression suite in SQL Server 2022 CI. Production deployment remains unverified.
 - [x] Calculation rerun rejection test added in PR #39; result writes are in one transaction.
-- [ ] Add explicit fault-injection test proving partial calculation/publication writes roll back after a forced mid-write failure.
+- [x] PR #41 adds a synthetic fault-injection regression for atomic rollback after a forced mid-write calculation failure; verify the linked Actions run before relying on its runtime result.
 
 ## Existing test coverage audit (2026-10-16)
 - `run_control_smoke_tests.sql`: lifecycle happy path, manifest sealing/immutability, successful reconciliation/publication milestones, and rejection of a transition out of PUBLISHED.
@@ -79,7 +79,14 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #36 | #23 | Input data-quality gates | Merged; SQL Server 2022 CI passed |
 | #37 | #24 | Reconcile roadmap and canonical contract | Merged |
 | #38 | #25 | Complete input data-quality regression coverage | Merged; CI passed |
-| Current | #26 | Implement ECL calculation and publication v1 | In review |
+| #39 | #26 | Implement ECL calculation and publication v1 | Merged |
+| #41 | #27 | Fault-injection rollback regression | Merged; confirm Actions result before citing runtime validation |
+| #42 | #28 | Reconcile README, roadmap, and implementation logs | In progress |
 
-## Next action
-Run the full SQL Server 2022 integration suite with PR #39. If green, review formula outputs against the synthetic expected values before merge. Add fault-injection rollback coverage for a forced mid-write failure; do not merge without the user's explicit authorization.
+## Current next actions
+1. Reconcile the README and implementation logs with the merged calculation and rollback-test work (PR #42).
+2. Complete the step-by-step SQL Server deployment guide tracked in [Issue #40](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/40).
+3. Run migrations 001–005 and the complete synthetic calculate-and-publish flow against a clean, disposable SQL Server 2022 database; record the actual results and any blockers.
+4. Keep production readiness separate: environment-specific source mapping, approved scenario-weight provenance, permissions, performance, monitoring/retention, backup/restore and operational runbooks remain gated.
+
+Do not infer production deployment success from CI. Do not merge future PRs without explicit user authorization.
