@@ -138,8 +138,10 @@ BEGIN TRY
     DELETE FROM ecl_stg.EADCurve WHERE RUN_ID=@R;
     DELETE FROM ecl_stg.EIRCurve WHERE RUN_ID=@R;
     DELETE FROM ecl_stg.AccountSnapshot WHERE RUN_ID=@R;
+    DISABLE TRIGGER ecl_core.trg_RunInputManifestItem_Sealed ON ecl_core.RunInputManifestItem;
     DELETE FROM ecl_core.RunInputManifestItem WHERE RUN_ID=@R;
     DELETE FROM ecl_core.RunInputManifest WHERE RUN_ID=@R;
+    ENABLE TRIGGER ecl_core.trg_RunInputManifestItem_Sealed ON ecl_core.RunInputManifestItem;
     DELETE FROM ecl_audit.ValidationError WHERE RUN_ID=@R;
     DELETE FROM ecl_audit.RunEvent WHERE RUN_ID=@R;
     DELETE FROM ecl_core.RunControl WHERE RUN_ID=@R;
