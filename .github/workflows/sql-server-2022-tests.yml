@@ -105,6 +105,7 @@ jobs:
             "tests/sql/selective_run_scope_tests.sql"
             "tests/sql/input_data_quality_tests.sql"
             "tests/sql/ecl_calculation_tests.sql"
+            "tests/sql/ecl_calculation_rollback_fault_injection_tests.sql"
           )
           for script in "${scripts[@]}"; do
             echo "Running $script"
