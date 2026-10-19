@@ -1,8 +1,8 @@
 # IFRS 9 Retail ECL Engine
 
-Production-oriented IFRS 9 expected credit loss (ECL) calculation engine for retail lending products, implemented in T-SQL for SQL Server 2016.
+Production-oriented IFRS 9 expected credit loss (ECL) engine for retail lending, implemented in T-SQL. The current development and integration-test target is **SQL Server 2022**. Production deployment has not been verified by CI.
 
-> **Status:** Documentation and logical-schema proposal are under review. No ECL calculation procedure is implemented.
+> **Status:** ECL calculation and publication v1 are implemented in migrations 001–005. SQL Server 2022 regression coverage includes synthetic formula, lifecycle, input-quality, reconciliation, and calculation rollback tests. A reproducible database deployment guide and clean-database end-to-end verification remain outstanding.
 
 ## Scope
 
@@ -10,42 +10,41 @@ Products in scope: Mortgage, Auto, Credit Card, Personal Loan, and Other Retail.
 
 The engine consumes approved upstream data. It does not build PD, LGD, EAD, pool assignment, or Stage/SICR models.
 
-- PD: annual unconditional marginal PD on the original cohort, supplied upstream for Downturn, Base, and Upturn scenarios. **Do not prorate or rescale PD for a partial final forecast year.**
-- LGD: supplied upstream; currently assumed flat across scenarios.
-- EAD: supplied upstream as annual EAD at expected default, using a year-end convention; use the annual curve through each account's contractual maturity date. **Do not prorate or rescale EAD for a partial final forecast year.**
-- Partial final forecast year: calculate the remaining-month fraction as `remaining months / 12` and apply it **only to the discounting time/exponent**. For example, 3 full years plus 6 months means `t = 3.5` in `DF(t) = 1 / (1 + EIR(t))^t`. Use the applicable EIR from the shared EIR curve for that forecast period. This is the agreed simplified convention for v1.
-- Currency: VND; retain internal precision and round final published ECL to whole VND.
-- Stage / SICR and pool: supplied upstream.
-- Scenario weights are user-confirmed: Downturn 15.68%, Base 68.64%, Upturn 15.68%. Store immutable weight sets by `VERSION_ID`, `PROCESS_DATE`, effective dates and audit history; official external source/provenance will be added later. Scenario-weighted ECL = `ECL_DOWNTURN × 15.68% + ECL_BASE × 68.64% + ECL_UPTURN × 15.68%`.
-- SQL runtime: SQL Server 2016, T-SQL only. Python is not part of the calculation engine.
+- **PD:** annual unconditional marginal PD on the original cohort, supplied upstream by scenario. Do not prorate PD for a partial final forecast year.
+- **LGD:** supplied upstream; assumed flat across scenarios in v1.
+- **EAD:** supplied upstream as annual EAD at expected default, using a year-end convention. Do not prorate EAD for a partial final forecast year.
+- **Horizon:** Stage 1 uses 12-month ECL; Stage 2 and Stage 3 run to contractual maturity. Stage 3 uses PD = 1 and the same annual EAD/LGD/EIR curve convention as Stage 2.
+- **Discounting:** shared EIR curve and DF(t)=1/(1+EIR(t))^t. For a partial final year, the remaining-month fraction affects only discounting time/exponent.
+- **Scenario weights:** Downturn 15.68%, Base 68.64%, Upturn 15.68%. The selected immutable/versioned weight set is stored with run controls and audit data. Official external provenance remains a follow-up.
+- **Currency:** VND. Keep detail precision and round published account/summary ECL to whole VND.
+- **POCI:** excluded from v1; validation must not silently treat POCI as a regular loan.
 
-## Stage mapping
+## Implementation
 
-| Stage | ECL horizon | Output category |
-|---|---|---|
-| Stage 1 | 12-month ECL | `ECL_12_MONTH` |
-| Stage 2 | Lifetime ECL | `ECL_LIFETIME` |
-| Stage 3 | Lifetime/default ECL using PD = 1 | `ECL_DEFAULT` |
+Migrations are ordered database/001 through database/005:
 
-Stage outputs are mutually exclusive at account/reporting-date grain. Do not add `ECL_DEFAULT` again into `ECL_LIFETIME` when aggregating the portfolio. Stage 2 and Stage 3 lifetime calculations run through each account's contractual maturity date. POCI is excluded from v1. If a POCI account is detected, persist a validation finding at the configured severity; never silently calculate it as a regular loan. ERROR/FATAL blocks the run. WARN may allow continuation only after excluding the POCI account from calculation and explicitly reconciling the exclusion.
+1. Logical schema and canonical staging/result structures.
+2. Run control, lifecycle, and input manifest.
+3. Input validation.
+4. Input snapshot reconciliation.
+5. ECL calculation and publication procedures: ecl_core.usp_CalculateECL and ecl_core.usp_PublishECL.
 
-## Database design
+Review the migration headers and the SQL Server 2022 CI workflow for the exact files and test sequence. Deploy only into a disposable development/test database until the deployment guide, clean-database verification, and environment-specific approvals are complete.
 
-The proposed functional schemas are `ecl_cfg`, `ecl_stg`, `ecl_core`, `ecl_result`, and `ecl_audit`. Inputs are normalized into separate tables: PD at account/scenario/period, LGD and EAD at account/period, and shared EIR at period grain. Results use a shared product discriminator and are stored at account/run grain with a scenario-period detail layer.
+## Testing and deployment status
 
-See [Logical database schema v1.0](docs/database-schema-v1.0.md) and [initial SQL Server 2016 DDL](database/001_create_logical_schema.sql). The DDL is a review proposal and has not been deployed to a live SQL Server instance.
+- Synthetic SQL Server 2022 integration tests run in an ephemeral GitHub Actions SQL Server container.
+- CI success demonstrates the checked-in migrations/tests ran in that CI environment; it does **not** prove production readiness, successful deployment to another SQL Server, or SQL Server 2016 compatibility.
+- Never commit customer-identifiable data, credentials, or environment-specific secrets.
+- Use a new RUN_ID for a rerun; do not overwrite prior run outputs.
+- Deployment guide roadmap: [Issue #40](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/40).
 
-## Scenario and discounting assumptions
+## Development records
 
-Three scenario PD curves are supplied upstream; the engine must not derive scenario PD from `PD FWL ± 1 SE`. Standard error, if present in source data, is audit/control information only.
+- [Project roadmap](TODO.md)
+- [PR #39 — ECL calculation v1](docs/implementation-log/PR-039.md)
+- [PR #41 — Calculation rollback fault-injection regression](docs/implementation-log/PR-041.md)
 
-The selected discount factor is `DF(t) = 1 / (1 + EIR(t))^t`, where `t` is elapsed forecast time in years, including the remaining-month fraction for a partial final year. Only the discounting exponent/time uses that fraction; annual PD and EAD remain as supplied. EIR is shared across accounts, products and pools. Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and discounting/aggregation. These are recorded design decisions; this PR still does not implement calculation procedures.
+## Safety
 
-## Development sequence
-
-- PR #1: documentation foundation and methodology/open-question register.
-- PR #2: source inventory toolkit and templates (separate, reviewable change).
-- PR #3: functional schemas, normalized logical input tables, run/audit/output DDL proposal.
-- Later PRs: input quality gates, snapshot/version binding, calculation routines, deterministic synthetic tests, reconciliation, publication, deployment, and CI.
-
-No source survey is required to design the logical schema. Physical source mappings remain out of scope. Never include customer-identifiable data in public fixtures.
+Use synthetic, privacy-safe fixtures only. Do not run deployment scripts against a production database without environment approval, an approved backup/restore plan, and a reviewed deployment procedure.
