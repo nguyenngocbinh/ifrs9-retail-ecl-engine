@@ -135,9 +135,9 @@ Do not report the suite as passed until it has actually completed on your target
 
 The engine consumes upstream snapshots; it does not populate staging tables or build PD/LGD/EAD models. Each run needs complete snapshots for ACCOUNT, PD, LGD, EAD, EIR, and SCENARIO_WEIGHT.
 
-1. Load the staged snapshots for the intended RUN_ID and PROCESS_DATE.
-2. Create the run with ecl_core.usp_CreateRun and an effective scenario-weight version.
-3. Transition CREATED to VALIDATING with ecl_core.usp_TransitionRunStatus.
+1. Create the run with ecl_core.usp_CreateRun and an effective scenario-weight version; capture the returned RUN_ID.
+2. Transition CREATED to VALIDATING with ecl_core.usp_TransitionRunStatus.
+3. Load the staged snapshots for that RUN_ID and PROCESS_DATE.
 4. Register each input family using ecl_core.usp_RegisterRunInput with source system/object/version, expected row count, completeness flag, and optional content hash.
 5. Seal the manifest with ecl_core.usp_SealRunInputs.
 6. Run ecl_core.usp_ValidateRunInputs and inspect findings. ERROR/FATAL findings block calculation.
