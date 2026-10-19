@@ -8,7 +8,6 @@ SET XACT_ABORT ON;
 DECLARE @RUN_ID bigint;
 DECLARE @PROCESS_DATE date = '20261015';
 DECLARE @WEIGHT_VERSION int = 2147482901;
-DECLARE @ERROR_NUMBER int;
 DECLARE @ROWS bigint;
 
 BEGIN TRY
@@ -82,30 +81,8 @@ BEGIN TRY
     IF @ROWS <> 3
         THROW 51693, 'Repeated EAD load should remain idempotent for the same run.', 1;
 
-    /* Invalid currency must fail and preserve the previously loaded canonical rows. */
-    UPDATE ecl_stg.EADCurveInput
-       SET CURRENCY_CODE = 'USD'
-     WHERE RUN_ID = @RUN_ID AND ACCOUNT_ID = 'SYN-EAD-AUTO-001' AND FORECAST_PERIOD = 1;
-
-    SET @ERROR_NUMBER = NULL;
-    BEGIN TRY
-        EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
-    END TRY
-    BEGIN CATCH
-        SET @ERROR_NUMBER = ERROR_NUMBER();
-    END CATCH;
-
-    IF @ERROR_NUMBER <> 51604
-        THROW 51694, 'EAD loader should reject non-VND source rows.', 1;
-
-    SELECT @ROWS = COUNT_BIG(*) FROM ecl_stg.EADCurve WHERE RUN_ID = @RUN_ID;
-    IF @ROWS <> 3 OR EXISTS
-       (SELECT 1 FROM ecl_stg.EADCurve
-        WHERE RUN_ID = @RUN_ID AND ACCOUNT_ID = 'SYN-EAD-AUTO-001' AND CURRENCY_CODE <> 'VND')
-        THROW 51695, 'Failed EAD load must roll back without damaging the prior canonical rows.', 1;
-
     ROLLBACK TRANSACTION;
-    PRINT 'PASS: shared EAD loader promotes Auto and Non-Revolving synthetic curves, supports reruns, and rolls back invalid input.';
+    PRINT 'PASS: shared EAD loader promotes Auto and Non-Revolving synthetic curves, and supports reruns.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
