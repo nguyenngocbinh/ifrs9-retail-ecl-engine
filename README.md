@@ -2,7 +2,7 @@
 
 Production-oriented IFRS 9 expected credit loss (ECL) engine for retail lending, implemented in T-SQL. The current development and integration-test target is **SQL Server 2022**. Production deployment has not been verified by CI.
 
-> **Status:** ECL calculation and publication v1 are implemented in migrations 001–005; migration 006 adds the shared EAD curve loader. SQL Server 2022 regression coverage includes synthetic formula, lifecycle, input-quality, reconciliation, and calculation rollback tests. A reproducible database deployment guide and clean-database end-to-end verification remain outstanding.
+> **Status:** ECL calculation and publication v1 are implemented in migrations 001–005; migration 006 adds shared EAD curve validation. SQL Server 2022 regression coverage includes synthetic formula, lifecycle, input-quality, reconciliation, and calculation rollback tests. A reproducible database deployment guide and clean-database end-to-end verification remain outstanding.
 
 ## Scope
 
@@ -21,13 +21,13 @@ The engine consumes approved upstream data. It does not build PD, LGD, EAD, pool
 
 ## Implementation
 
-Migrations are ordered database/001 through database/005:
+Migrations are ordered database/001 through database/006:
 
 1. Logical schema and canonical staging/result structures.
 2. Run control, lifecycle, and input manifest.
 3. Input validation.
 4. Input snapshot reconciliation.
-5. ECL calculation and publication procedures: ecl_core.usp_CalculateECL and ecl_core.usp_PublishECL.\n6. Shared EAD intake and promotion: ecl_stg.EADCurveInput and ecl_core.usp_LoadEADCurve.
+5. ECL calculation and publication procedures: ecl_core.usp_CalculateECL and ecl_core.usp_PublishECL.\n6. Shared EAD validation: ecl_core.usp_LoadEADCurve validates rows already loaded into ecl_stg.EADCurve.
 
 Review the migration headers and the SQL Server 2022 CI workflow for the exact files and test sequence. Deploy only into a disposable development/test database until the deployment guide, clean-database verification, and environment-specific approvals are complete.
 
@@ -52,6 +52,6 @@ Use synthetic, privacy-safe fixtures only. Do not run deployment scripts against
 
 ## Shared EAD loading
 
-`ecl_core.usp_LoadEADCurve @RUN_ID` is product-agnostic. ETL/source-specific transformations first write normalized annual EAD rows to `ecl_stg.EADCurveInput` at the grain `RUN_ID + ACCOUNT_ID + FORECAST_PERIOD`. The procedure validates the run date, VND currency, non-negative EAD, and active-account coverage through maturity, then replaces that run's rows in `ecl_stg.EADCurve` in one transaction. `ecl_core.usp_CalculateECL` continues to consume the canonical table unchanged.
+Product-specific ETL calculates annual EAD and loads it directly into the canonical `ecl_stg.EADCurve` table at grain `RUN_ID + ACCOUNT_ID + FORECAST_PERIOD`. Then call `ecl_core.usp_LoadEADCurve @RUN_ID` to validate process date, VND currency, non-negative EAD, and active-account coverage through maturity, and to record the successful validation in `ecl_audit.RunEvent`.
 
-For Auto, the schedule-to-annual-period conversion remains in the Auto source adapter/ETL. For Non-Revolving loans, the corresponding source transformation writes the same normalized input contract. Do not load monthly schedule rows directly into `EADCurveInput`; it requires one EAD amount per account and forecast period. The loader does not calculate amortization or determine source-specific outstanding-balance semantics.
+There is no separate `EADCurveInput` table and no copy/promotion step. `ecl_core.usp_CalculateECL` continues to consume `ecl_stg.EADCurve` unchanged. Auto and Non-Revolving ETL share the same canonical output contract; the loader does not calculate amortization or infer source-specific outstanding-balance, settlement, write-off, or waiver semantics. Load a new run under a new `RUN_ID`; do not overwrite prior run inputs.
