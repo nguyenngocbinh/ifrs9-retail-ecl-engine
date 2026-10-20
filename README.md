@@ -27,7 +27,8 @@ Migrations are ordered database/001 through database/006:
 2. Run control, lifecycle, and input manifest.
 3. Input validation.
 4. Input snapshot reconciliation.
-5. ECL calculation and publication procedures: ecl_core.usp_CalculateECL and ecl_core.usp_PublishECL.\n6. Shared EAD validation: ecl_core.usp_LoadEADCurve validates rows already loaded into ecl_stg.EADCurve.
+5. ECL calculation and publication procedures: ecl_core.usp_CalculateECL and ecl_core.usp_PublishECL.
+6. Shared EAD validation: ecl_core.usp_LoadEADCurve validates rows already loaded into ecl_stg.EADCurve.
 
 Review the migration headers and the SQL Server 2022 CI workflow for the exact files and test sequence. Deploy only into a disposable development/test database until the deployment guide, clean-database verification, and environment-specific approvals are complete.
 
