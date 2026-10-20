@@ -1,12 +1,10 @@
--- DB2 LUW: calculate Auto EAD by contractual principal schedule.
--- Writes results to RM_RDM_MOP_PROD.TBL_AUTO_EAD_SCHEDULE.
--- PROCESS_DATE is the reporting/run date and is NOT the schedule table's PROCESS_DATE.
--- The schedule source is the latest available snapshot; align it to the reporting
--- date before using this as an approved production EAD source.
+-- DB2 LUW: calculate Non-Revolving EAD by contractual principal schedule.
+-- Writes results to RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE.
+-- This initial implementation uses the source fields and assumptions documented in README.
 --
 --#SET TERMINATOR @
 
-CREATE PROCEDURE RM_RDM_MOP_PROD.SP_CALC_AUTO_EAD
+CREATE PROCEDURE RM_RDM_MOP_PROD.SP_CALC_NONREVOLVING_EAD
 (
     IN P_PROCESS_DATE DATE
 )
@@ -14,10 +12,10 @@ LANGUAGE SQL
 MODIFIES SQL DATA
 BEGIN
 
-    DELETE FROM RM_RDM_MOP_PROD.TBL_AUTO_EAD_SCHEDULE
+    DELETE FROM RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE
     WHERE PROCESS_DATE = P_PROCESS_DATE;
 
-    INSERT INTO RM_RDM_MOP_PROD.TBL_AUTO_EAD_SCHEDULE
+    INSERT INTO RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE
     (
         PROCESS_DATE,
         ACCOUNT_NUMBER,
@@ -88,4 +86,4 @@ END
 --#SET TERMINATOR ;
 
 -- Example:
--- CALL RM_RDM_MOP_PROD.SP_CALC_AUTO_EAD(DATE('2026-09-30'));
+-- CALL RM_RDM_MOP_PROD.SP_CALC_NONREVOLVING_EAD(DATE('2026-09-30'));

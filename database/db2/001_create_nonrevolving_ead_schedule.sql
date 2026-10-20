@@ -1,8 +1,8 @@
--- DB2 LUW: Auto EAD schedule staging table
+-- DB2 LUW: Non-Revolving EAD schedule staging table.
 -- Separate upstream/staging adapter; this is not a SQL Server migration.
 -- Execute in the DB2 environment where TPBCSO_SEC source tables are available.
 
-CREATE TABLE RM_RDM_MOP_PROD.TBL_AUTO_EAD_SCHEDULE
+CREATE TABLE RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE
 (
     PROCESS_DATE                 DATE          NOT NULL,
     ACCOUNT_NUMBER               VARCHAR(50)   NOT NULL,
