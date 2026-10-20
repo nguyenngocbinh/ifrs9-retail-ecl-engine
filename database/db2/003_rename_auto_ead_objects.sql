@@ -1,0 +1,15 @@
+-- DB2 LUW migration: move existing Auto-named schedule table to Non-Revolving naming.
+-- Review dependencies and take a backup before execution.
+-- Run once, only if the old table exists and the target table does not.
+--
+-- DB2 RENAME TABLE is a standalone statement:
+-- RENAME TABLE RM_RDM_MOP_PROD.TBL_AUTO_EAD_SCHEDULE
+--     TO TBL_NONREVOLVING_EAD_SCHEDULE;
+--
+-- After the new procedure has been created and verified from
+-- 002_sp_calc_nonrevolving_ead.sql, retire the old procedure during an approved
+-- maintenance window using the exact routine signature in the target DB2 catalog:
+-- DROP PROCEDURE RM_RDM_MOP_PROD.SP_CALC_AUTO_EAD(DATE);
+--
+-- Do not execute the rename if TBL_NONREVOLVING_EAD_SCHEDULE already exists.
+-- The migration is intentionally manual to avoid overwriting existing production data.
