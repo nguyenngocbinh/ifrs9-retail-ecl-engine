@@ -39,12 +39,12 @@ BEGIN TRY
 
     INSERT INTO ecl_stg.AccountSnapshot
         (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, PRODUCT_TYPE, STAGE,
-         POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE, IS_POCI)
+         POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE)
     VALUES
         (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-AUTO-001', NULL, 'AUTO', 2,
-         'POOL-AUTO', '20271015', 1, 1, 0),
+         'POOL-AUTO', '20271015', 1, 1),
         (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-PL-001', NULL, 'PERSONALLOAN', 2,
-         'POOL-PL', '20281015', 1, 1, 0);
+         'POOL-PL', '20281015', 1, 1);
 
     /* Product-specific ETL inserts its calculated annual curve into the canonical table. */
     INSERT INTO ecl_stg.EADCurve
