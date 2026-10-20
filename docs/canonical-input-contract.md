@@ -64,3 +64,12 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 - SQL Server 2022 is the CI target. SQL Server 2016 compatibility verification is not required.
 - POCI is outside the current canonical contract. Historical migrations/tests may retain legacy POCI behavior; do not alter those historical behaviors without a separate cleanup decision.
 - ECL calculation formulas and publication remain blocked until the safety regression gates are reviewed and green. Result-level rerun idempotency and transactional publication atomicity can only be tested after their respective procedures exist.
+
+## 8. Shared EAD loading
+
+- Product-specific ETL calculates one annual EAD value per account and forecast period, then writes it directly into canonical `ecl_stg.EADCurve`. No separate `EADCurveInput` table is used.
+- The common procedure `ecl_core.usp_LoadEADCurve @RUN_ID` validates the rows already loaded into `ecl_stg.EADCurve` and records the successful validation in `ecl_audit.RunEvent`; it does not copy, transform, or calculate EAD.
+- The run's `PROCESS_DATE` must match the run control and account snapshot; currency must be VND; EAD must be non-negative.
+- Every active account must have active EAD rows for all annual forecast periods through maturity, with a maximum supported horizon of 120 periods.
+- Auto and Non-Revolving source ETL are responsible for source-specific schedule/balance transformations before inserting into the canonical table. The shared procedure does not infer settlement, write-off, waiver, or amortization semantics.
+- `ecl_core.usp_CalculateECL` continues to consume `ecl_stg.EADCurve` unchanged.
