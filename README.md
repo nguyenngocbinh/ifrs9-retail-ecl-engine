@@ -96,7 +96,7 @@ A rerun must use a **new `RUN_ID`**. Do not overwrite the inputs or results of a
 
 | Schema | Role | Main tables / objects | Questions it answers |
 |---|---|---|---|
-| `ecl_cfg` | Governed configuration | `ProductType`, `Scenario`, `ScenarioWeightVersion`, `ScenarioWeight` | Which products/scenarios/weights are allowed for this run? |
+| `ecl_cfg` | Governed configuration | `PoolName`, `Scenario`, `ScenarioWeightVersion`, `ScenarioWeight` | Which pools/scenarios/weights are allowed for this run? |
 | `ecl_stg` | Canonical input contract for a run | `AccountSnapshot`, `PDCurve`, `LGDCurve`, `EADCurve`, `EIRCurve` | Which account and annual curve rows were supplied to this run? |
 | `ecl_core` | Run control and processing logic | `RunControl`, `usp_CalculateECL`, `usp_PublishECL`, `usp_LoadEADCurve` | Is the run valid, what state is it in, and which controlled operation runs next? |
 | `ecl_result` | Calculation output | `ECLDetail`, `ECLAccount`, `ECLPortfolioSummary` | What was calculated at detail, account, pool, and product level? |
@@ -113,7 +113,7 @@ A rerun must use a **new `RUN_ID`**. Do not overwrite the inputs or results of a
 | `EIRCurve` | One forecast period shared across accounts | `RUN_ID + FORECAST_PERIOD` |
 | `ECLDetail` | One account, scenario, and period contribution | `RUN_ID + ACCOUNT_ID + SCENARIO_CODE + FORECAST_PERIOD` |
 | `ECLAccount` | One account result for a run | `RUN_ID + ACCOUNT_ID` |
-| `ECLPortfolioSummary` | One product, Stage, aggregation level, and pool key for a run | `RUN_ID + PRODUCT_TYPE + STAGE + AGGREGATION_LEVEL + POOL_ID` |
+| `ECLPortfolioSummary` | One pool name, Stage, aggregation level, and pool key for a run | `RUN_ID + POOL_NAME + STAGE + AGGREGATION_LEVEL + POOL_ID` |
 
 `RUN_ID` isolates each run; `PROCESS_DATE` identifies the reporting/as-of date; `VERSION_ID` tracks the selected input/configuration version; `IS_ACTIVE` supports controlled row selection but does not replace run isolation.
 
@@ -122,7 +122,7 @@ A rerun must use a **new `RUN_ID`**. Do not overwrite the inputs or results of a
 | Procedure | Responsibility | When to read/call it |
 |---|---|---|
 | `ecl_core.usp_LoadAccountStagePoolSource` | Expands customer-level Stage to contract-level Stage/Pool staging, joining by PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. | After upstream Stage data is ready. |
-| `ecl_core.usp_LoadAccountSnapshot` | Loads canonical account rows from Stage/Pool staging, reads contract `expiry_date` as MATURITY_DATE, and requires an approved `ecl_cfg.PoolProductTypeMap`. | After Stage/Pool staging and product mapping configuration. |
+| `ecl_core.usp_LoadAccountSnapshot` | Loads canonical account rows from Stage/Pool staging, reads contract `expiry_date` as MATURITY_DATE, and requires an approved `ecl_cfg.PoolPoolNameMap`. | After Stage/Pool staging and product mapping configuration. |
 | `ecl_core.usp_LoadEADCurve` | Validates EAD rows already loaded into canonical `ecl_stg.EADCurve`: run/date alignment, VND, non-negative values, account matching, and annual coverage through maturity; records an audit event. It does **not** calculate product-specific EAD or copy from a second staging table. | After product-specific ETL loads EAD, before calculation. |
 | `ecl_core.usp_CalculateECL` | Checks run state and required curves, calculates scenario × account × period contributions, writes detail/account/summary results, and records lifecycle/audit milestones in a transaction. | Main calculation step after input validation and loading. |
 | `ecl_core.usp_PublishECL` | Allows only a successful run to be published, checks that outputs exist, rounds account/summary amounts to whole VND at the publication boundary, and transitions the run to `PUBLISHED`. | After calculation and reconciliation succeed. |
@@ -132,7 +132,7 @@ For upstream DB2 Non-Revolving EAD, inspect `database/db2/README.md`, then `data
 
 ## 6. Upstream Stage and pool configuration
 
-Stage assignment from source buckets and segment-to-pool mapping are upstream responsibilities. See [Stage, segment and pool mapping](docs/stage-segment-pool-mapping.md) for bucket → Stage 1/2/3 rules, retail/corporate pool IDs, and the contract-level join from CUSTOMER_ODR_LRA_IRB to ODR_CONTRACT_LEVEL_IRB using PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. CONTRACT_ID becomes ACCOUNT_ID; source segment normalization and duplicate-expansion checks are documented. The upstream loaders are `database/upstream/001_load_account_stage_pool_source.sql` (`ecl_core.usp_LoadAccountStagePoolSource`) and `database/upstream/002_load_account_snapshot.sql` (`ecl_core.usp_LoadAccountSnapshot`). The first prepares Stage/Pool separately. The second reads `expiry_date` as `MATURITY_DATE` and loads canonical AccountSnapshot using an approved `ecl_cfg.PoolProductTypeMap` configuration. It deliberately fails when a pool lacks an approved product mapping; do not infer product types from pool names.
+Stage assignment from source buckets and segment-to-pool mapping are upstream responsibilities. See [Stage, segment and pool mapping](docs/stage-segment-pool-mapping.md) for bucket → Stage 1/2/3 rules, retail/corporate pool IDs, and the contract-level join from CUSTOMER_ODR_LRA_IRB to ODR_CONTRACT_LEVEL_IRB using PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. CONTRACT_ID becomes ACCOUNT_ID; source segment normalization and duplicate-expansion checks are documented. The upstream loaders are `database/upstream/001_load_account_stage_pool_source.sql` (`ecl_core.usp_LoadAccountStagePoolSource`) and `database/upstream/002_load_account_snapshot.sql` (`ecl_core.usp_LoadAccountSnapshot`). The first prepares Stage/Pool separately. The second reads `expiry_date` as `MATURITY_DATE` and loads canonical AccountSnapshot using an approved `ecl_cfg.PoolPoolNameMap` configuration. It deliberately fails when a pool lacks an approved product mapping; do not infer product types from pool names.
 
 ## 7. Core IFRS 9 calculation conventions
 
