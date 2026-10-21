@@ -21,7 +21,7 @@ This is a logical-to-canonical reference, not a requirement to inspect upstream 
 ACCOUNT
   Engine-generated: RUN_ID
   Load/run contract: PROCESS_DATE
-  Required source mapping: ACCOUNT_ID, PRODUCT_TYPE, STAGE, POOL_ID, MATURITY_DATE
+  Required source mapping: ACCOUNT_ID, POOL_NAME, STAGE, POOL_ID, MATURITY_DATE
   Optional source mapping: CUSTOMER_ID, source version/reference, active flag
   Target: ecl_stg.AccountSnapshot
 
