@@ -108,7 +108,6 @@ BEGIN
             WHERE a.RUN_ID = @RUN_ID
               AND a.PROCESS_DATE = @PROCESS_DATE
               AND a.IS_ACTIVE = 1
-              AND ISNULL(a.IS_POCI, 0) = 0
               AND
               (
                   h.HORIZON < 1
