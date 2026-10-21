@@ -35,7 +35,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - `canonical_input_happy_path_tests.sql`: positive-path validation/reconciliation of all six input families without ECL output.
 - `precalculation_rerun_safety_tests.sql`: repeated validation/reconciliation keeps manifest and run state stable, creates no ECL output, and records one reconciliation event per attempt.
 - `publication_gate_tests.sql`: rejects invalid lifecycle transitions after failed reconciliation/publication milestones; does not test output-write atomicity.
-- `selective_run_scope_tests.sql`: accepts in-scope synthetic rows and blocks product/pool mismatches.
+- `selective_run_scope_tests.sql`: accepts in-scope synthetic rows and blocks pool-name/pool-ID mismatches.
 - `input_data_quality_tests.sql`: PR #36 covered ACCOUNT wrong-date handling and duplicate ACCOUNT/PD grains; PR #38 adds wrong-date coverage for PD/LGD/EAD/EIR/SCENARIO_WEIGHT and duplicate LGD/EAD/EIR grain rejection.
 - `ecl_calculation_tests.sql`: PR #39 synthetic calculation coverage for Stage 1/2/3, scenario weighting, fractional discount time, retry rejection and publication rounding.
 - Gap remaining: explicit fault-injection rollback regression for a forced mid-write failure.
