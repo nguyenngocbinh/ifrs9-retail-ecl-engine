@@ -164,7 +164,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 8. `database/005_ecl_calculation.sql` — trace the core calculation and result writes.
 9. `database/006_ead_curve_loader.sql` — shared EAD contract validation.
 10. `database/007_pd_curve_loader.sql` — shared PD contract validation.
-10. [SQL Server deployment guide](docs/sql-server-deployment-guide.md) and [tests](tests/sql/) — deployment steps and examples of expected behavior.
+11. [SQL Server deployment guide](docs/sql-server-deployment-guide.md) and [tests](tests/sql/) — deployment steps and examples of expected behavior.
 
 **How to read a procedure:** start with its header/comments, parameters, run-state checks, validation queries, transaction boundary, main INSERT/UPDATE, audit writes, and error handling. Then follow the referenced table names back to the schema map above.
 
