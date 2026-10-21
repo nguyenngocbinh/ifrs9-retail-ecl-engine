@@ -36,14 +36,55 @@ Mapping này là business rule được cung cấp cho repo, không phải kết
 
 Lưu ý: query nguồn ở mục 4 chỉ lọc 7 segment Retail. Các pool Corporate (200–202) là cấu hình mapping riêng; query retail hiện tại không trả các segment Large/Medium/Small. Cần xác nhận nguồn upstream và mapping customer type của Corporate trước khi dùng chung trong một batch.
 
-## 4. SQL tham khảo: tạo account snapshot source
+## 4. SQL tham khảo: join Stage xuống cấp hợp đồng
 
-SQL dưới đây mô tả mapping; chỉ chạy khi đã xác nhận database/schema nguồn và quyền truy cập. Nó không ghi trực tiếp vào bảng canonical của engine vì cần ánh xạ thêm `ACCOUNT_ID`, `PRODUCT_TYPE`, `MATURITY_DATE`, `VERSION_ID` và `RUN_ID` từ các nguồn được phê duyệt.
+Nguồn Stage là bảng customer-level DEFAULT.dbo.CUSTOMER_ODR_LRA_IRB, còn tài khoản trong engine là hợp đồng từ DEFAULT.dbo.ODR_CONTRACT_LEVEL_IRB. Không được dùng CUSTOMER_ID làm ACCOUNT_ID: một khách hàng có thể có nhiều hợp đồng. Dùng CONTRACT_ID làm ACCOUNT_ID.
 
-```sql
+**Khóa join nghiệp vụ:** PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. Trong bảng customer-level, segment được lưu ở segment_odr_lv1. Trong đoạn ETL nguồn được cung cấp, segment của hợp đồng được chuẩn hóa từ segment_lv1, segment_lv2 và modul; CTE bên dưới đặt tên cột đã chuẩn hóa là segment_odr_lv1 để áp dụng đúng ba khóa join. Nếu bảng contract thực tế đã có cột chuẩn hóa segment_odr_lv1, có thể dùng trực tiếp cột đó và bỏ CTE chuẩn hóa tương ứng.
+
+Ví dụ dưới đây là SQL tham khảo cho phần Stage/Pool; nó không ghi vào canonical table. Cần xác nhận tên/cấu trúc cột thực tế và PRODUCT_TYPE, MATURITY_DATE, RUN_ID, VERSION_ID trước khi triển khai.
+
+~~~sql
 DECLARE @PROCESS_DATE date = '2026-09-30';
 
-WITH SegmentPool AS (
+WITH ContractNormalized AS (
+    SELECT
+        c.PROCESS_DATE,
+        c.CUSTOMER_ID,
+        c.CONTRACT_ID AS ACCOUNT_ID,
+        CASE
+            WHEN c.segment_lv1 IN (
+                'bigcorp 1', 'bigcorp 2', 'medium 1', 'medium 2',
+                'micro', 'small', 'upper 1', 'upper 2', 'micro sme'
+            ) THEN
+                CASE
+                    WHEN c.segment_lv1 IN ('bigcorp 1', 'bigcorp 2', 'upper 1', 'upper 2')
+                        THEN 'Large'
+                    WHEN c.segment_lv1 IN ('medium 1', 'medium 2')
+                        THEN 'Medium'
+                    WHEN c.segment_lv1 IN ('micro', 'small', 'micro sme')
+                        THEN 'Small'
+                END
+            WHEN c.segment_lv1 = 'khcn' OR (c.segment_lv1 IS NULL AND c.modul = 'cc')
+                THEN c.segment_lv2
+            WHEN c.segment_lv1 = 'nonbank'
+                THEN 'nonbank'
+            ELSE 'x'
+        END AS segment_odr_lv1
+    FROM [DEFAULT].[dbo].[ODR_CONTRACT_LEVEL_IRB] AS c
+    WHERE c.PROCESS_DATE = @PROCESS_DATE
+),
+StageMap AS (
+    SELECT *
+    FROM (VALUES
+        ('b1: mob <6 & dpd 0-30', 1),
+        ('b2: mob >=6 & dpd 0-30', 1),
+        ('b3: dpd 31-60', 2),
+        ('b4: dpd 61-90', 2),
+        ('b5: dpd >90', 3)
+    ) AS v(BUCKET, STAGE)
+),
+SegmentPool AS (
     SELECT *
     FROM (VALUES
         (100, 'RETAIL_LN_AUTO',       'RETAIL', 'Autoloan'),
@@ -57,44 +98,50 @@ WITH SegmentPool AS (
         (201, 'CORP_MEDIUM_LOAN',     'CORP_M', 'Medium'),
         (202, 'CORP_SMALL_LOAN',      'CORP_S', 'Small')
     ) AS v(POOL_ID, POOL_NAME, CUSTOMER_TYPE_MODEL, SEGMENT)
-),
-StageMap AS (
-    SELECT *
-    FROM (VALUES
-        ('b1: mob <6 & dpd 0-30', 1),
-        ('b2: mob >=6 & dpd 0-30', 1),
-        ('b3: dpd 31-60', 2),
-        ('b4: dpd 61-90', 2),
-        ('b5: dpd >90', 3)
-    ) AS v(BUCKET, STAGE)
 )
 SELECT
-    src.process_date,
-    src.customer_id,
-    src.segment_odr_lv1 AS segment,
-    src.bucket,
+    c.PROCESS_DATE,
+    c.ACCOUNT_ID,
+    c.CUSTOMER_ID,
+    s.segment_odr_lv1,
+    s.bucket,
     sm.STAGE,
     sp.POOL_ID,
     sp.POOL_NAME,
     sp.CUSTOMER_TYPE_MODEL
-FROM [DEFAULT].[dbo].[CUSTOMER_ODR_LRA_IRB] AS src
+FROM ContractNormalized AS c
+LEFT JOIN [DEFAULT].[dbo].[CUSTOMER_ODR_LRA_IRB] AS s
+    ON  s.PROCESS_DATE = c.PROCESS_DATE
+    AND s.CUSTOMER_ID = c.CUSTOMER_ID
+    AND s.segment_odr_lv1 = c.segment_odr_lv1
 LEFT JOIN StageMap AS sm
-    ON sm.BUCKET = src.bucket
+    ON sm.BUCKET = s.bucket
 LEFT JOIN SegmentPool AS sp
-    ON sp.SEGMENT = src.segment_odr_lv1
-WHERE src.process_date = @PROCESS_DATE
-  AND src.segment_odr_lv1 IN (
-      'Autoloan',
-      'Consumer lending - secured',
-      'Consumer lending - unsecured',
-      'Mortgage',
-      'Others',
-      'CC',
-      'OD'
-  );
+    ON sp.SEGMENT = s.segment_odr_lv1
+WHERE c.PROCESS_DATE = @PROCESS_DATE;
+~~~
+
+Dùng LEFT JOIN để hợp đồng không tìm được Stage hoặc Pool vẫn xuất hiện trong kết quả kiểm tra. Không loại bỏ âm thầm các dòng lỗi trước khi nạp. Stage được đọc từ bucket đã xử lý xong trong bảng customer-level; không tính lại Stage từ DPD/MOB hợp đồng, vì các quy tắc nguồn còn có điều chỉnh riêng cho OD và Corporate.
+
+### SQL procedure triển khai tham khảo
+
+Đã bổ sung script `database/upstream/001_load_account_stage_pool_source.sql`. Sau khi chạy các migration core để tạo schema và bảng RunControl, script này tạo:
+
+- `ecl_stg.AccountStagePoolSource`: kết quả mapping Stage/Pool ở cấp hợp đồng, theo `RUN_ID + ACCOUNT_ID`.
+- `ecl_core.usp_LoadAccountStagePoolSource`: procedure đọc PROCESS_DATE từ RunControl, chuẩn hóa segment từ các trường nguồn, JOIN theo ba khóa yêu cầu và lưu kết quả mapping.
+
+Procedure sẽ chặn trường hợp trùng khóa nguồn, bucket không hợp lệ, hợp đồng thuộc segment được hỗ trợ nhưng không có bản ghi Stage, hoặc nạp lặp RUN_ID khi chưa yêu cầu thay thế. Các segment ngoài 10 pool đã cấu hình không được nạp vào bảng này.
+
+Ví dụ chạy trên môi trường dev/test sau khi tạo run:
+
+```sql
+EXEC ecl_core.usp_LoadAccountStagePoolSource
+    @RUN_ID = 123,       -- thay bằng RUN_ID đã tạo
+    @VERSION_ID = 1,     -- thay bằng version nguồn đã phê duyệt
+    @REPLACE_EXISTING = 0;
 ```
 
-Dùng `LEFT JOIN` để các dòng chưa mapping vẫn xuất hiện trong kết quả kiểm tra. Trước khi nạp chính thức, cần chặn run nếu Stage hoặc pool chưa mapping thay vì loại bỏ âm thầm những dòng này.
+Đây là bước staging Stage/Pool, chưa phải loader hoàn chỉnh cho `ecl_stg.AccountSnapshot`. Không chạy trực tiếp trên production trước khi xác minh tên cột vật lý, xử lý khóa trùng và kiểm thử trên database disposable. Cần bổ sung mapping `PRODUCT_TYPE` và `MATURITY_DATE` được phê duyệt trước khi hoàn tất canonical load.
 
 ## 5. Kiểm tra chất lượng trước khi nạp
 
@@ -115,9 +162,10 @@ ORDER BY segment, bucket;
 ```
 
 Checklist tối thiểu:
+- Mỗi hợp đồng khớp đúng một dòng customer-level theo PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1; không để JOIN nhân bản hợp đồng.
 - Mỗi dòng tài khoản có đúng một Stage hợp lệ trong (1, 2, 3).
 - Mỗi segment retail được chọn map đến đúng một `POOL_ID`.
-- Không có `customer_id` NULL hoặc trùng khóa ở grain đầu vào mà quy trình upstream phê duyệt.
+- Không có customer_id/contract_id NULL; kiểm tra trùng khóa ở grain nguồn và bảo đảm mỗi PROCESS_DATE + CONTRACT_ID tạo tối đa một dòng snapshot. Kiểm tra cả trường hợp bảng customer-level có nhiều dòng cho cùng PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1.
 - `PROCESS_DATE` đồng nhất với ngày của `ecl_core.RunControl`.
 - Snapshot có đủ `ACCOUNT_ID`, `PRODUCT_TYPE`, `MATURITY_DATE`, `RUN_ID`, `VERSION_ID`; quy tắc chuyển `CUSTOMER_ID` thành `ACCOUNT_ID` phải được xác nhận theo nguồn dữ liệu, không mặc định hai khóa này tương đương.
 - Kết quả Stage/pool mapping được lưu hoặc truy vết theo run để có thể tái lập và giải trình.
@@ -133,7 +181,7 @@ Khi chuẩn hóa upstream, các trường tối thiểu liên quan là:
 | `STAGE` | `StageMap` theo `src.bucket` |
 | `POOL_ID` | `SegmentPool.POOL_ID` |
 | `PRODUCT_TYPE` | Cần mapping riêng từ segment sang mã `ecl_cfg.ProductType`; không suy đoán chỉ từ `POOL_NAME` |
-| `ACCOUNT_ID` | Khóa tài khoản theo nguồn đã phê duyệt; `CUSTOMER_ID` chỉ dùng thay thế nếu business xác nhận đúng grain |
+| `ACCOUNT_ID` | `ODR_CONTRACT_LEVEL_IRB.CONTRACT_ID`; không dùng `CUSTOMER_ID` thay cho khóa hợp đồng |
 | `MATURITY_DATE` | Nguồn hợp đồng/khoản vay đã phê duyệt |
 | `RUN_ID`, `VERSION_ID`, `IS_ACTIVE` | Do quy trình điều phối và kiểm soát phiên bản upstream cấp |
 
@@ -141,7 +189,7 @@ Engine vẫn chịu trách nhiệm xác thực hợp đồng canonical, tính to
 
 ## 7. Điểm cần xác nhận trước khi triển khai
 
-1. Nguồn `CUSTOMER_ODR_LRA_IRB` có một dòng mỗi customer hay mỗi account? Nếu là customer-level, cần xác định cách chọn Stage/pool khi khách hàng có nhiều khoản vay.
+1. Xác nhận cột segment chuẩn hóa thực tế trong `ODR_CONTRACT_LEVEL_IRB`; ví dụ này tạo `segment_odr_lv1` từ `segment_lv1`, `segment_lv2`, `modul` theo quy tắc đã cung cấp.
 2. Có cần lọc Corporate từ một nguồn/segment khác hay không? Query retail mẫu hiện tại không gồm `Large`, `Medium`, `Small`.
 3. Mapping `SEGMENT` sang `PRODUCT_TYPE` nào được phê duyệt, đặc biệt với `Others`, `CC`, `OD`.
 4. `bucket` có phản ánh đầy đủ Stage/SICR theo chính sách IFRS 9 hiện hành không, và quy tắc xử lý bucket NULL/không biết là chặn run hay ngoại lệ được phê duyệt?
