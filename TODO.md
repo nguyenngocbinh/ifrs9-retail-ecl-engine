@@ -93,3 +93,11 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 5. Keep production readiness separate: environment-specific source mapping, approved scenario-weight provenance, permissions, performance, monitoring/retention, backup/restore and operational runbooks remain gated.
 
 Do not infer production deployment success from CI. Do not merge future PRs without explicit user authorization.
+
+
+## Upstream canonical account load
+- [x] Add `ecl_core.usp_LoadAccountStagePoolSource` to stage contract-level Stage/Pool rows separately.
+- [x] Add `ecl_core.usp_LoadAccountSnapshot` to populate canonical `ecl_stg.AccountSnapshot` from Stage/Pool staging and contract `expiry_date`.
+- [x] Require explicit `ecl_cfg.PoolProductTypeMap` configuration and fail closed for unmapped pools rather than guessing `PRODUCT_TYPE`.
+- [ ] Obtain business-approved product mappings for all in-scope pools; test both loaders against verified source DDL and synthetic/disposable SQL Server data.
+- [ ] Add SQL regression tests for successful load, missing mapping, invalid maturity, duplicate source contract, and guarded reload.
