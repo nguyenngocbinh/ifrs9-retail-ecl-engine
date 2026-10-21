@@ -96,7 +96,7 @@ Mỗi lần chạy lại phải sử dụng **`RUN_ID` mới**. Không ghi đè 
 
 | Schema | Vai trò | Bảng/đối tượng chính | Câu hỏi được trả lời |
 |---|---|---|---|
-| `ecl_cfg` | Cấu hình có kiểm soát | `ProductType`, `Scenario`, `ScenarioWeightVersion`, `ScenarioWeight` | Sản phẩm, kịch bản và bộ trọng số nào được phép dùng cho run? |
+| `ecl_cfg` | Cấu hình có kiểm soát | `PoolName`, `Scenario`, `ScenarioWeightVersion`, `ScenarioWeight` | Pool, kịch bản và bộ trọng số nào được phép dùng cho run? |
 | `ecl_stg` | Hợp đồng dữ liệu đầu vào chuẩn hóa theo run | `AccountSnapshot`, `PDCurve`, `LGDCurve`, `EADCurve`, `EIRCurve` | Run đang sử dụng những tài khoản và đường cong năm nào? |
 | `ecl_core` | Quản lý vòng đời run và logic xử lý | `RunControl`, `usp_CalculateECL`, `usp_PublishECL`, `usp_LoadEADCurve` | Run đang ở trạng thái nào và bước xử lý tiếp theo là gì? |
 | `ecl_result` | Kết quả tính toán | `ECLDetail`, `ECLAccount`, `ECLPortfolioSummary` | Kết quả chi tiết, theo tài khoản, pool và sản phẩm là bao nhiêu? |
@@ -113,7 +113,7 @@ Mỗi lần chạy lại phải sử dụng **`RUN_ID` mới**. Không ghi đè 
 | `EIRCurve` | Một kỳ dự báo dùng chung cho các tài khoản | `RUN_ID + FORECAST_PERIOD` |
 | `ECLDetail` | Đóng góp ECL của một tài khoản, kịch bản, kỳ | `RUN_ID + ACCOUNT_ID + SCENARIO_CODE + FORECAST_PERIOD` |
 | `ECLAccount` | Kết quả một tài khoản trong một run | `RUN_ID + ACCOUNT_ID` |
-| `ECLPortfolioSummary` | Một sản phẩm, Stage, cấp tổng hợp và khóa pool trong một run | `RUN_ID + PRODUCT_TYPE + STAGE + AGGREGATION_LEVEL + POOL_ID` |
+| `ECLPortfolioSummary` | Một pool name, Stage, cấp tổng hợp và khóa pool trong một run | `RUN_ID + POOL_NAME + STAGE + AGGREGATION_LEVEL + POOL_ID` |
 
 Các trường điều khiển cần nhớ:
 
@@ -127,7 +127,7 @@ Các trường điều khiển cần nhớ:
 | Procedure | Trách nhiệm | Thời điểm đọc/chạy |
 |---|---|---|
 | `ecl_core.usp_LoadAccountStagePoolSource` | Mở rộng Stage từ cấp khách hàng xuống hợp đồng và nạp Stage/Pool staging theo khóa PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. | Sau khi dữ liệu Stage nguồn sẵn sàng. |
-| `ecl_core.usp_LoadAccountSnapshot` | Nạp snapshot chuẩn từ bảng Stage/Pool, lấy `expiry_date` làm `MATURITY_DATE`, yêu cầu cấu hình `ecl_cfg.PoolProductTypeMap` đã được phê duyệt. | Sau khi nạp Stage/Pool và cấu hình mapping sản phẩm. |
+| `ecl_core.usp_LoadAccountSnapshot` | Nạp snapshot chuẩn từ bảng Stage/Pool, lấy `expiry_date` làm `MATURITY_DATE`, yêu cầu cấu hình `ecl_cfg.PoolPoolNameMap` đã được phê duyệt. | Sau khi nạp Stage/Pool và cấu hình mapping sản phẩm. |
 | `ecl_core.usp_LoadEADCurve` | Kiểm tra EAD đã được nạp trực tiếp vào `ecl_stg.EADCurve`: ngày xử lý, đơn vị VND, EAD không âm, tài khoản khớp snapshot và đủ các kỳ năm đến đáo hạn; ghi audit. Procedure **không** tự tính EAD theo sản phẩm và không sao chép từ một bảng staging trung gian khác. | Sau ETL EAD theo sản phẩm, trước bước tính ECL. |
 | `ecl_core.usp_CalculateECL` | Kiểm tra trạng thái run và độ đầy đủ đường cong; tính đóng góp ECL theo kịch bản × tài khoản × kỳ; ghi kết quả detail/account/summary và audit trong transaction. | Bước tính toán chính sau khi nạp và kiểm tra đầu vào. |
 | `ecl_core.usp_PublishECL` | Chỉ cho phép xuất bản run thành công, kiểm tra kết quả tồn tại, làm tròn số tiền kết quả tài khoản/tổng hợp về VND nguyên tại ranh giới xuất bản và chuyển trạng thái sang `PUBLISHED`. | Sau khi tính toán và đối soát đạt. |
@@ -137,7 +137,7 @@ Với EAD Non-Revolving xử lý upstream trên DB2, đọc theo thứ tự: `da
 
 ## 6. Cấu hình Stage và mapping pool upstream
 
-Quy tắc gán Stage từ bucket nguồn và mapping segment sang pool thuộc trách nhiệm upstream. Xem [Stage, segment và pool mapping](docs/stage-segment-pool-mapping.md) để biết mapping bucket → Stage 1/2/3 và cách mở rộng Stage xuống cấp hợp đồng bằng JOIN theo PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1 giữa CUSTOMER_ODR_LRA_IRB và ODR_CONTRACT_LEVEL_IRB. CONTRACT_ID được dùng làm ACCOUNT_ID; tài liệu cũng mô tả chuẩn hóa segment và kiểm tra tránh nhân bản hợp đồng. Hai script upstream là `database/upstream/001_load_account_stage_pool_source.sql` (`ecl_core.usp_LoadAccountStagePoolSource`) và `database/upstream/002_load_account_snapshot.sql` (`ecl_core.usp_LoadAccountSnapshot`). Procedure đầu nạp Stage/Pool vào bảng staging riêng. Procedure thứ hai lấy `expiry_date` của hợp đồng làm `MATURITY_DATE` và nạp `AccountSnapshot`, sử dụng cấu hình `ecl_cfg.PoolProductTypeMap` đã được phê duyệt. Procedure sẽ báo lỗi nếu pool chưa có mapping PRODUCT_TYPE; không tự suy đoán loại sản phẩm từ tên pool.
+Quy tắc gán Stage từ bucket nguồn và mapping segment sang pool thuộc trách nhiệm upstream. Xem [Stage, segment và pool mapping](docs/stage-segment-pool-mapping.md) để biết mapping bucket → Stage 1/2/3 và cách mở rộng Stage xuống cấp hợp đồng bằng JOIN theo PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1 giữa CUSTOMER_ODR_LRA_IRB và ODR_CONTRACT_LEVEL_IRB. CONTRACT_ID được dùng làm ACCOUNT_ID; tài liệu cũng mô tả chuẩn hóa segment và kiểm tra tránh nhân bản hợp đồng. Hai script upstream là `database/upstream/001_load_account_stage_pool_source.sql` (`ecl_core.usp_LoadAccountStagePoolSource`) và `database/upstream/002_load_account_snapshot.sql` (`ecl_core.usp_LoadAccountSnapshot`). Procedure đầu nạp Stage/Pool vào bảng staging riêng. Procedure thứ hai lấy `expiry_date` của hợp đồng làm `MATURITY_DATE` và nạp `AccountSnapshot`, sử dụng cấu hình `ecl_cfg.PoolPoolNameMap` đã được phê duyệt. Procedure sẽ báo lỗi nếu pool chưa có mapping POOL_NAME; không tự suy đoán loại sản phẩm từ tên pool.
 
 ## 7. Các quy ước tính toán IFRS 9 chính
 
