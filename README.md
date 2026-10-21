@@ -59,7 +59,7 @@ mindmap
       ECLAccount
         One row per account and run
       ECLPortfolioSummary
-        Pool and product totals
+        Pool totals
     Controls
       Reconciliation
       ValidationError
@@ -84,7 +84,7 @@ flowchart TD
     D -->|Pass| E[Calculate account × scenario × period ECL]
     D -->|Fail| X[Record finding / fail run]
     E --> F[Aggregate scenarios and calculate account ECL]
-    F --> G[Aggregate by pool and product]
+    F --> G[Aggregate by pool]
     G --> H[Reconcile outputs and record audit events]
     H -->|Pass| I[Publish completed run]
     H -->|Fail| X
