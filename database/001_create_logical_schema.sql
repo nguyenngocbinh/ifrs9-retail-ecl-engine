@@ -27,12 +27,12 @@ IF SCHEMA_ID(N'ecl_result') IS NULL EXEC(N'CREATE SCHEMA ecl_result AUTHORIZATIO
 IF SCHEMA_ID(N'ecl_audit') IS NULL EXEC(N'CREATE SCHEMA ecl_audit AUTHORIZATION dbo;');
 GO
 
-CREATE TABLE ecl_cfg.ProductType (
-    PRODUCT_TYPE varchar(30) NOT NULL,
-    PRODUCT_NAME nvarchar(100) NOT NULL,
-    IS_ACTIVE bit NOT NULL CONSTRAINT DF_ProductType_IsActive DEFAULT (1),
-    CONSTRAINT PK_ProductType PRIMARY KEY CLUSTERED (PRODUCT_TYPE),
-    CONSTRAINT UQ_ProductType_Name UNIQUE (PRODUCT_NAME)
+CREATE TABLE ecl_cfg.PoolName (
+    POOL_NAME varchar(100) NOT NULL,
+    POOL_DESCRIPTION nvarchar(100) NOT NULL,
+    IS_ACTIVE bit NOT NULL CONSTRAINT DF_PoolName_IsActive DEFAULT (1),
+    CONSTRAINT PK_PoolName PRIMARY KEY CLUSTERED (POOL_NAME),
+    CONSTRAINT UQ_PoolName_Description UNIQUE (POOL_DESCRIPTION)
 );
 GO
 
@@ -81,7 +81,7 @@ CREATE TABLE ecl_core.RunControl (
     RUN_TYPE varchar(20) NOT NULL,
     RUN_STATUS varchar(20) NOT NULL,
     SCENARIO_WEIGHT_VERSION_ID int NOT NULL,
-    REQUESTED_PRODUCT_TYPE varchar(30) NULL,
+    REQUESTED_POOL_NAME varchar(100) NULL,
     REQUESTED_POOL_ID varchar(100) NULL,
     CALCULATION_VERSION varchar(30) NOT NULL,
     STARTED_AT datetime2(0) NOT NULL CONSTRAINT DF_RunControl_StartedAt DEFAULT (SYSUTCDATETIME()),
@@ -92,12 +92,12 @@ CREATE TABLE ecl_core.RunControl (
     CONSTRAINT PK_RunControl PRIMARY KEY CLUSTERED (RUN_ID),
     CONSTRAINT FK_RunControl_WeightVersion FOREIGN KEY (SCENARIO_WEIGHT_VERSION_ID)
         REFERENCES ecl_cfg.ScenarioWeightVersion(VERSION_ID),
-    CONSTRAINT FK_RunControl_Product FOREIGN KEY (REQUESTED_PRODUCT_TYPE)
-        REFERENCES ecl_cfg.ProductType(PRODUCT_TYPE),
+    CONSTRAINT FK_RunControl_PoolName FOREIGN KEY (REQUESTED_POOL_NAME)
+        REFERENCES ecl_cfg.PoolName(POOL_NAME),
     CONSTRAINT CK_RunControl_Type CHECK (RUN_TYPE IN ('FULL', 'SELECTIVE')),
     CONSTRAINT CK_RunControl_Status CHECK (RUN_STATUS IN ('CREATED','VALIDATING','VALIDATION_FAILED','CALCULATING','RECONCILIATION_FAILED','SUCCEEDED','PUBLISHED','FAILED','CANCELLED')),
     CONSTRAINT CK_RunControl_Finish CHECK (FINISHED_AT IS NULL OR FINISHED_AT >= STARTED_AT),
-    CONSTRAINT CK_RunControl_Selective CHECK (RUN_TYPE <> 'SELECTIVE' OR REQUESTED_PRODUCT_TYPE IS NOT NULL OR REQUESTED_POOL_ID IS NOT NULL)
+    CONSTRAINT CK_RunControl_Selective CHECK (RUN_TYPE <> 'SELECTIVE' OR REQUESTED_POOL_NAME IS NOT NULL OR REQUESTED_POOL_ID IS NOT NULL)
 );
 GO
 CREATE INDEX IX_RunControl_ProcessDate_Status
@@ -113,7 +113,7 @@ CREATE TABLE ecl_stg.AccountSnapshot (
     PROCESS_DATE date NOT NULL,
     ACCOUNT_ID varchar(100) NOT NULL,
     CUSTOMER_ID varchar(100) NULL,
-    PRODUCT_TYPE varchar(30) NOT NULL,
+    POOL_NAME varchar(100) NOT NULL,
     STAGE tinyint NOT NULL,
     POOL_ID varchar(100) NOT NULL,
     MATURITY_DATE date NOT NULL,
@@ -123,16 +123,16 @@ CREATE TABLE ecl_stg.AccountSnapshot (
     LOADED_AT datetime2(0) NOT NULL CONSTRAINT DF_AccountSnapshot_LoadedAt DEFAULT (SYSUTCDATETIME()),
     CONSTRAINT PK_AccountSnapshot PRIMARY KEY CLUSTERED (RUN_ID, ACCOUNT_ID),
     CONSTRAINT FK_AccountSnapshot_Run FOREIGN KEY (RUN_ID) REFERENCES ecl_core.RunControl(RUN_ID),
-    CONSTRAINT FK_AccountSnapshot_Product FOREIGN KEY (PRODUCT_TYPE) REFERENCES ecl_cfg.ProductType(PRODUCT_TYPE),
+    CONSTRAINT FK_AccountSnapshot_PoolName FOREIGN KEY (POOL_NAME) REFERENCES ecl_cfg.PoolName(POOL_NAME),
     CONSTRAINT CK_AccountSnapshot_Stage CHECK (STAGE IN (1,2,3))
 );
 GO
 CREATE INDEX IX_AccountSnapshot_Run_Product_Stage
-    ON ecl_stg.AccountSnapshot (RUN_ID, PRODUCT_TYPE, STAGE)
+    ON ecl_stg.AccountSnapshot (RUN_ID, POOL_NAME, STAGE)
     INCLUDE (POOL_ID, ACCOUNT_ID, VERSION_ID, IS_ACTIVE);
 CREATE INDEX IX_AccountSnapshot_Run_Pool
     ON ecl_stg.AccountSnapshot (RUN_ID, POOL_ID, ACCOUNT_ID)
-    INCLUDE (PRODUCT_TYPE, STAGE, VERSION_ID, IS_ACTIVE);
+    INCLUDE (POOL_NAME, STAGE, VERSION_ID, IS_ACTIVE);
 GO
 
 CREATE TABLE ecl_stg.PDCurve (
@@ -218,7 +218,7 @@ CREATE TABLE ecl_result.ECLDetail (
     SCENARIO_CODE varchar(20) NOT NULL,
     FORECAST_PERIOD smallint NOT NULL,
     STAGE tinyint NOT NULL,
-    PRODUCT_TYPE varchar(30) NOT NULL,
+    POOL_NAME varchar(100) NOT NULL,
     POOL_ID varchar(100) NOT NULL,
     PD_USED decimal(19,12) NOT NULL,
     LGD_USED decimal(19,12) NOT NULL,
@@ -243,11 +243,11 @@ CREATE TABLE ecl_result.ECLDetail (
 );
 GO
 CREATE INDEX IX_ECLDetail_Run_Product_Stage
-    ON ecl_result.ECLDetail (RUN_ID, PRODUCT_TYPE, STAGE)
+    ON ecl_result.ECLDetail (RUN_ID, POOL_NAME, STAGE)
     INCLUDE (ACCOUNT_ID, POOL_ID, SCENARIO_CODE, FORECAST_PERIOD, ECL_WEIGHTED);
 CREATE INDEX IX_ECLDetail_Run_Pool
     ON ecl_result.ECLDetail (RUN_ID, POOL_ID, SCENARIO_CODE, FORECAST_PERIOD)
-    INCLUDE (PRODUCT_TYPE, STAGE, ECL_WEIGHTED);
+    INCLUDE (POOL_NAME, STAGE, ECL_WEIGHTED);
 GO
 
 CREATE TABLE ecl_result.ECLAccount (
@@ -255,7 +255,7 @@ CREATE TABLE ecl_result.ECLAccount (
     PROCESS_DATE date NOT NULL,
     ACCOUNT_ID varchar(100) NOT NULL,
     CUSTOMER_ID varchar(100) NULL,
-    PRODUCT_TYPE varchar(30) NOT NULL,
+    POOL_NAME varchar(100) NOT NULL,
     POOL_ID varchar(100) NOT NULL,
     STAGE tinyint NOT NULL,
     ECL_12_MONTH decimal(28,8) NOT NULL CONSTRAINT DF_ECLAccount_ECL12 DEFAULT (0),
@@ -266,7 +266,7 @@ CREATE TABLE ecl_result.ECLAccount (
     CONSTRAINT PK_ECLAccount PRIMARY KEY CLUSTERED (RUN_ID, ACCOUNT_ID),
     CONSTRAINT FK_ECLAccount_Account FOREIGN KEY (RUN_ID, ACCOUNT_ID)
         REFERENCES ecl_stg.AccountSnapshot(RUN_ID, ACCOUNT_ID),
-    CONSTRAINT FK_ECLAccount_Product FOREIGN KEY (PRODUCT_TYPE) REFERENCES ecl_cfg.ProductType(PRODUCT_TYPE),
+    CONSTRAINT FK_ECLAccount_PoolName FOREIGN KEY (POOL_NAME) REFERENCES ecl_cfg.PoolName(POOL_NAME),
     CONSTRAINT CK_ECLAccount_Stage CHECK (STAGE IN (1,2,3)),
     CONSTRAINT CK_ECLAccount_Amounts CHECK (
         ECL_12_MONTH >= 0 AND ECL_LIFETIME >= 0 AND ECL_DEFAULT >= 0 AND ECL_TOTAL >= 0
@@ -274,17 +274,17 @@ CREATE TABLE ecl_result.ECLAccount (
 );
 GO
 CREATE INDEX IX_ECLAccount_Run_Product_Stage
-    ON ecl_result.ECLAccount (RUN_ID, PRODUCT_TYPE, STAGE)
+    ON ecl_result.ECLAccount (RUN_ID, POOL_NAME, STAGE)
     INCLUDE (POOL_ID, ECL_12_MONTH, ECL_LIFETIME, ECL_DEFAULT, ECL_TOTAL);
 CREATE INDEX IX_ECLAccount_Run_Pool
     ON ecl_result.ECLAccount (RUN_ID, POOL_ID)
-    INCLUDE (PRODUCT_TYPE, STAGE, ECL_TOTAL);
+    INCLUDE (POOL_NAME, STAGE, ECL_TOTAL);
 GO
 
 CREATE TABLE ecl_result.ECLPortfolioSummary (
     RUN_ID bigint NOT NULL,
     PROCESS_DATE date NOT NULL,
-    PRODUCT_TYPE varchar(30) NOT NULL,
+    POOL_NAME varchar(100) NOT NULL,
     AGGREGATION_LEVEL varchar(10) NOT NULL,
     POOL_ID varchar(100) NOT NULL,
     STAGE tinyint NOT NULL,
@@ -294,11 +294,10 @@ CREATE TABLE ecl_result.ECLPortfolioSummary (
     ECL_DEFAULT decimal(28,8) NOT NULL,
     ECL_TOTAL decimal(28,8) NOT NULL,
     CREATED_AT datetime2(0) NOT NULL CONSTRAINT DF_ECLPortfolioSummary_CreatedAt DEFAULT (SYSUTCDATETIME()),
-    CONSTRAINT PK_ECLPortfolioSummary PRIMARY KEY CLUSTERED (RUN_ID, PRODUCT_TYPE, STAGE, AGGREGATION_LEVEL, POOL_ID),
+    CONSTRAINT PK_ECLPortfolioSummary PRIMARY KEY CLUSTERED (RUN_ID, POOL_NAME, STAGE, AGGREGATION_LEVEL, POOL_ID),
     CONSTRAINT FK_ECLPortfolioSummary_Run FOREIGN KEY (RUN_ID) REFERENCES ecl_core.RunControl(RUN_ID),
-    CONSTRAINT FK_ECLPortfolioSummary_Product FOREIGN KEY (PRODUCT_TYPE) REFERENCES ecl_cfg.ProductType(PRODUCT_TYPE),
-    CONSTRAINT CK_ECLPortfolioSummary_Level CHECK (AGGREGATION_LEVEL IN ('PORTFOLIO','POOL')),
-    CONSTRAINT CK_ECLPortfolioSummary_Pool CHECK ((AGGREGATION_LEVEL = 'PORTFOLIO' AND POOL_ID = '__ALL_POOLS__') OR (AGGREGATION_LEVEL = 'POOL' AND POOL_ID <> '__ALL_POOLS__')),
+    CONSTRAINT CONSTRAINT CK_ECLPortfolioSummary_Level CHECK (AGGREGATION_LEVEL IN ('PORTFOLIO','POOL')),
+    CONSTRAINT CK_ECLPortfolioSummary_Pool CHECK ((AGGREGATION_LEVEL = 'PORTFOLIO' AND POOL_ID = '__ALL_POOLS__' AND POOL_NAME = '__ALL_POOLS__') OR (AGGREGATION_LEVEL = 'POOL' AND POOL_ID <> '__ALL_POOLS__' AND POOL_NAME <> '__ALL_POOLS__')),
     CONSTRAINT CK_ECLPortfolioSummary_Stage CHECK (STAGE IN (1,2,3)),
     CONSTRAINT CK_ECLPortfolioSummary_Count CHECK (ACCOUNT_COUNT >= 0),
     CONSTRAINT CK_ECLPortfolioSummary_Amounts CHECK (
@@ -307,7 +306,7 @@ CREATE TABLE ecl_result.ECLPortfolioSummary (
 );
 GO
 CREATE INDEX IX_ECLPortfolioSummary_Run_Stage
-    ON ecl_result.ECLPortfolioSummary (RUN_ID, STAGE, PRODUCT_TYPE)
+    ON ecl_result.ECLPortfolioSummary (RUN_ID, STAGE, POOL_NAME)
     INCLUDE (ACCOUNT_COUNT, ECL_TOTAL);
 GO
 
@@ -338,7 +337,7 @@ CREATE TABLE ecl_audit.ValidationError (
     PROCESS_DATE date NOT NULL,
     VALIDATION_CODE varchar(50) NOT NULL,
     SEVERITY varchar(10) NOT NULL,
-    PRODUCT_TYPE varchar(30) NULL,
+    POOL_NAME varchar(100) NULL,
     ACCOUNT_ID varchar(100) NULL,
     POOL_ID varchar(100) NULL,
     SCENARIO_CODE varchar(20) NULL,
@@ -352,19 +351,24 @@ CREATE TABLE ecl_audit.ValidationError (
 GO
 CREATE INDEX IX_ValidationError_Run_Severity
     ON ecl_audit.ValidationError (RUN_ID, SEVERITY, ERROR_ID)
-    INCLUDE (VALIDATION_CODE, PRODUCT_TYPE, ACCOUNT_ID, FORECAST_PERIOD);
+    INCLUDE (VALIDATION_CODE, POOL_NAME, ACCOUNT_ID, FORECAST_PERIOD);
 GO
 
-/* Seed logical product/scenario codes only. User-confirmed scenario weights must be
+/* Seed canonical pool names and scenario codes. User-confirmed scenario weights must be
    loaded as an immutable versioned config set with VERSION_ID, PROCESS_DATE,
    effective dates, and audit history: DOWNTURN=0.1568, BASE=0.6864, UPTURN=0.1568.
    External official source/provenance is pending and may be added later. */
-INSERT INTO ecl_cfg.ProductType (PRODUCT_TYPE, PRODUCT_NAME)
-VALUES ('MORTGAGE', N'Mortgage'),
-       ('AUTO', N'Auto'),
-       ('CREDITCARD', N'Credit Card'),
-       ('PERSONALLOAN', N'Personal Loan'),
-       ('OTHER', N'Other Retail');
+INSERT INTO ecl_cfg.PoolName (POOL_NAME, POOL_DESCRIPTION)
+VALUES ('RETAIL_LN_AUTO', N'Autoloan'),
+       ('RETAIL_LN_CONS_SEC', N'Consumer lending - secured'),
+       ('RETAIL_LN_CONS_UNSEC', N'Consumer lending - unsecured'),
+       ('RETAIL_LN_MORTGAGE', N'Mortgage'),
+       ('RETAIL_LN_OTHERS', N'Others'),
+       ('RETAIL_CARD', N'Credit card'),
+       ('RETAIL_OVERDRAFT', N'Overdraft'),
+       ('CORP_LARGE_LOAN', N'Large corporate loan'),
+       ('CORP_MEDIUM_LOAN', N'Medium corporate loan'),
+       ('CORP_SMALL_LOAN', N'Small corporate loan');
 
 INSERT INTO ecl_cfg.Scenario (SCENARIO_CODE, SCENARIO_NAME)
 VALUES ('DOWNTURN', N'Downturn'),
