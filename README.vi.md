@@ -4,7 +4,7 @@ Engine tính **tổn thất tín dụng dự kiến (Expected Credit Loss — EC
 
 **English:** [README.md](README.md)
 
-> **Trạng thái hiện tại:** Phần tính toán và xuất bản ECL v1 nằm trong migration 001–005; migration 006 bổ sung kiểm tra đường cong EAD dùng chung. CI có kiểm thử SQL Server 2022 bằng dữ liệu giả lập về công thức, vòng đời run, chất lượng đầu vào, đối soát và rollback khi lỗi tính toán. Hướng dẫn triển khai có thể lặp lại và kiểm chứng end-to-end trên database sạch vẫn là các việc cần hoàn thiện.
+> **Trạng thái hiện tại:** Phần tính toán và xuất bản ECL v1 nằm trong migration 001–005; migration 006 bổ sung kiểm tra đường cong EAD dùng chung, migration 007 bổ sung kiểm tra đường cong PD dùng chung. CI có kiểm thử SQL Server 2022 bằng dữ liệu giả lập về công thức, vòng đời run, chất lượng đầu vào, đối soát và rollback khi lỗi tính toán. Hướng dẫn triển khai có thể lặp lại và kiểm chứng end-to-end trên database sạch vẫn là các việc cần hoàn thiện.
 
 ## 1. Hiểu hệ thống trong một phút
 
@@ -100,7 +100,7 @@ Mỗi lần chạy lại phải sử dụng **`RUN_ID` mới**. Không ghi đè 
 |---|---|---|---|
 | `ecl_cfg` | Cấu hình có kiểm soát | `PoolName`, `Scenario`, `ScenarioWeightVersion`, `ScenarioWeight` | Pool, kịch bản và bộ trọng số nào được phép dùng cho run? |
 | `ecl_stg` | Hợp đồng dữ liệu đầu vào chuẩn hóa theo run | `AccountSnapshot`, `PDCurve`, `LGDCurve`, `EADCurve`, `EIRCurve` | Run đang sử dụng những tài khoản và đường cong năm nào? |
-| `ecl_core` | Quản lý vòng đời run và logic xử lý | `RunControl`, `usp_CalculateECL`, `usp_PublishECL`, `usp_LoadEADCurve` | Run đang ở trạng thái nào và bước xử lý tiếp theo là gì? |
+| `ecl_core` | Quản lý vòng đời run và logic xử lý | `RunControl`, `usp_CalculateECL`, `usp_PublishECL`, `usp_LoadEADCurve`, `usp_LoadPDCurve` | Run đang ở trạng thái nào và bước xử lý tiếp theo là gì? |
 | `ecl_result` | Kết quả tính toán | `ECLDetail`, `ECLAccount`, `ECLPortfolioSummary` | Kết quả chi tiết, theo tài khoản, pool và toàn danh mục là bao nhiêu? |
 | `ecl_audit` | Truy vết và lưu ngoại lệ | `RunEvent`, `ValidationError` | Đã xảy ra việc gì, khi nào, xử lý bao nhiêu dòng và vì sao kiểm tra thất bại? |
 
@@ -131,6 +131,7 @@ Các trường điều khiển cần nhớ:
 | `ecl_core.usp_LoadAccountStagePoolSource` | Mở rộng Stage từ cấp khách hàng xuống hợp đồng và nạp Stage/Pool staging theo khóa PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. | Sau khi dữ liệu Stage nguồn sẵn sàng. |
 | `ecl_core.usp_LoadAccountSnapshot` | Nạp snapshot chuẩn từ bảng Stage/Pool, lấy `expiry_date` làm `MATURITY_DATE`, kiểm tra `POOL_NAME` với danh mục `ecl_cfg.PoolName`. | Sau khi nạp Stage/Pool. |
 | `ecl_core.usp_LoadEADCurve` | Kiểm tra EAD đã được nạp trực tiếp vào `ecl_stg.EADCurve`: ngày xử lý, đơn vị VND, EAD không âm, tài khoản khớp snapshot và đủ các kỳ năm đến đáo hạn; ghi audit. Procedure **không** tự tính EAD theo sản phẩm và không sao chép từ một bảng staging trung gian khác. | Sau ETL EAD theo sản phẩm, trước bước tính ECL. |
+| `ecl_core.usp_LoadPDCurve` | Kiểm tra PD biên theo kịch bản đã nạp vào `ecl_stg.PDCurve`: ngày xử lý, tài khoản khớp snapshot, PD trong [0,1], đủ Downturn/Base/Upturn và đủ kỳ năm đến đáo hạn; ghi audit. Procedure **không** tự suy luận mapping scenario nguồn hoặc tính PD. | Sau ETL PD nguồn, trước bước tính ECL. |
 | `ecl_core.usp_CalculateECL` | Kiểm tra trạng thái run và độ đầy đủ đường cong; tính đóng góp ECL theo kịch bản × tài khoản × kỳ; ghi kết quả detail/account/summary và audit trong transaction. | Bước tính toán chính sau khi nạp và kiểm tra đầu vào. |
 | `ecl_core.usp_PublishECL` | Chỉ cho phép xuất bản run thành công, kiểm tra kết quả tồn tại, làm tròn số tiền kết quả tài khoản/tổng hợp về VND nguyên tại ranh giới xuất bản và chuyển trạng thái sang `PUBLISHED`. | Sau khi tính toán và đối soát đạt. |
 | Các procedure quản lý run/validation | Tạo run, quản lý chuyển trạng thái, kiểm tra đầu vào chuẩn hóa, lưu lỗi kiểm tra và các mốc xử lý. Xem migration và định nghĩa procedure để biết chính xác tên/tham số. | Trước và trong quá trình tính toán/xuất bản. |
@@ -167,6 +168,7 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 7. `database/003_input_validation.sql` và `database/004_input_reconciliation.sql` — kiểm tra chất lượng và đối soát đầu vào.
 8. `database/005_ecl_calculation.sql` — theo dõi công thức tính và nơi ghi kết quả.
 9. `database/006_ead_curve_loader.sql` — kiểm tra hợp đồng EAD dùng chung.
+10. `database/007_pd_curve_loader.sql` — kiểm tra hợp đồng PD dùng chung.
 10. [SQL Server deployment guide](docs/sql-server-deployment-guide.md) và [tests](tests/sql/) — quy trình triển khai, tình huống kiểm thử và kết quả mong đợi.
 
 **Cách đọc một procedure:** bắt đầu từ comment/header, tham số, điều kiện trạng thái run, các câu truy vấn validation, ranh giới transaction, câu INSERT/UPDATE chính, audit và xử lý lỗi. Khi gặp tên bảng, đối chiếu ngược với bản đồ schema ở mục 4.
@@ -176,7 +178,7 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 | Đường dẫn | Nội dung |
 |---|---|
 | `README.md` / `README.vi.md` | Tổng quan tiếng Anh / tiếng Việt |
-| `database/001–006*.sql` | Các migration SQL Server theo thứ tự |
+| `database/001–007*.sql` | Các migration SQL Server theo thứ tự |
 | `database/db2/` | Script bảng và procedure EAD Non-Revolving upstream trên DB2 |
 | `database/upstream/` | SQL loader upstream trên SQL Server cho Stage/Pool staging và nạp AccountSnapshot chuẩn |
 | `docs/architecture.md` | Kiến trúc logic |
