@@ -55,7 +55,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | GitHub PR | Project PR | Scope | Status |
 |---|---:|---|---|
 | #48 | #29 | Document upstream Stage bucket rules and segment-to-pool mappings | Merged |
-| Follow-up PR | #30 | Document contract-level Stage expansion and join keys | In progress |
+| #49 | #30 | Add contract-level Stage/Pool SQL loader and document join keys | Open — SQL draft added; source-schema validation and CI/testing pending |
 | #1 | #1 | Documentation foundation | Merged |
 | #13 | #2 | Source inventory toolkit | Merged; no source survey |
 | #15 | #3 | Logical schema | Merged |
@@ -86,7 +86,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #42 | #28 | Reconcile README, roadmap, and implementation logs | In progress |
 
 ## Current next actions
-1. Review the follow-up PR documenting the contract-level Stage/Pool join using PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1.
+1. Review PR #49 for the contract-level Stage/Pool SQL loader; test it against a disposable SQL Server and verify source column names/duplicate keys before production use.
 2. Reconcile the README and implementation logs with the merged calculation and rollback-test work (PR #42).
 3. Complete the step-by-step SQL Server deployment guide tracked in [Issue #40](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/40).
 4. Run migrations 001–005 and the complete synthetic calculate-and-publish flow against a clean, disposable SQL Server 2022 database; record the actual results and any blockers.
