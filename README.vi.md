@@ -206,6 +206,7 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 - [PR #46 — Rename shared EAD objects](docs/implementation-log/PR-046.md)
 - [PR #47 — Upstream Stage and pool mapping](docs/implementation-log/PR-047.md)
 - [PR #49 — Contract-level Stage and pool join keys](docs/implementation-log/PR-049.md)
+- [PR #50 — Canonical POOL_NAME input and AccountSnapshot loader](docs/implementation-log/PR-050.md)
 
 ## An toàn
 
