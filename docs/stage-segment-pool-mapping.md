@@ -141,7 +141,31 @@ EXEC ecl_core.usp_LoadAccountStagePoolSource
     @REPLACE_EXISTING = 0;
 ```
 
-Đây là bước staging Stage/Pool, chưa phải loader hoàn chỉnh cho `ecl_stg.AccountSnapshot`. Không chạy trực tiếp trên production trước khi xác minh tên cột vật lý, xử lý khóa trùng và kiểm thử trên database disposable. Cần bổ sung mapping `PRODUCT_TYPE` và `MATURITY_DATE` được phê duyệt trước khi hoàn tất canonical load.
+Đây là bước staging Stage/Pool. Bước nạp canonical tiếp theo được triển khai trong `database/upstream/002_load_account_snapshot.sql`, procedure `ecl_core.usp_LoadAccountSnapshot`. Procedure này lấy `expiry_date` từ `ODR_CONTRACT_LEVEL_IRB` làm `MATURITY_DATE`, sau đó map `POOL_ID` sang `PRODUCT_TYPE` qua bảng cấu hình `ecl_cfg.PoolProductTypeMap`.
+
+Bảng cấu hình chỉ chứa các mapping được chủ sở hữu nghiệp vụ phê duyệt; không tự động seed các mapping còn mơ hồ. Ví dụ minh họa dưới đây chỉ gồm các trường hợp dễ nhận diện, cần xác nhận trước khi chạy:
+
+```sql
+-- Chỉ chạy các dòng đã được phê duyệt bởi chủ sở hữu taxonomy sản phẩm.
+INSERT INTO ecl_cfg.PoolProductTypeMap (POOL_ID, PRODUCT_TYPE)
+VALUES
+    ('RETAIL_LN_AUTO', 'AUTO'),
+    ('RETAIL_LN_MORTGAGE', 'MORTGAGE'),
+    ('RETAIL_CARD', 'CREDITCARD');
+```
+
+Các pool còn lại như `RETAIL_LN_CONS_SEC`, `RETAIL_LN_CONS_UNSEC`, `RETAIL_OVERDRAFT` và `RETAIL_LN_OTHERS` phải được phân loại chính thức sang `PERSONALLOAN` hoặc `OTHER` trước khi nạp toàn bộ danh mục. Procedure sẽ chặn load nếu còn pool chưa được mapping, `expiry_date` không hợp lệ, ngày đáo hạn trước ngày xử lý, khóa nguồn không duy nhất, hoặc manifest đã được seal mà yêu cầu thay thế dữ liệu.
+
+Ví dụ gọi procedure sau khi mapping đã đủ:
+
+```sql
+EXEC ecl_core.usp_LoadAccountSnapshot
+    @RUN_ID = 123,
+    @VERSION_ID = 1,
+    @REPLACE_EXISTING = 0;
+```
+
+Chạy trên môi trường dev/test trước. Cần xác minh tên cột vật lý, mapping sản phẩm, khóa trùng và kết quả trên database disposable trước khi triển khai production.
 
 ## 5. Kiểm tra chất lượng trước khi nạp
 
