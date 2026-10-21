@@ -126,6 +126,8 @@ Các trường điều khiển cần nhớ:
 
 | Procedure | Trách nhiệm | Thời điểm đọc/chạy |
 |---|---|---|
+| `ecl_core.usp_LoadAccountStagePoolSource` | Mở rộng Stage từ cấp khách hàng xuống hợp đồng và nạp Stage/Pool staging theo khóa PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. | Sau khi dữ liệu Stage nguồn sẵn sàng. |
+| `ecl_core.usp_LoadAccountSnapshot` | Nạp snapshot chuẩn từ bảng Stage/Pool, lấy `expiry_date` làm `MATURITY_DATE`, yêu cầu cấu hình `ecl_cfg.PoolProductTypeMap` đã được phê duyệt. | Sau khi nạp Stage/Pool và cấu hình mapping sản phẩm. |
 | `ecl_core.usp_LoadEADCurve` | Kiểm tra EAD đã được nạp trực tiếp vào `ecl_stg.EADCurve`: ngày xử lý, đơn vị VND, EAD không âm, tài khoản khớp snapshot và đủ các kỳ năm đến đáo hạn; ghi audit. Procedure **không** tự tính EAD theo sản phẩm và không sao chép từ một bảng staging trung gian khác. | Sau ETL EAD theo sản phẩm, trước bước tính ECL. |
 | `ecl_core.usp_CalculateECL` | Kiểm tra trạng thái run và độ đầy đủ đường cong; tính đóng góp ECL theo kịch bản × tài khoản × kỳ; ghi kết quả detail/account/summary và audit trong transaction. | Bước tính toán chính sau khi nạp và kiểm tra đầu vào. |
 | `ecl_core.usp_PublishECL` | Chỉ cho phép xuất bản run thành công, kiểm tra kết quả tồn tại, làm tròn số tiền kết quả tài khoản/tổng hợp về VND nguyên tại ranh giới xuất bản và chuyển trạng thái sang `PUBLISHED`. | Sau khi tính toán và đối soát đạt. |
@@ -135,7 +137,7 @@ Với EAD Non-Revolving xử lý upstream trên DB2, đọc theo thứ tự: `da
 
 ## 6. Cấu hình Stage và mapping pool upstream
 
-Quy tắc gán Stage từ bucket nguồn và mapping segment sang pool thuộc trách nhiệm upstream. Xem [Stage, segment và pool mapping](docs/stage-segment-pool-mapping.md) để biết mapping bucket → Stage 1/2/3 và cách mở rộng Stage xuống cấp hợp đồng bằng JOIN theo PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1 giữa CUSTOMER_ODR_LRA_IRB và ODR_CONTRACT_LEVEL_IRB. CONTRACT_ID được dùng làm ACCOUNT_ID; tài liệu cũng mô tả chuẩn hóa segment và kiểm tra tránh nhân bản hợp đồng. Script SQL chạy được là `database/upstream/001_load_account_stage_pool_source.sql`, tạo procedure `ecl_core.usp_LoadAccountStagePoolSource` để nạp Stage/Pool vào bảng staging riêng. Chưa ghi vào AccountSnapshot vì cần phê duyệt mapping PRODUCT_TYPE và MATURITY_DATE.
+Quy tắc gán Stage từ bucket nguồn và mapping segment sang pool thuộc trách nhiệm upstream. Xem [Stage, segment và pool mapping](docs/stage-segment-pool-mapping.md) để biết mapping bucket → Stage 1/2/3 và cách mở rộng Stage xuống cấp hợp đồng bằng JOIN theo PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1 giữa CUSTOMER_ODR_LRA_IRB và ODR_CONTRACT_LEVEL_IRB. CONTRACT_ID được dùng làm ACCOUNT_ID; tài liệu cũng mô tả chuẩn hóa segment và kiểm tra tránh nhân bản hợp đồng. Hai script upstream là `database/upstream/001_load_account_stage_pool_source.sql` (`ecl_core.usp_LoadAccountStagePoolSource`) và `database/upstream/002_load_account_snapshot.sql` (`ecl_core.usp_LoadAccountSnapshot`). Procedure đầu nạp Stage/Pool vào bảng staging riêng. Procedure thứ hai lấy `expiry_date` của hợp đồng làm `MATURITY_DATE` và nạp `AccountSnapshot`, sử dụng cấu hình `ecl_cfg.PoolProductTypeMap` đã được phê duyệt. Procedure sẽ báo lỗi nếu pool chưa có mapping PRODUCT_TYPE; không tự suy đoán loại sản phẩm từ tên pool.
 
 ## 7. Các quy ước tính toán IFRS 9 chính
 
@@ -174,7 +176,7 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 | `README.md` / `README.vi.md` | Tổng quan tiếng Anh / tiếng Việt |
 | `database/001–006*.sql` | Các migration SQL Server theo thứ tự |
 | `database/db2/` | Script bảng và procedure EAD Non-Revolving upstream trên DB2 |
-| `database/upstream/` | SQL loader upstream trên SQL Server, gồm bước staging Stage/Pool |
+| `database/upstream/` | SQL loader upstream trên SQL Server cho Stage/Pool staging và nạp AccountSnapshot chuẩn |
 | `docs/architecture.md` | Kiến trúc logic |
 | `docs/canonical-input-contract.md` | Hợp đồng đầu vào chuẩn hóa |
 | `docs/database-schema-v1.0.md` | Bảng, grain, khóa và constraint |
