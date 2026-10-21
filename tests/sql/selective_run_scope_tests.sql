@@ -27,18 +27,18 @@ BEGIN TRY
            (@WEIGHT_VERSION, 'BASE',     0.68640000, @PROCESS_DATE, 1),
            (@WEIGHT_VERSION, 'UPTURN',   0.15680000, @PROCESS_DATE, 1);
 
-    /* Positive case: every active account matches both requested product and pool. */
+    /* Positive case: every active account matches both requested pool name and pool ID. */
     EXEC ecl_core.usp_CreateRun
         @PROCESS_DATE = @PROCESS_DATE, @RUN_TYPE = 'SELECTIVE',
         @SCENARIO_WEIGHT_VERSION_ID = @WEIGHT_VERSION,
         @CALCULATION_VERSION = 'SELECTIVE-SCOPE-PASS',
-        @REQUESTED_PRODUCT_TYPE = 'MORTGAGE', @REQUESTED_POOL_ID = 'POOL-A',
+        @REQUESTED_POOL_NAME = 'RETAIL_LN_MORTGAGE', @REQUESTED_POOL_ID = 'POOL-A',
         @RUN_ID = @RUN_VALID OUTPUT;
     EXEC ecl_core.usp_TransitionRunStatus @RUN_VALID, 'VALIDATING', N'Selective scope positive case';
 
     INSERT INTO ecl_stg.AccountSnapshot
-        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, PRODUCT_TYPE, STAGE, POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE, IS_POCI)
-    VALUES (@RUN_VALID, @PROCESS_DATE, 'SYN-SCOPE-OK', 'SYN-CUST-SCOPE-OK', 'MORTGAGE', 1, 'POOL-A', '20271016', 1, 1, 0);
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE, POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE, IS_POCI)
+    VALUES (@RUN_VALID, @PROCESS_DATE, 'SYN-SCOPE-OK', 'SYN-CUST-SCOPE-OK', 'RETAIL_LN_MORTGAGE', 1, 'POOL-A', '20271016', 1, 1, 0);
 
     INSERT INTO ecl_stg.PDCurve
         (RUN_ID, PROCESS_DATE, ACCOUNT_ID, SCENARIO_CODE, FORECAST_PERIOD, MARGINAL_PD, VERSION_ID, IS_ACTIVE)
@@ -69,20 +69,20 @@ BEGIN TRY
     IF EXISTS (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_VALID AND SEVERITY IN ('ERROR','FATAL'))
         THROW 52301, 'Valid selective-run fixture unexpectedly has ERROR/FATAL findings.', 1;
 
-    /* Negative case: one product mismatch and one pool mismatch must both be flagged. */
+    /* Negative case: one pool-name mismatch and one pool-ID mismatch must both be flagged. */
     EXEC ecl_core.usp_CreateRun
         @PROCESS_DATE = @PROCESS_DATE, @RUN_TYPE = 'SELECTIVE',
         @SCENARIO_WEIGHT_VERSION_ID = @WEIGHT_VERSION,
         @CALCULATION_VERSION = 'SELECTIVE-SCOPE-BLOCK',
-        @REQUESTED_PRODUCT_TYPE = 'MORTGAGE', @REQUESTED_POOL_ID = 'POOL-A',
+        @REQUESTED_POOL_NAME = 'RETAIL_LN_MORTGAGE', @REQUESTED_POOL_ID = 'POOL-A',
         @RUN_ID = @RUN_INVALID OUTPUT;
     EXEC ecl_core.usp_TransitionRunStatus @RUN_INVALID, 'VALIDATING', N'Selective scope negative case';
 
     INSERT INTO ecl_stg.AccountSnapshot
-        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, PRODUCT_TYPE, STAGE, POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE, IS_POCI)
-    VALUES (@RUN_INVALID, @PROCESS_DATE, 'SYN-SCOPE-IN', 'SYN-CUST-IN', 'MORTGAGE', 1, 'POOL-A', '20271016', 1, 1, 0),
-           (@RUN_INVALID, @PROCESS_DATE, 'SYN-SCOPE-BAD-PROD', 'SYN-CUST-BAD-PROD', 'AUTO', 1, 'POOL-A', '20271016', 1, 1, 0),
-           (@RUN_INVALID, @PROCESS_DATE, 'SYN-SCOPE-BAD-POOL', 'SYN-CUST-BAD-POOL', 'MORTGAGE', 1, 'POOL-B', '20271016', 1, 1, 0);
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE, POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE, IS_POCI)
+    VALUES (@RUN_INVALID, @PROCESS_DATE, 'SYN-SCOPE-IN', 'SYN-CUST-IN', 'RETAIL_LN_MORTGAGE', 1, 'POOL-A', '20271016', 1, 1, 0),
+           (@RUN_INVALID, @PROCESS_DATE, 'SYN-SCOPE-BAD-NAME', 'SYN-CUST-BAD-NAME', 'RETAIL_LN_AUTO', 1, 'POOL-A', '20271016', 1, 1, 0),
+           (@RUN_INVALID, @PROCESS_DATE, 'SYN-SCOPE-BAD-POOL', 'SYN-CUST-BAD-POOL', 'RETAIL_LN_MORTGAGE', 1, 'POOL-B', '20271016', 1, 1, 0);
 
     INSERT INTO ecl_stg.PDCurve
         (RUN_ID, PROCESS_DATE, ACCOUNT_ID, SCENARIO_CODE, FORECAST_PERIOD, MARGINAL_PD, VERSION_ID, IS_ACTIVE)
@@ -118,7 +118,7 @@ BEGIN TRY
     FROM ecl_audit.ValidationError
     WHERE RUN_ID = @RUN_INVALID AND VALIDATION_CODE = 'RUN_SCOPE_MISMATCH' AND SEVERITY = 'FATAL';
     IF @SCOPE_FINDINGS <> 2
-        THROW 52302, 'Expected exactly two selective scope findings: product mismatch and pool mismatch.', 1;
+        THROW 52302, 'Expected exactly two selective scope findings: pool-name mismatch and pool-ID mismatch.', 1;
 
     /* Commit fixtures before invoking a guarded procedure that rolls back its own transaction on rejection. */
     COMMIT TRANSACTION;
@@ -142,7 +142,7 @@ BEGIN TRY
        OR EXISTS (SELECT 1 FROM ecl_result.ECLPortfolioSummary WHERE RUN_ID IN (@RUN_VALID, @RUN_INVALID))
         THROW 52305, 'Selective-run scope tests must not generate ECL output rows.', 1;
 
-    PRINT 'PASS: valid product/pool selective scope is accepted; product and pool mismatches are flagged and block calculation; no ECL outputs.';
+    PRINT 'PASS: valid pool-name/pool-ID selective scope is accepted; pool-name and pool-ID mismatches are flagged and block calculation; no ECL outputs.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
