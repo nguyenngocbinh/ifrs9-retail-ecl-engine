@@ -21,6 +21,8 @@ Mapping này là business rule được cung cấp cho repo, không phải kết
 
 ## 3. Mapping segment → pool
 
+The same mapping is represented in `ecl_cfg.PoolName` as `POOL_NAME` → `SEGMENT`; this `SEGMENT` is also used to join `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` for the PD loader.
+
 | POOL_ID | POOL_NAME | CUSTOMER_TYPE_MODEL | SEGMENT |
 |---:|---|---|---|
 | 100 | `RETAIL_LN_AUTO` | `RETAIL` | `Autoloan` |
