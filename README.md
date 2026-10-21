@@ -4,7 +4,7 @@ Production-oriented IFRS 9 expected credit loss (ECL) engine for retail lending,
 
 **Read in another language:** [Tiếng Việt — README.vi.md](README.vi.md)
 
-> **Status:** ECL calculation and publication v1 are implemented in migrations 001–005; migration 006 adds shared EAD curve validation. SQL Server 2022 regression coverage includes synthetic formula, lifecycle, input-quality, reconciliation, and calculation rollback tests. A reproducible database deployment guide and clean-database end-to-end verification remain outstanding.
+> **Status:** ECL calculation and publication v1 are implemented in migrations 001–005; migration 006 adds shared EAD curve validation and migration 007 adds shared PD curve validation. SQL Server 2022 regression coverage includes synthetic formula, lifecycle, input-quality, reconciliation, and calculation rollback tests. A reproducible database deployment guide and clean-database end-to-end verification remain outstanding.
 
 ## 1. Understand the system in one minute
 
@@ -100,7 +100,7 @@ A rerun must use a **new `RUN_ID`**. Do not overwrite the inputs or results of a
 |---|---|---|---|
 | `ecl_cfg` | Governed configuration | `PoolName`, `Scenario`, `ScenarioWeightVersion`, `ScenarioWeight` | Which pools/scenarios/weights are allowed for this run? |
 | `ecl_stg` | Canonical input contract for a run | `AccountSnapshot`, `PDCurve`, `LGDCurve`, `EADCurve`, `EIRCurve` | Which account and annual curve rows were supplied to this run? |
-| `ecl_core` | Run control and processing logic | `RunControl`, `usp_CalculateECL`, `usp_PublishECL`, `usp_LoadEADCurve` | Is the run valid, what state is it in, and which controlled operation runs next? |
+| `ecl_core` | Run control and processing logic | `RunControl`, `usp_CalculateECL`, `usp_PublishECL`, `usp_LoadEADCurve`, `usp_LoadPDCurve` | Is the run valid, what state is it in, and which controlled operation runs next? |
 | `ecl_result` | Calculation output | `ECLDetail`, `ECLAccount`, `ECLPortfolioSummary` | What was calculated at detail, account, pool, and portfolio level? |
 | `ecl_audit` | Traceability and exceptions | `RunEvent`, `ValidationError` | What happened, when, how many rows were processed, and why did a check fail? |
 
@@ -126,6 +126,7 @@ A rerun must use a **new `RUN_ID`**. Do not overwrite the inputs or results of a
 | `ecl_core.usp_LoadAccountStagePoolSource` | Expands customer-level Stage to contract-level Stage/Pool staging, joining by PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. | After upstream Stage data is ready. |
 | `ecl_core.usp_LoadAccountSnapshot` | Loads canonical account rows from Stage/Pool staging, reads contract `expiry_date` as MATURITY_DATE, and validates `POOL_NAME` against `ecl_cfg.PoolName`. | After Stage/Pool staging. |
 | `ecl_core.usp_LoadEADCurve` | Validates EAD rows already loaded into canonical `ecl_stg.EADCurve`: run/date alignment, VND, non-negative values, account matching, and annual coverage through maturity; records an audit event. It does **not** calculate product-specific EAD or copy from a second staging table. | After product-specific ETL loads EAD, before calculation. |
+| `ecl_core.usp_LoadPDCurve` | Validates scenario-specific marginal PD rows already loaded into canonical `ecl_stg.PDCurve`, including run/date, active account matching, PD range, all three scenarios, annual coverage through maturity, and audit. It does **not** infer source scenario mapping or calculate PD. | After PD source ETL loads canonical PDCurve, before calculation. |
 | `ecl_core.usp_CalculateECL` | Checks run state and required curves, calculates scenario × account × period contributions, writes detail/account/summary results, and records lifecycle/audit milestones in a transaction. | Main calculation step after input validation and loading. |
 | `ecl_core.usp_PublishECL` | Allows only a successful run to be published, checks that outputs exist, rounds account/summary amounts to whole VND at the publication boundary, and transitions the run to `PUBLISHED`. | After calculation and reconciliation succeed. |
 | Run-control / validation procedures | Create and transition runs, validate canonical inputs, persist validation findings and milestones. See migration headers and procedure definitions for exact names and contracts. | Before and around calculation/publication. |
@@ -162,6 +163,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 7. `database/003_input_validation.sql` and `database/004_input_reconciliation.sql` — input quality and reconciliation checks.
 8. `database/005_ecl_calculation.sql` — trace the core calculation and result writes.
 9. `database/006_ead_curve_loader.sql` — shared EAD contract validation.
+10. `database/007_pd_curve_loader.sql` — shared PD contract validation.
 10. [SQL Server deployment guide](docs/sql-server-deployment-guide.md) and [tests](tests/sql/) — deployment steps and examples of expected behavior.
 
 **How to read a procedure:** start with its header/comments, parameters, run-state checks, validation queries, transaction boundary, main INSERT/UPDATE, audit writes, and error handling. Then follow the referenced table names back to the schema map above.
@@ -171,7 +173,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 | Path | Purpose |
 |---|---|
 | `README.md` / `README.vi.md` | English overview / Vietnamese overview |
-| `database/001–006*.sql` | Ordered SQL Server schema and procedure migrations |
+| `database/001–007*.sql` | Ordered SQL Server schema and procedure migrations |
 | `database/db2/` | DB2 upstream Non-Revolving EAD table/procedure scripts |
 | `database/upstream/` | SQL Server upstream loaders for Stage/Pool staging and canonical AccountSnapshot loading |
 | `docs/architecture.md` | Logical architecture |
