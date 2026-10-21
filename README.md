@@ -130,7 +130,7 @@ For upstream DB2 Non-Revolving EAD, inspect `database/db2/README.md`, then `data
 
 ## 6. Upstream Stage and pool configuration
 
-Stage assignment from source buckets and segment-to-pool mapping are upstream responsibilities. See [Stage, segment and pool mapping](docs/stage-segment-pool-mapping.md) for the supplied bucket → Stage 1/2/3 rules, retail/corporate pool IDs, SQL reference query, quality checks, and unresolved source-key mappings. The example uses a parameterized process date; it is not a production source load procedure.
+Stage assignment from source buckets and segment-to-pool mapping are upstream responsibilities. See [Stage, segment and pool mapping](docs/stage-segment-pool-mapping.md) for bucket → Stage 1/2/3 rules, retail/corporate pool IDs, and the contract-level join from CUSTOMER_ODR_LRA_IRB to ODR_CONTRACT_LEVEL_IRB using PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. CONTRACT_ID becomes ACCOUNT_ID; source segment normalization and duplicate-expansion checks are documented. This is a reference design, not a production loader.
 
 ## 7. Core IFRS 9 calculation conventions
 
@@ -197,6 +197,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 - [PR #45 — DB2 Non-Revolving EAD](docs/implementation-log/PR-045.md)
 - [PR #46 — Rename shared EAD objects](docs/implementation-log/PR-046.md)
 - [PR #47 — Upstream Stage and pool mapping](docs/implementation-log/PR-047.md)
+- [PR #49 — Contract-level Stage and pool join keys](docs/implementation-log/PR-049.md)
 
 ## Safety
 
