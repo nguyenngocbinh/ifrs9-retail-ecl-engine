@@ -86,7 +86,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #42 | #28 | Reconcile README, roadmap, and implementation logs | In progress |
 
 ## Current next actions
-1. Review PR #49 for the contract-level Stage/Pool SQL loader; test it against a disposable SQL Server and verify source column names/duplicate keys before production use.
+1. PR #49 is merged with the contract-level Stage/Pool SQL loader. Verify source column names/duplicate keys and test it with the AccountSnapshot loader against a disposable SQL Server before production use.
 2. Reconcile the README and implementation logs with the merged calculation and rollback-test work (PR #42).
 3. Complete the step-by-step SQL Server deployment guide tracked in [Issue #40](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/40).
 4. Run migrations 001–005 and the complete synthetic calculate-and-publish flow against a clean, disposable SQL Server 2022 database; record the actual results and any blockers.
