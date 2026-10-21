@@ -99,7 +99,7 @@ A rerun must use a **new `RUN_ID`**. Do not overwrite the inputs or results of a
 | `ecl_cfg` | Governed configuration | `PoolName`, `Scenario`, `ScenarioWeightVersion`, `ScenarioWeight` | Which pools/scenarios/weights are allowed for this run? |
 | `ecl_stg` | Canonical input contract for a run | `AccountSnapshot`, `PDCurve`, `LGDCurve`, `EADCurve`, `EIRCurve` | Which account and annual curve rows were supplied to this run? |
 | `ecl_core` | Run control and processing logic | `RunControl`, `usp_CalculateECL`, `usp_PublishECL`, `usp_LoadEADCurve` | Is the run valid, what state is it in, and which controlled operation runs next? |
-| `ecl_result` | Calculation output | `ECLDetail`, `ECLAccount`, `ECLPortfolioSummary` | What was calculated at detail, account, pool, and product level? |
+| `ecl_result` | Calculation output | `ECLDetail`, `ECLAccount`, `ECLPortfolioSummary` | What was calculated at detail, account, pool, and portfolio level? |
 | `ecl_audit` | Traceability and exceptions | `RunEvent`, `ValidationError` | What happened, when, how many rows were processed, and why did a check fail? |
 
 ### Grain (the most important design concept)
