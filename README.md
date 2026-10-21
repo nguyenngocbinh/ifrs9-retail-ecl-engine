@@ -130,7 +130,7 @@ For upstream DB2 Non-Revolving EAD, inspect `database/db2/README.md`, then `data
 
 ## 6. Upstream Stage and pool configuration
 
-Stage assignment from source buckets and segment-to-pool mapping are upstream responsibilities. See [Stage, segment and pool mapping](docs/stage-segment-pool-mapping.md) for bucket → Stage 1/2/3 rules, retail/corporate pool IDs, and the contract-level join from CUSTOMER_ODR_LRA_IRB to ODR_CONTRACT_LEVEL_IRB using PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. CONTRACT_ID becomes ACCOUNT_ID; source segment normalization and duplicate-expansion checks are documented. This is a reference design, not a production loader.
+Stage assignment from source buckets and segment-to-pool mapping are upstream responsibilities. See [Stage, segment and pool mapping](docs/stage-segment-pool-mapping.md) for bucket → Stage 1/2/3 rules, retail/corporate pool IDs, and the contract-level join from CUSTOMER_ODR_LRA_IRB to ODR_CONTRACT_LEVEL_IRB using PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. CONTRACT_ID becomes ACCOUNT_ID; source segment normalization and duplicate-expansion checks are documented. The runnable staging entry point is `database/upstream/001_load_account_stage_pool_source.sql` (`ecl_core.usp_LoadAccountStagePoolSource`); it prepares Stage/Pool rows separately and does not yet populate canonical AccountSnapshot because product-type and maturity mappings need approval.
 
 ## 7. Core IFRS 9 calculation conventions
 
@@ -169,6 +169,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 | `README.md` / `README.vi.md` | English overview / Vietnamese overview |
 | `database/001–006*.sql` | Ordered SQL Server schema and procedure migrations |
 | `database/db2/` | DB2 upstream Non-Revolving EAD table/procedure scripts |
+| `database/upstream/` | SQL Server upstream loaders for source-specific input preparation, including Stage/Pool staging |
 | `docs/architecture.md` | Logical architecture |
 | `docs/canonical-input-contract.md` | Standardized input contract |
 | `docs/database-schema-v1.0.md` | Logical tables, grains, keys, and constraints |
