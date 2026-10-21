@@ -230,7 +230,7 @@ BEGIN
         WHERE a.RUN_ID=@RUN_ID
         GROUP BY a.ACCOUNT_ID,a.CUSTOMER_ID,a.POOL_NAME,a.POOL_ID,a.STAGE;
 
-        /* Pool and product portfolio summaries by stage. */
+        /* Pool-level and portfolio-wide summaries by stage. */
         INSERT INTO ecl_result.ECLPortfolioSummary
             (RUN_ID,PROCESS_DATE,POOL_NAME,AGGREGATION_LEVEL,POOL_ID,STAGE,ACCOUNT_COUNT,
              ECL_12_MONTH,ECL_LIFETIME,ECL_DEFAULT,ECL_TOTAL)
