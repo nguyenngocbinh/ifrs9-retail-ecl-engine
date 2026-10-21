@@ -133,7 +133,11 @@ Các trường điều khiển cần nhớ:
 
 Với EAD Non-Revolving xử lý upstream trên DB2, đọc theo thứ tự: `database/db2/README.md`, `database/db2/001_create_nonrevolving_ead_schedule.sql`, `002_sp_calc_nonrevolving_ead.sql`, rồi `003_rename_auto_ead_objects.sql`. ETL theo sản phẩm tính EAD năm và nạp trực tiếp vào hợp đồng chuẩn dùng chung `ecl_stg.EADCurve`; procedure loader chỉ kiểm tra hợp đồng dữ liệu, không viết lại quy tắc khấu hao/trả nợ của từng sản phẩm.
 
-## 6. Các quy ước tính toán IFRS 9 chính
+## 6. Cấu hình Stage và mapping pool upstream
+
+Quy tắc gán Stage từ bucket nguồn và mapping segment sang pool thuộc trách nhiệm upstream. Xem [Stage, segment và pool mapping](docs/stage-segment-pool-mapping.md) để biết mapping bucket → Stage 1/2/3, các mã pool retail/corporate, SQL tham khảo, kiểm tra chất lượng và các khóa nguồn còn cần xác nhận. Ngày xử lý trong ví dụ phải được tham số hóa theo ngày của run; đây chưa phải procedure nạp dữ liệu production.
+
+## 7. Các quy ước tính toán IFRS 9 chính
 
 - **Sản phẩm:** Mortgage, Auto, Credit Card, Personal Loan và Other Retail.
 - **PD:** PD biên vô điều kiện theo năm trên original cohort, được upstream cung cấp riêng theo kịch bản. Không phân bổ lại PD cho năm dự báo cuối bị lẻ.
@@ -148,7 +152,7 @@ Với EAD Non-Revolving xử lý upstream trên DB2, đọc theo thứ tự: `da
 
 ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản với trọng số được duyệt rồi cộng lại. Bảng detail lưu dấu vết PD, LGD, EAD, EIR, hệ số chiết khấu và trọng số đã sử dụng.
 
-## 7. Thứ tự đọc repository để hiểu nhanh
+## 8. Thứ tự đọc repository để hiểu nhanh
 
 1. **README này** — mục tiêu, ranh giới trách nhiệm, schema và luồng tổng thể.
 2. [Architecture](docs/architecture.md) — các thành phần logic và thứ tự xử lý.
@@ -163,7 +167,7 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 
 **Cách đọc một procedure:** bắt đầu từ comment/header, tham số, điều kiện trạng thái run, các câu truy vấn validation, ranh giới transaction, câu INSERT/UPDATE chính, audit và xử lý lỗi. Khi gặp tên bảng, đối chiếu ngược với bản đồ schema ở mục 4.
 
-## 8. Bản đồ thư mục
+## 9. Bản đồ thư mục
 
 | Đường dẫn | Nội dung |
 |---|---|
@@ -176,10 +180,11 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 | `docs/methodology-specification-v1.0.md` | Đặc tả phương pháp tính |
 | `docs/sql-server-deployment-guide.md` | Hướng dẫn triển khai và lưu ý vận hành |
 | `docs/upstream-source-mapping.md` | Ghi chú mapping nguồn upstream |
+| `docs/stage-segment-pool-mapping.md` | Mapping bucket sang Stage và segment sang pool upstream |
 | `tests/sql/` | Kiểm thử tích hợp/hồi quy bằng dữ liệu giả lập |
 | `TODO.md` và `docs/implementation-log/` | Lộ trình và quyết định theo từng lần triển khai |
 
-## 9. Trạng thái kiểm thử và triển khai
+## 10. Trạng thái kiểm thử và triển khai
 
 - Kiểm thử tích hợp SQL Server 2022 dùng dữ liệu giả lập chạy trong container SQL Server tạm thời của GitHub Actions.
 - CI thành công chỉ chứng minh các migration/test được commit đã chạy trong môi trường CI đó. **Không** chứng minh hệ thống sẵn sàng production, triển khai thành công trên SQL Server khác hoặc tương thích SQL Server 2016.
@@ -188,7 +193,7 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 - Chỉ dùng dữ liệu test tổng hợp, an toàn về quyền riêng tư; mỗi lần chạy lại phải có `RUN_ID` mới.
 - Lộ trình hướng dẫn triển khai: [Issue #40](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/40).
 
-## 10. Tài liệu tham khảo thêm
+## 11. Tài liệu tham khảo thêm
 
 - [Project roadmap](TODO.md)
 - [PR #39 — ECL calculation v1](docs/implementation-log/PR-039.md)
@@ -196,6 +201,7 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 - [PR #44 — Shared EAD contract](docs/implementation-log/PR-044.md)
 - [PR #45 — DB2 Non-Revolving EAD](docs/implementation-log/PR-045.md)
 - [PR #46 — Rename shared EAD objects](docs/implementation-log/PR-046.md)
+- [PR #47 — Upstream Stage and pool mapping](docs/implementation-log/PR-047.md)
 
 ## An toàn
 
