@@ -101,6 +101,14 @@ BEGIN TRY
  EXEC ecl_core.usp_PublishECL @R;
  SELECT @STATUS=RUN_STATUS FROM ecl_core.RunControl WHERE RUN_ID=@R;
  IF @STATUS<>'PUBLISHED' THROW 52510,'Publication must finish in PUBLISHED status.',1;
+ IF NOT EXISTS(SELECT 1 FROM ecl_result.ECLPortfolioSummary
+             WHERE RUN_ID=@R AND POOL_NAME='RETAIL_LN_MORTGAGE'
+               AND AGGREGATION_LEVEL='POOL' AND POOL_ID='POOL-CALC')
+   THROW 52514,'Pool-level summary must retain the canonical POOL_NAME.',1;
+ IF NOT EXISTS(SELECT 1 FROM ecl_result.ECLPortfolioSummary
+             WHERE RUN_ID=@R AND POOL_NAME='__ALL_POOLS__'
+               AND AGGREGATION_LEVEL='PORTFOLIO' AND POOL_ID='__ALL_POOLS__')
+   THROW 52515,'Portfolio-wide summary must use the all-pools sentinel for POOL_NAME and POOL_ID.',1;
  IF EXISTS(SELECT 1 FROM ecl_result.ECLAccount WHERE RUN_ID=@R
            AND (ECL_TOTAL<>ROUND(ECL_TOTAL,0) OR ECL_12_MONTH<>ROUND(ECL_12_MONTH,0)
                 OR ECL_LIFETIME<>ROUND(ECL_LIFETIME,0) OR ECL_DEFAULT<>ROUND(ECL_DEFAULT,0)))
