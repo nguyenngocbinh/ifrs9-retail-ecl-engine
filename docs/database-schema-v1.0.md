@@ -6,7 +6,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 
 - Schemas: `ecl_cfg`, `ecl_stg`, `ecl_core`, `ecl_result`, `ecl_audit`.
 - Inputs are normalized into separate tables.
-- Product types share one model and one set of result tables; `PRODUCT_TYPE` distinguishes Mortgage, Auto, Credit Card, Personal Loan, and Other Retail.
+- Pool names share one model and one set of result tables; `POOL_NAME` is the upstream-mapped pool code (for example `RETAIL_LN_AUTO` or `RETAIL_LN_MORTGAGE`).
 - Primary business grain is `PROCESS_DATE + ACCOUNT_ID`; every execution is isolated by `RUN_ID`.
 - Input rows carry `VERSION_ID` and `IS_ACTIVE`; a run must bind to one immutable set of input versions. `IS_ACTIVE` is selection metadata, not permission to mutate an already captured run.
 - PD grain is account × scenario × forecast period; LGD and EAD grains are account × forecast period. EIR is shared by forecast period. Result detail is account × scenario × forecast period. Account output is one row per account/run. Portfolio output stores both portfolio and pool totals.
@@ -23,7 +23,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 
 | Schema | Table | Purpose / grain |
 |---|---|---|
-| ecl_cfg | ProductType | Approved shared product code list |
+| ecl_cfg | PoolName | Approved pool-name code list used by canonical inputs |
 | ecl_cfg | Scenario | Downturn/Base/Upturn code list |
 | ecl_cfg | ScenarioWeightVersion | Version/effective period for scenario weights |
 | ecl_cfg | ScenarioWeight | One row per version/scenario; process-date trace |
@@ -49,7 +49,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - EIR curve PK: `(RUN_ID, FORECAST_PERIOD)`.
 - ECL detail PK: `(RUN_ID, ACCOUNT_ID, SCENARIO_CODE, FORECAST_PERIOD)`.
 - Account output PK: `(RUN_ID, ACCOUNT_ID)`.
-- Portfolio summary PK: `(RUN_ID, PRODUCT_TYPE, STAGE, AGGREGATION_LEVEL, POOL_ID)`. `AGGREGATION_LEVEL` is `PORTFOLIO` or `POOL`; portfolio-wide rows use the non-null sentinel `POOL_ID='__ALL_POOLS__'`, while pool-level rows must use a real pool ID. This avoids nullable columns in the primary key.
+- Portfolio summary PK: `(RUN_ID, POOL_NAME, STAGE, AGGREGATION_LEVEL, POOL_ID)`. `AGGREGATION_LEVEL` is `PORTFOLIO` or `POOL`; portfolio-wide rows use `POOL_NAME='__ALL_POOLS__'` and `POOL_ID='__ALL_POOLS__'`; pool-level rows use the actual pool name and pool ID. This avoids nullable columns in the primary key.
 - FKs enforce product/scenario/run lineage and result-to-input account existence.
 - Check constraints reject invalid Stage, PD/LGD/weight ranges, negative EAD/ECL and invalid run states.
 - Indexes target run-first access patterns, account/pool joins, product/Stage aggregation and audit lookup.
