@@ -28,14 +28,14 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 | ecl_cfg | ScenarioWeightVersion | Version/effective period for scenario weights |
 | ecl_cfg | ScenarioWeight | One row per version/scenario; process-date trace |
 | ecl_core | RunControl | One row per run, including process date, scope, lifecycle, calculation version |
-| ecl_stg | AccountSnapshot | One row per run/account; product, Stage, pool assignment and contractual maturity date |
+| ecl_stg | AccountSnapshot | One row per run/account; pool name, Stage, pool ID and contractual maturity date |
 | ecl_stg | PDCurve | One row per run/account/scenario/forecast period |
 | ecl_stg | LGDCurve | One row per run/account/forecast period |
 | ecl_stg | EADCurve | One row per run/account/forecast period |
 | ecl_stg | EIRCurve | One row per run/forecast period; shared EIR curve |
 | ecl_result | ECLDetail | One row per run/account/scenario/forecast period; calculation trace |
 | ecl_result | ECLAccount | One row per run/account; mutually exclusive Stage output fields |
-| ecl_result | ECLPortfolioSummary | One row per run/product/Stage/aggregation level/pool key |
+| ecl_result | ECLPortfolioSummary | One row per run/pool name/Stage/aggregation level/pool key |
 | ecl_audit | RunEvent | Append-only run lifecycle and reconciliation events |
 | ecl_audit | ValidationError | Persisted validation findings by run and optional business key |
 
