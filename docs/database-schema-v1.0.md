@@ -50,9 +50,9 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - ECL detail PK: `(RUN_ID, ACCOUNT_ID, SCENARIO_CODE, FORECAST_PERIOD)`.
 - Account output PK: `(RUN_ID, ACCOUNT_ID)`.
 - Portfolio summary PK: `(RUN_ID, POOL_NAME, STAGE, AGGREGATION_LEVEL, POOL_ID)`. `AGGREGATION_LEVEL` is `PORTFOLIO` or `POOL`; portfolio-wide rows use `POOL_NAME='__ALL_POOLS__'` and `POOL_ID='__ALL_POOLS__'`; pool-level rows use the actual pool name and pool ID. This avoids nullable columns in the primary key.
-- FKs enforce product/scenario/run lineage and result-to-input account existence.
+- FKs enforce pool/scenario/run lineage and result-to-input account existence.
 - Check constraints reject invalid Stage, PD/LGD/weight ranges, negative EAD/ECL and invalid run states.
-- Indexes target run-first access patterns, account/pool joins, product/Stage aggregation and audit lookup.
+- Indexes target run-first access patterns, account/pool joins, pool/Stage aggregation and audit lookup.
 
 ## Management fields and rerun semantics
 
@@ -72,11 +72,11 @@ A run must transition through controlled states. Only a fully validated, calcula
 3. PD is supplied upstream as annual unconditional marginal PD on the original cohort. Use the supplied annual PD unchanged in a partial final year; do not apply a linear or hazard-based prorating transformation.
 4. **EIR curve is shared across pools**. The selected discount factor is `DF(t) = 1 / (1 + EIR(t))^t`, where `t` is elapsed forecast time in years, including the remaining-month fraction for the partial final year. Example: 6 months into the fourth forecast year gives `t = 3.5`. Only discounting time uses the partial-year fraction; PD and EAD remain unchanged. No calculation procedure is implemented here.
 5. `ScenarioWeight` DDL stores weights by version and scenario. Weight-sum and exact effective-version selection are run-time validation rules, not enforced by a row-level CHECK constraint.
-6. `ECLPortfolioSummary` uses a non-null `AGGREGATION_LEVEL` and `POOL_ID`; portfolio-wide rows use `AGGREGATION_LEVEL='PORTFOLIO'` and `POOL_ID='__ALL_POOLS__'`, while pool rows use `AGGREGATION_LEVEL='POOL'` and a real pool ID.
+6. `ECLPortfolioSummary` uses a non-null `AGGREGATION_LEVEL` and `POOL_ID`; portfolio-wide rows use `AGGREGATION_LEVEL='PORTFOLIO'` and `POOL_ID='__ALL_POOLS__'`, while pool rows use `AGGREGATION_LEVEL='POOL'`, the actual pool name, and a real pool ID.
 7. `IS_ACTIVE` is included on standardized inputs as requested, but each run should snapshot only the selected active version. It is not a substitute for run isolation.
 8. Currency handling is explicit on EAD; all amounts must be in a consistent reporting currency before aggregation. Conversion logic is outside this DDL.
 9. Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual discounting/aggregation. Lifetime horizon is each account's MATURITY_DATE. Scenario weights are Downturn 15.68%, Base 68.64%, Upturn 15.68%.
 
 ## Deployment
 
-Run `database/001_create_logical_schema.sql` only in a disposable or explicitly approved development database. It is an initial-create script, not an idempotent migration or rollback script. It inserts shared product/scenario codes and deliberately does not seed scenario weights. No customer-level data or credentials are included.
+Run `database/001_create_logical_schema.sql` only in a disposable or explicitly approved development database. It is an initial-create script, not an idempotent migration or rollback script. It inserts canonical pool-name and scenario codes and deliberately does not seed scenario weights. No customer-level data or credentials are included.
