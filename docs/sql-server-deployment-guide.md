@@ -86,7 +86,8 @@ WHERE SCHEMA_NAME(schema_id) = N'ecl_core'
   AND name IN (N'usp_CreateRun', N'usp_TransitionRunStatus',
                N'usp_RegisterRunInput', N'usp_SealRunInputs',
                N'usp_ValidateRunInputs', N'usp_ReconcileInputSnapshots',
-               N'usp_CalculateECL', N'usp_PublishECL')
+               N'usp_CalculateECL', N'usp_PublishECL',
+               N'usp_LoadEADCurve', N'usp_LoadPDCurve')
 ORDER BY name;
 
 SELECT name, state_desc, compatibility_level
