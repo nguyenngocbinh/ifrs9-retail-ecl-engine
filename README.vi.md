@@ -135,7 +135,7 @@ Với EAD Non-Revolving xử lý upstream trên DB2, đọc theo thứ tự: `da
 
 ## 6. Cấu hình Stage và mapping pool upstream
 
-Quy tắc gán Stage từ bucket nguồn và mapping segment sang pool thuộc trách nhiệm upstream. Xem [Stage, segment và pool mapping](docs/stage-segment-pool-mapping.md) để biết mapping bucket → Stage 1/2/3, các mã pool retail/corporate, SQL tham khảo, kiểm tra chất lượng và các khóa nguồn còn cần xác nhận. Ngày xử lý trong ví dụ phải được tham số hóa theo ngày của run; đây chưa phải procedure nạp dữ liệu production.
+Quy tắc gán Stage từ bucket nguồn và mapping segment sang pool thuộc trách nhiệm upstream. Xem [Stage, segment và pool mapping](docs/stage-segment-pool-mapping.md) để biết mapping bucket → Stage 1/2/3 và cách mở rộng Stage xuống cấp hợp đồng bằng JOIN theo PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1 giữa CUSTOMER_ODR_LRA_IRB và ODR_CONTRACT_LEVEL_IRB. CONTRACT_ID được dùng làm ACCOUNT_ID; tài liệu cũng mô tả chuẩn hóa segment và kiểm tra tránh nhân bản hợp đồng. Đây là thiết kế tham khảo, chưa phải procedure nạp dữ liệu production.
 
 ## 7. Các quy ước tính toán IFRS 9 chính
 
@@ -202,6 +202,7 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 - [PR #45 — DB2 Non-Revolving EAD](docs/implementation-log/PR-045.md)
 - [PR #46 — Rename shared EAD objects](docs/implementation-log/PR-046.md)
 - [PR #47 — Upstream Stage and pool mapping](docs/implementation-log/PR-047.md)
+- [PR #49 — Contract-level Stage and pool join keys](docs/implementation-log/PR-049.md)
 
 ## An toàn
 
