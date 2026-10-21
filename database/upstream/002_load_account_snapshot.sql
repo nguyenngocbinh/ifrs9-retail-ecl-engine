@@ -11,34 +11,17 @@ Prerequisites:
 Purpose:
   - Reuse Stage/Pool already validated by usp_LoadAccountStagePoolSource.
   - Read MATURITY_DATE from DEFAULT.dbo.ODR_CONTRACT_LEVEL_IRB.expiry_date.
-  - Map POOL_ID to canonical PRODUCT_TYPE through governed configuration.
+  - Reuse POOL_NAME already mapped by usp_LoadAccountStagePoolSource and validate it against ecl_cfg.PoolName.
   - Insert the canonical account grain RUN_ID + ACCOUNT_ID into AccountSnapshot.
 
 Important:
   - Does not recalculate Stage or Pool.
-  - Does not guess product mapping. Populate ecl_cfg.PoolProductTypeMap only with
-    mappings approved by the business/data owner.
+  - Does not infer a pool name. Source POOL_NAME must match an active configured value in ecl_cfg.PoolName.
   - Review physical source names and test in a disposable database before use.
 */
 
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
-GO
-
-IF OBJECT_ID(N'ecl_cfg.PoolProductTypeMap', N'U') IS NULL
-BEGIN
-    CREATE TABLE ecl_cfg.PoolProductTypeMap
-    (
-        POOL_ID varchar(100) NOT NULL,
-        PRODUCT_TYPE varchar(30) NOT NULL,
-        IS_ACTIVE bit NOT NULL CONSTRAINT DF_PoolProductTypeMap_IsActive DEFAULT (1),
-        CREATED_AT datetime2(0) NOT NULL CONSTRAINT DF_PoolProductTypeMap_CreatedAt DEFAULT (SYSUTCDATETIME()),
-        CREATED_BY sysname NOT NULL CONSTRAINT DF_PoolProductTypeMap_CreatedBy DEFAULT (SUSER_SNAME()),
-        CONSTRAINT PK_PoolProductTypeMap PRIMARY KEY CLUSTERED (POOL_ID),
-        CONSTRAINT FK_PoolProductTypeMap_ProductType FOREIGN KEY (PRODUCT_TYPE)
-            REFERENCES ecl_cfg.ProductType(PRODUCT_TYPE)
-    );
-END;
 GO
 
 CREATE OR ALTER PROCEDURE ecl_core.usp_LoadAccountSnapshot
@@ -94,7 +77,7 @@ BEGIN
         FROM ecl_stg.AccountStagePoolSource
         WHERE RUN_ID = @RUN_ID
           AND IS_ACTIVE = 1
-          AND (STAGE IS NULL OR STAGE NOT IN (1,2,3) OR POOL_ID IS NULL OR ACCOUNT_ID IS NULL)
+          AND (STAGE IS NULL OR STAGE NOT IN (1,2,3) OR POOL_ID IS NULL OR POOL_NAME IS NULL OR ACCOUNT_ID IS NULL)
     )
         THROW 51306, 'Stage/Pool source contains a missing or invalid STAGE, POOL_ID, or ACCOUNT_ID.', 1;
 
@@ -124,7 +107,7 @@ BEGIN
         s.PROCESS_DATE,
         s.ACCOUNT_ID,
         s.CUSTOMER_ID,
-        m.PRODUCT_TYPE,
+        p.POOL_NAME,
         s.STAGE,
         s.POOL_ID,
         TRY_CONVERT(date, c.expiry_date) AS MATURITY_DATE,
@@ -135,10 +118,10 @@ BEGIN
     FROM ecl_stg.AccountStagePoolSource AS s
     INNER JOIN [DEFAULT].[dbo].[ODR_CONTRACT_LEVEL_IRB] AS c
       ON c.PROCESS_DATE = s.PROCESS_DATE
-     AND c.CONTRACT_ID = s.ACCOUNT_ID
-    LEFT JOIN ecl_cfg.PoolProductTypeMap AS m
-      ON m.POOL_ID = s.POOL_ID
-     AND m.IS_ACTIVE = 1
+     AND CONVERT(varchar(100), c.CONTRACT_ID) = s.ACCOUNT_ID
+    LEFT JOIN ecl_cfg.PoolName AS p
+      ON p.POOL_NAME = s.POOL_NAME
+     AND p.IS_ACTIVE = 1
     WHERE s.RUN_ID = @RUN_ID
       AND s.IS_ACTIVE = 1;
 
@@ -146,9 +129,9 @@ BEGIN
     (
         SELECT 1
         FROM #SnapshotCandidate
-        WHERE PRODUCT_TYPE IS NULL
+        WHERE POOL_NAME IS NULL
     )
-        THROW 51308, 'At least one POOL_ID has no active approved mapping in ecl_cfg.PoolProductTypeMap. Configure mappings before loading AccountSnapshot.', 1;
+        THROW 51308, 'At least one source POOL_NAME is missing or inactive in ecl_cfg.PoolName. Configure the pool name before loading AccountSnapshot.', 1;
 
     IF EXISTS
     (
@@ -252,7 +235,7 @@ BEGIN
         RUN_ID,
         PROCESS_DATE,
         COUNT_BIG(*) AS ACCOUNT_COUNT,
-        COUNT_BIG(DISTINCT PRODUCT_TYPE) AS PRODUCT_TYPE_COUNT,
+        COUNT_BIG(DISTINCT POOL_NAME) AS POOL_NAME_COUNT,
         COUNT_BIG(DISTINCT POOL_ID) AS POOL_COUNT,
         MIN(MATURITY_DATE) AS MIN_MATURITY_DATE,
         MAX(MATURITY_DATE) AS MAX_MATURITY_DATE
@@ -263,16 +246,7 @@ END;
 GO
 
 /*
-Configuration example — do not run until each mapping is approved.
-
-INSERT INTO ecl_cfg.PoolProductTypeMap (POOL_ID, PRODUCT_TYPE)
-VALUES
-    ('RETAIL_LN_AUTO', 'AUTO'),
-    ('RETAIL_LN_MORTGAGE', 'MORTGAGE'),
-    ('RETAIL_CARD', 'CREDITCARD');
-
-The remaining pools (including consumer lending, overdraft and others) must be
-mapped to PERSONALLOAN or OTHER only after the bank's product taxonomy is confirmed.
+The pool names are seeded in ecl_cfg.PoolName by database/001_create_logical_schema.sql. Review them against the approved source mapping before execution.
 
 Execution:
 EXEC ecl_core.usp_LoadAccountSnapshot
