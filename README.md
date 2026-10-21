@@ -121,6 +121,8 @@ A rerun must use a **new `RUN_ID`**. Do not overwrite the inputs or results of a
 
 | Procedure | Responsibility | When to read/call it |
 |---|---|---|
+| `ecl_core.usp_LoadAccountStagePoolSource` | Expands customer-level Stage to contract-level Stage/Pool staging, joining by PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. | After upstream Stage data is ready. |
+| `ecl_core.usp_LoadAccountSnapshot` | Loads canonical account rows from Stage/Pool staging, reads contract `expiry_date` as MATURITY_DATE, and requires an approved `ecl_cfg.PoolProductTypeMap`. | After Stage/Pool staging and product mapping configuration. |
 | `ecl_core.usp_LoadEADCurve` | Validates EAD rows already loaded into canonical `ecl_stg.EADCurve`: run/date alignment, VND, non-negative values, account matching, and annual coverage through maturity; records an audit event. It does **not** calculate product-specific EAD or copy from a second staging table. | After product-specific ETL loads EAD, before calculation. |
 | `ecl_core.usp_CalculateECL` | Checks run state and required curves, calculates scenario × account × period contributions, writes detail/account/summary results, and records lifecycle/audit milestones in a transaction. | Main calculation step after input validation and loading. |
 | `ecl_core.usp_PublishECL` | Allows only a successful run to be published, checks that outputs exist, rounds account/summary amounts to whole VND at the publication boundary, and transitions the run to `PUBLISHED`. | After calculation and reconciliation succeed. |
@@ -130,7 +132,7 @@ For upstream DB2 Non-Revolving EAD, inspect `database/db2/README.md`, then `data
 
 ## 6. Upstream Stage and pool configuration
 
-Stage assignment from source buckets and segment-to-pool mapping are upstream responsibilities. See [Stage, segment and pool mapping](docs/stage-segment-pool-mapping.md) for bucket → Stage 1/2/3 rules, retail/corporate pool IDs, and the contract-level join from CUSTOMER_ODR_LRA_IRB to ODR_CONTRACT_LEVEL_IRB using PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. CONTRACT_ID becomes ACCOUNT_ID; source segment normalization and duplicate-expansion checks are documented. The runnable staging entry point is `database/upstream/001_load_account_stage_pool_source.sql` (`ecl_core.usp_LoadAccountStagePoolSource`); it prepares Stage/Pool rows separately and does not yet populate canonical AccountSnapshot because product-type and maturity mappings need approval.
+Stage assignment from source buckets and segment-to-pool mapping are upstream responsibilities. See [Stage, segment and pool mapping](docs/stage-segment-pool-mapping.md) for bucket → Stage 1/2/3 rules, retail/corporate pool IDs, and the contract-level join from CUSTOMER_ODR_LRA_IRB to ODR_CONTRACT_LEVEL_IRB using PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. CONTRACT_ID becomes ACCOUNT_ID; source segment normalization and duplicate-expansion checks are documented. The upstream loaders are `database/upstream/001_load_account_stage_pool_source.sql` (`ecl_core.usp_LoadAccountStagePoolSource`) and `database/upstream/002_load_account_snapshot.sql` (`ecl_core.usp_LoadAccountSnapshot`). The first prepares Stage/Pool separately. The second reads `expiry_date` as `MATURITY_DATE` and loads canonical AccountSnapshot using an approved `ecl_cfg.PoolProductTypeMap` configuration. It deliberately fails when a pool lacks an approved product mapping; do not infer product types from pool names.
 
 ## 7. Core IFRS 9 calculation conventions
 
@@ -169,7 +171,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 | `README.md` / `README.vi.md` | English overview / Vietnamese overview |
 | `database/001–006*.sql` | Ordered SQL Server schema and procedure migrations |
 | `database/db2/` | DB2 upstream Non-Revolving EAD table/procedure scripts |
-| `database/upstream/` | SQL Server upstream loaders for source-specific input preparation, including Stage/Pool staging |
+| `database/upstream/` | SQL Server upstream loaders for Stage/Pool staging and canonical AccountSnapshot loading |
 | `docs/architecture.md` | Logical architecture |
 | `docs/canonical-input-contract.md` | Standardized input contract |
 | `docs/database-schema-v1.0.md` | Logical tables, grains, keys, and constraints |
