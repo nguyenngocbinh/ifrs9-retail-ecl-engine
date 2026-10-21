@@ -128,7 +128,11 @@ A rerun must use a **new `RUN_ID`**. Do not overwrite the inputs or results of a
 
 For upstream DB2 Non-Revolving EAD, inspect `database/db2/README.md`, then `database/db2/001_create_nonrevolving_ead_schedule.sql`, `002_sp_calc_nonrevolving_ead.sql`, and `003_rename_auto_ead_objects.sql`. Product-specific ETL calculates annual EAD and lands it directly in the shared SQL Server contract `ecl_stg.EADCurve`; the shared loader validates the contract rather than reimplementing amortization rules.
 
-## 6. Core IFRS 9 calculation conventions
+## 6. Upstream Stage and pool configuration
+
+Stage assignment from source buckets and segment-to-pool mapping are upstream responsibilities. See [Stage, segment and pool mapping](docs/stage-segment-pool-mapping.md) for the supplied bucket → Stage 1/2/3 rules, retail/corporate pool IDs, SQL reference query, quality checks, and unresolved source-key mappings. The example uses a parameterized process date; it is not a production source load procedure.
+
+## 7. Core IFRS 9 calculation conventions
 
 - **Products:** Mortgage, Auto, Credit Card, Personal Loan, and Other Retail.
 - **PD:** annual unconditional marginal PD on the original cohort, supplied upstream per scenario. Do not prorate PD for a partial final forecast year.
@@ -143,7 +147,7 @@ For upstream DB2 Non-Revolving EAD, inspect `database/db2/README.md`, then `data
 
 Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied by its approved weight. The detail output retains inputs used in the calculation, including PD, LGD, EAD, EIR, discount factor, and scenario weight, for traceability.
 
-## 7. Read the repository in this order
+## 8. Read the repository in this order
 
 1. **This README** — system purpose, boundary, schema map, and end-to-end flow.
 2. [Architecture](docs/architecture.md) — logical components and processing sequence.
@@ -158,7 +162,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 
 **How to read a procedure:** start with its header/comments, parameters, run-state checks, validation queries, transaction boundary, main INSERT/UPDATE, audit writes, and error handling. Then follow the referenced table names back to the schema map above.
 
-## 8. Repository map
+## 9. Repository map
 
 | Path | Purpose |
 |---|---|
@@ -171,10 +175,11 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 | `docs/methodology-specification-v1.0.md` | Calculation methodology |
 | `docs/sql-server-deployment-guide.md` | Deployment guidance and operational safeguards |
 | `docs/upstream-source-mapping.md` | Source-to-contract mapping notes |
+| `docs/stage-segment-pool-mapping.md` | Upstream bucket-to-Stage and segment-to-pool mapping |
 | `tests/sql/` | Synthetic SQL integration/regression tests |
 | `TODO.md` and `docs/implementation-log/` | Roadmap and implementation decisions |
 
-## 9. Testing and deployment status
+## 10. Testing and deployment status
 
 - Synthetic SQL Server 2022 integration tests run in an ephemeral GitHub Actions SQL Server container.
 - CI success demonstrates that the checked-in migrations/tests ran in that CI environment. It does **not** prove production readiness, successful deployment to another SQL Server, or SQL Server 2016 compatibility.
@@ -183,7 +188,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 - Use synthetic, privacy-safe fixtures only; reruns must use a new `RUN_ID`.
 - Deployment guide roadmap: [Issue #40](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/40).
 
-## 10. Further references
+## 11. Further references
 
 - [Project roadmap](TODO.md)
 - [PR #39 — ECL calculation v1](docs/implementation-log/PR-039.md)
@@ -191,6 +196,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 - [PR #44 — Shared EAD contract](docs/implementation-log/PR-044.md)
 - [PR #45 — DB2 Non-Revolving EAD](docs/implementation-log/PR-045.md)
 - [PR #46 — Rename shared EAD objects](docs/implementation-log/PR-046.md)
+- [PR #47 — Upstream Stage and pool mapping](docs/implementation-log/PR-047.md)
 
 ## Safety
 
