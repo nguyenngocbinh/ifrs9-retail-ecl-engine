@@ -172,11 +172,11 @@ SELECT COUNT_BIG(*) AS account_rows,
        SUM(ECL_TOTAL) AS ecl_total
 FROM ecl_result.ECLAccount WHERE RUN_ID = @RUN_ID;
 
-SELECT PRODUCT_TYPE, AGGREGATION_LEVEL, POOL_ID, STAGE, ACCOUNT_COUNT,
+SELECT POOL_NAME, AGGREGATION_LEVEL, POOL_ID, STAGE, ACCOUNT_COUNT,
        ECL_12_MONTH, ECL_LIFETIME, ECL_DEFAULT, ECL_TOTAL
 FROM ecl_result.ECLPortfolioSummary
 WHERE RUN_ID = @RUN_ID
-ORDER BY PRODUCT_TYPE, AGGREGATION_LEVEL, POOL_ID, STAGE;
+ORDER BY POOL_NAME, AGGREGATION_LEVEL, POOL_ID, STAGE;
 ```
 
 Before accepting results, verify PUBLISHED status, successful latest input-reconciliation and publication milestones, reconciliation of account and summary totals to detail under approved reporting rules, correct scenario-weight version, and whole-VND published account/summary values. Stage categories are mutually exclusive; do not add Stage 3 default ECL to Stage 2 lifetime ECL.
