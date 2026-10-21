@@ -79,7 +79,7 @@ BEGIN
 
     IF @REQUESTED_POOL_NAME IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM ecl_cfg.PoolName WHERE POOL_NAME = @REQUESTED_POOL_NAME AND IS_ACTIVE = 1)
-        THROW 51006, 'Requested product type is not active or does not exist.', 1;
+        THROW 51006, 'Requested pool name is not active or does not exist.', 1;
 
     BEGIN TRY
         BEGIN TRANSACTION;
