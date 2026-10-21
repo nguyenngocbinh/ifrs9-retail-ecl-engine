@@ -127,7 +127,7 @@ CREATE TABLE ecl_stg.AccountSnapshot (
     CONSTRAINT CK_AccountSnapshot_Stage CHECK (STAGE IN (1,2,3))
 );
 GO
-CREATE INDEX IX_AccountSnapshot_Run_Product_Stage
+CREATE INDEX IX_AccountSnapshot_Run_PoolName_Stage
     ON ecl_stg.AccountSnapshot (RUN_ID, POOL_NAME, STAGE)
     INCLUDE (POOL_ID, ACCOUNT_ID, VERSION_ID, IS_ACTIVE);
 CREATE INDEX IX_AccountSnapshot_Run_Pool
@@ -242,7 +242,7 @@ CREATE TABLE ecl_result.ECLDetail (
     CONSTRAINT CK_ECLDetail_Amounts CHECK (ECL_UNWEIGHTED >= 0 AND ECL_WEIGHTED >= 0)
 );
 GO
-CREATE INDEX IX_ECLDetail_Run_Product_Stage
+CREATE INDEX IX_ECLDetail_Run_PoolName_Stage
     ON ecl_result.ECLDetail (RUN_ID, POOL_NAME, STAGE)
     INCLUDE (ACCOUNT_ID, POOL_ID, SCENARIO_CODE, FORECAST_PERIOD, ECL_WEIGHTED);
 CREATE INDEX IX_ECLDetail_Run_Pool
@@ -273,7 +273,7 @@ CREATE TABLE ecl_result.ECLAccount (
     )
 );
 GO
-CREATE INDEX IX_ECLAccount_Run_Product_Stage
+CREATE INDEX IX_ECLAccount_Run_PoolName_Stage
     ON ecl_result.ECLAccount (RUN_ID, POOL_NAME, STAGE)
     INCLUDE (POOL_ID, ECL_12_MONTH, ECL_LIFETIME, ECL_DEFAULT, ECL_TOTAL);
 CREATE INDEX IX_ECLAccount_Run_Pool
@@ -305,7 +305,7 @@ CREATE TABLE ecl_result.ECLPortfolioSummary (
     )
 );
 GO
-CREATE INDEX IX_ECLPortfolioSummary_Run_Stage
+CREATE INDEX IX_ECLPortfolioSummary_Run_Stage_PoolName
     ON ecl_result.ECLPortfolioSummary (RUN_ID, STAGE, POOL_NAME)
     INCLUDE (ACCOUNT_COUNT, ECL_TOTAL);
 GO
