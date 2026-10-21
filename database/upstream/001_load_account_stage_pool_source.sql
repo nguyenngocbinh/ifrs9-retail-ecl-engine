@@ -10,7 +10,7 @@ Purpose:
 - Preserve the finalized bucket from CUSTOMER_ODR_LRA_IRB; do not recalculate DPD/MOB rules here.
 
 This loader writes to a separate staging table, NOT ecl_stg.AccountSnapshot.
-The canonical AccountSnapshot also requires approved PRODUCT_TYPE and MATURITY_DATE mappings;
+The canonical AccountSnapshot also requires approved POOL_NAME and MATURITY_DATE mappings;
 those fields are deliberately not guessed by this source loader.
 Review source column names and business rules before deployment.
 */
@@ -271,6 +271,6 @@ EXEC ecl_core.usp_LoadAccountStagePoolSource
     @REPLACE_EXISTING = 0;
 
 This is the Stage/Pool source-loading step only. Do not copy rows to
-ecl_stg.AccountSnapshot until approved PRODUCT_TYPE and MATURITY_DATE mappings
+ecl_stg.AccountSnapshot until approved POOL_NAME and MATURITY_DATE mappings
 are supplied and validated.
 */
