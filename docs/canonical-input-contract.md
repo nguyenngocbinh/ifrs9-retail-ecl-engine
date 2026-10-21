@@ -73,3 +73,13 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 - Every active account must have active EAD rows for all annual forecast periods through maturity, with a maximum supported horizon of 120 periods.
 - Auto and Non-Revolving source ETL are responsible for source-specific schedule/balance transformations before inserting into the canonical table. The shared procedure does not infer settlement, write-off, waiver, or amortization semantics.
 - `ecl_core.usp_CalculateECL` continues to consume `ecl_stg.EADCurve` unchanged.
+
+
+## 9. Shared PD loading
+
+- Source-specific ETL must resolve the facility rating, approved business segment, source bucket, reporting date, forecast period, and scenario before inserting into canonical `ecl_stg.PDCurve`.
+- `ecl_core.usp_LoadPDCurve @RUN_ID` validates the rows already loaded into `ecl_stg.PDCurve`; it does not calculate PD or silently infer source scenario codes.
+- Every PD row must match the run `PROCESS_DATE` and an active account snapshot. Values must be within [0,1].
+- Every active account must have active rows for `DOWNTURN`, `BASE`, and `UPTURN` for each annual forecast period through maturity (maximum 120 periods).
+- The approved source `RETAIL_MARGINAL_PIT_PD` stores `FINAL_MARGINAL_PIT_PD` by `SEGMENT_LV1`, `SEGMENT_LV2`, `BUCKET`, `RATING`, and `SCENARIO`. Source-to-canonical scenario mapping and all join-key semantics must be explicit in source ETL; the shared loader does not guess whether source scenario codes 1/2/3 mean Downturn/Base/Upturn.
+- This migration completes shared contract validation. The source-specific transformation from `TBL_MAN_FACILITY_RATING` and `RETAIL_MARGINAL_PIT_PD` into `PDCurve` remains a separate upstream implementation.
