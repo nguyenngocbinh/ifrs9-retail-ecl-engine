@@ -207,8 +207,11 @@ BEGIN
             IF EXISTS (SELECT 1 FROM ecl_stg.PDCurve WHERE RUN_ID = @RUN_ID)
                OR EXISTS (SELECT 1 FROM ecl_stg.LGDCurve WHERE RUN_ID = @RUN_ID)
                OR EXISTS (SELECT 1 FROM ecl_stg.EADCurve WHERE RUN_ID = @RUN_ID)
+               OR EXISTS (SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID = @RUN_ID)
+               OR EXISTS (SELECT 1 FROM ecl_result.ECLAccount WHERE RUN_ID = @RUN_ID)
+               OR EXISTS (SELECT 1 FROM ecl_result.ECLPortfolioSummary WHERE RUN_ID = @RUN_ID)
             BEGIN
-                THROW 51315, 'Cannot replace AccountSnapshot while PD/LGD/EAD curve rows exist for RUN_ID. Use a new RUN_ID or remove dependent inputs through an approved reset procedure.', 1;
+                THROW 51315, 'Cannot replace AccountSnapshot while dependent curves or ECL results exist for RUN_ID. Use a new RUN_ID or remove dependent inputs through an approved reset procedure.', 1;
             END;
 
             DELETE FROM ecl_stg.AccountSnapshot
