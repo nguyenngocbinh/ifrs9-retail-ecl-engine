@@ -98,6 +98,6 @@ Do not infer production deployment success from CI. Do not merge future PRs with
 ## Upstream canonical account load
 - [x] Add `ecl_core.usp_LoadAccountStagePoolSource` to stage contract-level Stage/Pool rows separately.
 - [x] Add `ecl_core.usp_LoadAccountSnapshot` to populate canonical `ecl_stg.AccountSnapshot` from Stage/Pool staging and contract `expiry_date`.
-- [x] Require explicit `ecl_cfg.PoolProductTypeMap` configuration and fail closed for unmapped pools rather than guessing `PRODUCT_TYPE`.
-- [ ] Obtain business-approved product mappings for all in-scope pools; test both loaders against verified source DDL and synthetic/disposable SQL Server data.
+- [x] Require explicit `ecl_cfg.PoolPoolNameMap` configuration and fail closed for unmapped pools rather than guessing `POOL_NAME`.
+- [ ] Confirm the canonical pool-name list against approved source mapping; test both loaders against verified source DDL and synthetic/disposable SQL Server data.
 - [ ] Add SQL regression tests for successful load, missing mapping, invalid maturity, duplicate source contract, and guarded reload.
