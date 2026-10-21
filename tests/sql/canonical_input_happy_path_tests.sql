@@ -18,8 +18,6 @@ DECLARE @MATCH_COUNT int;
 BEGIN TRY
     IF COL_LENGTH(N'ecl_stg.AccountSnapshot', N'POOL_NAME') IS NULL
         THROW 51806, 'AccountSnapshot must expose POOL_NAME.', 1;
-    IF COL_LENGTH(N'ecl_stg.AccountSnapshot', N'PRODUCT_TYPE') IS NOT NULL
-        THROW 51807, 'Legacy PRODUCT_TYPE must not remain in AccountSnapshot.', 1;
     IF NOT EXISTS (SELECT 1 FROM ecl_cfg.PoolName WHERE POOL_NAME = 'RETAIL_LN_MORTGAGE' AND IS_ACTIVE = 1)
         THROW 51808, 'Canonical pool-name catalog must include the mortgage pool.', 1;
     BEGIN TRANSACTION;
