@@ -109,7 +109,7 @@ BEGIN
         FROM ecl_stg.AccountStagePoolSource AS s
         LEFT JOIN [DEFAULT].[dbo].[ODR_CONTRACT_LEVEL_IRB] AS c
           ON c.PROCESS_DATE = s.PROCESS_DATE
-         AND c.CONTRACT_ID = s.ACCOUNT_ID
+         AND CONVERT(varchar(100), c.CONTRACT_ID) = s.ACCOUNT_ID
         WHERE s.RUN_ID = @RUN_ID
           AND s.IS_ACTIVE = 1
         GROUP BY s.ACCOUNT_ID
