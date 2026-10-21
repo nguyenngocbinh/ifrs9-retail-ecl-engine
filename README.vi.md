@@ -15,6 +15,8 @@ Công thức ở mức khái quát:
 `ECL = PD × LGD × EAD × Hệ số chiết khấu`
 
 Engine tính ECL theo từng kịch bản, áp dụng trọng số Downturn/Base/Upturn đã version hóa, tổng hợp kết quả, kiểm tra đối soát và chỉ xuất bản run thành công.
+Bảng danh mục `ecl_cfg.PoolName` đồng thời quản lý mapping giữa `POOL_NAME` chuẩn của engine và `SEGMENT` nghiệp vụ. Giá trị `SEGMENT` được dùng để mapping với `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` khi kết hợp rating tài khoản với đường cong marginal PIT PD theo kỳ và kịch bản.
+
 
 ## 2. Mindmap tổng thể
 
