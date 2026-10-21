@@ -50,10 +50,10 @@ BEGIN TRY
       Only period 1 is supplied for both; period 2 must be required only for B.
     */
     INSERT INTO ecl_stg.AccountSnapshot
-        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, PRODUCT_TYPE, STAGE, POOL_ID,
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE, POOL_ID,
          MATURITY_DATE, VERSION_ID, IS_ACTIVE, IS_POCI)
     VALUES
-        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M', NULL, 'MORTGAGE', 1, 'POOL-MAT',
+        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M', NULL, 'RETAIL_LN_MORTGAGE', 1, 'POOL-MAT',
          '20271015', 1, 1, 0),
         (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M-1D', NULL, 'AUTO', 2, 'POOL-MAT',
          '20271016', 1, 1, 0);
