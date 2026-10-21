@@ -29,10 +29,10 @@ GO
 
 CREATE TABLE ecl_cfg.PoolName (
     POOL_NAME varchar(100) NOT NULL,
-    POOL_DESCRIPTION nvarchar(100) NOT NULL,
+    SEGMENT nvarchar(100) NOT NULL,
     IS_ACTIVE bit NOT NULL CONSTRAINT DF_PoolName_IsActive DEFAULT (1),
     CONSTRAINT PK_PoolName PRIMARY KEY CLUSTERED (POOL_NAME),
-    CONSTRAINT UQ_PoolName_Description UNIQUE (POOL_DESCRIPTION)
+    CONSTRAINT UQ_PoolName_Segment UNIQUE (SEGMENT)
 );
 GO
 
@@ -358,7 +358,7 @@ GO
    loaded as an immutable versioned config set with VERSION_ID, PROCESS_DATE,
    effective dates, and audit history: DOWNTURN=0.1568, BASE=0.6864, UPTURN=0.1568.
    External official source/provenance is pending and may be added later. */
-INSERT INTO ecl_cfg.PoolName (POOL_NAME, POOL_DESCRIPTION)
+INSERT INTO ecl_cfg.PoolName (POOL_NAME, SEGMENT)
 VALUES ('RETAIL_LN_AUTO', N'Autoloan'),
        ('RETAIL_LN_CONS_SEC', N'Consumer lending - secured'),
        ('RETAIL_LN_CONS_UNSEC', N'Consumer lending - unsecured'),
