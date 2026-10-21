@@ -220,7 +220,7 @@ BEGIN
         VALUES
         (
             @RUN_ID, @PROCESS_DATE, 'ACCOUNT_SNAPSHOT_LOAD', 'SUCCEEDED',
-            N'Loaded canonical AccountSnapshot from AccountStagePoolSource with approved pool-to-product mapping.',
+            N'Loaded canonical AccountSnapshot from AccountStagePoolSource with validated POOL_NAME from Stage/Pool staging.',
             @ROW_COUNT
         );
 
