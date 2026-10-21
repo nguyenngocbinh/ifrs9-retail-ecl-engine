@@ -35,7 +35,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - `canonical_input_happy_path_tests.sql`: positive-path validation/reconciliation of all six input families without ECL output.
 - `precalculation_rerun_safety_tests.sql`: repeated validation/reconciliation keeps manifest and run state stable, creates no ECL output, and records one reconciliation event per attempt.
 - `publication_gate_tests.sql`: rejects invalid lifecycle transitions after failed reconciliation/publication milestones; does not test output-write atomicity.
-- `selective_run_scope_tests.sql`: accepts in-scope synthetic rows and blocks product/pool mismatches.
+- `selective_run_scope_tests.sql`: accepts in-scope synthetic rows and blocks pool-name/pool-ID mismatches.
 - `input_data_quality_tests.sql`: PR #36 covered ACCOUNT wrong-date handling and duplicate ACCOUNT/PD grains; PR #38 adds wrong-date coverage for PD/LGD/EAD/EIR/SCENARIO_WEIGHT and duplicate LGD/EAD/EIR grain rejection.
 - `ecl_calculation_tests.sql`: PR #39 synthetic calculation coverage for Stage 1/2/3, scenario weighting, fractional discount time, retry rejection and publication rounding.
 - Gap remaining: explicit fault-injection rollback regression for a forced mid-write failure.
@@ -86,10 +86,18 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 | #42 | #28 | Reconcile README, roadmap, and implementation logs | In progress |
 
 ## Current next actions
-1. Review PR #49 for the contract-level Stage/Pool SQL loader; test it against a disposable SQL Server and verify source column names/duplicate keys before production use.
+1. PR #49 is merged with the contract-level Stage/Pool SQL loader. Verify source column names/duplicate keys and test it with the AccountSnapshot loader against a disposable SQL Server before production use.
 2. Reconcile the README and implementation logs with the merged calculation and rollback-test work (PR #42).
 3. Complete the step-by-step SQL Server deployment guide tracked in [Issue #40](https://github.com/nguyenngocbinh/ifrs9-retail-ecl-engine/issues/40).
 4. Run migrations 001–005 and the complete synthetic calculate-and-publish flow against a clean, disposable SQL Server 2022 database; record the actual results and any blockers.
 5. Keep production readiness separate: environment-specific source mapping, approved scenario-weight provenance, permissions, performance, monitoring/retention, backup/restore and operational runbooks remain gated.
 
 Do not infer production deployment success from CI. Do not merge future PRs without explicit user authorization.
+
+
+## Upstream canonical account load
+- [x] Add `ecl_core.usp_LoadAccountStagePoolSource` to stage contract-level Stage/Pool rows separately.
+- [x] Add `ecl_core.usp_LoadAccountSnapshot` to populate canonical `ecl_stg.AccountSnapshot` from Stage/Pool staging and contract `expiry_date`.
+- [x] Reuse upstream `POOL_NAME` and validate it against the canonical `ecl_cfg.PoolName` list; no separate product mapping layer is needed.
+- [ ] Confirm the canonical pool-name list against approved source mapping; test both loaders against verified source DDL and synthetic/disposable SQL Server data.
+- [ ] Add SQL regression tests for successful load, missing mapping, invalid maturity, duplicate source contract, and guarded reload.

@@ -27,12 +27,12 @@ BEGIN TRY
     EXEC ecl_core.usp_TransitionRunStatus @RUN_ID, 'VALIDATING';
 
     INSERT INTO ecl_stg.AccountSnapshot
-        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, PRODUCT_TYPE, STAGE, POOL_ID,
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, POOL_NAME, STAGE, POOL_ID,
          MATURITY_DATE, VERSION_ID, IS_ACTIVE, IS_POCI)
     VALUES
-        (@RUN_ID, @PROCESS_DATE, 'SYN-RECON-001', 'MORTGAGE', 1, 'POOL-A',
+        (@RUN_ID, @PROCESS_DATE, 'SYN-RECON-001', 'RETAIL_LN_MORTGAGE', 1, 'POOL-A',
          '20281015', 1, 1, 0),
-        (@RUN_ID, @PROCESS_DATE, 'SYN-RECON-002', 'AUTO', 2, 'POOL-B',
+        (@RUN_ID, @PROCESS_DATE, 'SYN-RECON-002', 'RETAIL_LN_AUTO', 2, 'POOL-B',
          '20271015', 1, 1, 1);
 
     EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'ACCOUNT', 'TEST', 'synthetic.account', 'v1', 1, 1, NULL;

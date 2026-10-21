@@ -16,6 +16,10 @@ DECLARE @ERROR_COUNT int;
 DECLARE @MATCH_COUNT int;
 
 BEGIN TRY
+    IF COL_LENGTH(N'ecl_stg.AccountSnapshot', N'POOL_NAME') IS NULL
+        THROW 51806, 'AccountSnapshot must expose POOL_NAME.', 1;
+    IF NOT EXISTS (SELECT 1 FROM ecl_cfg.PoolName WHERE POOL_NAME = 'RETAIL_LN_MORTGAGE' AND IS_ACTIVE = 1)
+        THROW 51808, 'Canonical pool-name catalog must include the mortgage pool.', 1;
     BEGIN TRANSACTION;
 
     INSERT INTO ecl_cfg.ScenarioWeightVersion
@@ -42,10 +46,10 @@ BEGIN TRY
         @EVENT_MESSAGE = N'Positive-path canonical input integration test';
 
     INSERT INTO ecl_stg.AccountSnapshot
-        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, PRODUCT_TYPE, STAGE,
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE,
          POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE, IS_POCI)
     VALUES
-        (@RUN_ID, @PROCESS_DATE, 'SYN-HAPPY-001', 'SYN-CUST-001', 'MORTGAGE', 1,
+        (@RUN_ID, @PROCESS_DATE, 'SYN-HAPPY-001', 'SYN-CUST-001', 'RETAIL_LN_MORTGAGE', 1,
          'POOL-HAPPY', '20271015', 1, 1, 0);
 
     INSERT INTO ecl_stg.PDCurve

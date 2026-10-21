@@ -49,10 +49,10 @@ BEGIN TRY
     EXEC ecl_core.usp_SealRunInputs @RUN_ID;
 
     INSERT INTO ecl_stg.AccountSnapshot
-        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, PRODUCT_TYPE, STAGE, POOL_ID,
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE, POOL_ID,
          MATURITY_DATE, VERSION_ID, IS_ACTIVE, IS_POCI)
     VALUES
-        (@RUN_ID, @PROCESS_DATE, 'SYN-REGRESSION-001', NULL, 'MORTGAGE', 1, 'POOL-REG',
+        (@RUN_ID, @PROCESS_DATE, 'SYN-REGRESSION-001', NULL, 'RETAIL_LN_MORTGAGE', 1, 'POOL-REG',
          '20271015', 1, 1, 0);
 
     /* EIR = -1 is the exact invalid boundary for DF(t)=1/(1+EIR(t))^t. */

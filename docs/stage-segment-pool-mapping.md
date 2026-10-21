@@ -42,7 +42,7 @@ Nguồn Stage là bảng customer-level DEFAULT.dbo.CUSTOMER_ODR_LRA_IRB, còn t
 
 **Khóa join nghiệp vụ:** PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. Trong bảng customer-level, segment được lưu ở segment_odr_lv1. Trong đoạn ETL nguồn được cung cấp, segment của hợp đồng được chuẩn hóa từ segment_lv1, segment_lv2 và modul; CTE bên dưới đặt tên cột đã chuẩn hóa là segment_odr_lv1 để áp dụng đúng ba khóa join. Nếu bảng contract thực tế đã có cột chuẩn hóa segment_odr_lv1, có thể dùng trực tiếp cột đó và bỏ CTE chuẩn hóa tương ứng.
 
-Ví dụ dưới đây là SQL tham khảo cho phần Stage/Pool; nó không ghi vào canonical table. Cần xác nhận tên/cấu trúc cột thực tế và PRODUCT_TYPE, MATURITY_DATE, RUN_ID, VERSION_ID trước khi triển khai.
+Ví dụ dưới đây là SQL tham khảo cho phần Stage/Pool; nó không ghi vào canonical table. Cần xác nhận tên/cấu trúc cột thực tế, MATURITY_DATE, RUN_ID và VERSION_ID trước khi triển khai.
 
 ~~~sql
 DECLARE @PROCESS_DATE date = '2026-09-30';
@@ -141,7 +141,18 @@ EXEC ecl_core.usp_LoadAccountStagePoolSource
     @REPLACE_EXISTING = 0;
 ```
 
-Đây là bước staging Stage/Pool, chưa phải loader hoàn chỉnh cho `ecl_stg.AccountSnapshot`. Không chạy trực tiếp trên production trước khi xác minh tên cột vật lý, xử lý khóa trùng và kiểm thử trên database disposable. Cần bổ sung mapping `PRODUCT_TYPE` và `MATURITY_DATE` được phê duyệt trước khi hoàn tất canonical load.
+Đây là bước staging Stage/Pool. Bước nạp canonical tiếp theo nằm trong `database/upstream/002_load_account_snapshot.sql`, procedure `ecl_core.usp_LoadAccountSnapshot`. Procedure lấy `expiry_date` từ `ODR_CONTRACT_LEVEL_IRB` làm `MATURITY_DATE` và dùng `POOL_NAME` đã được ánh xạ trong `AccountStagePoolSource`; không tạo thêm mapping từ `POOL_ID` sang loại sản phẩm. Giá trị `POOL_NAME` phải tồn tại và đang hoạt động trong danh mục `ecl_cfg.PoolName`, được seed trong migration schema từ danh sách pool chuẩn.
+
+Ví dụ gọi procedure:
+
+```sql
+EXEC ecl_core.usp_LoadAccountSnapshot
+    @RUN_ID = 123,
+    @VERSION_ID = 1,
+    @REPLACE_EXISTING = 0;
+```
+
+Procedure sẽ chặn load nếu `POOL_NAME` không có trong danh mục, `expiry_date` không hợp lệ, ngày đáo hạn trước ngày xử lý, khóa nguồn không duy nhất, hoặc manifest đã seal mà yêu cầu thay thế dữ liệu. Chạy trên môi trường dev/test và xác minh DDL nguồn trước khi triển khai production.
 
 ## 5. Kiểm tra chất lượng trước khi nạp
 
@@ -167,7 +178,7 @@ Checklist tối thiểu:
 - Mỗi segment retail được chọn map đến đúng một `POOL_ID`.
 - Không có customer_id/contract_id NULL; kiểm tra trùng khóa ở grain nguồn và bảo đảm mỗi PROCESS_DATE + CONTRACT_ID tạo tối đa một dòng snapshot. Kiểm tra cả trường hợp bảng customer-level có nhiều dòng cho cùng PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1.
 - `PROCESS_DATE` đồng nhất với ngày của `ecl_core.RunControl`.
-- Snapshot có đủ `ACCOUNT_ID`, `PRODUCT_TYPE`, `MATURITY_DATE`, `RUN_ID`, `VERSION_ID`; quy tắc chuyển `CUSTOMER_ID` thành `ACCOUNT_ID` phải được xác nhận theo nguồn dữ liệu, không mặc định hai khóa này tương đương.
+- Snapshot có đủ `ACCOUNT_ID`, `POOL_NAME`, `MATURITY_DATE`, `RUN_ID`, `VERSION_ID`; quy tắc chuyển `CUSTOMER_ID` thành `ACCOUNT_ID` phải được xác nhận theo nguồn dữ liệu, không mặc định hai khóa này tương đương.
 - Kết quả Stage/pool mapping được lưu hoặc truy vết theo run để có thể tái lập và giải trình.
 
 ## 6. Map vào hợp đồng canonical
@@ -180,7 +191,7 @@ Khi chuẩn hóa upstream, các trường tối thiểu liên quan là:
 | `CUSTOMER_ID` | `src.customer_id` |
 | `STAGE` | `StageMap` theo `src.bucket` |
 | `POOL_ID` | `SegmentPool.POOL_ID` |
-| `PRODUCT_TYPE` | Cần mapping riêng từ segment sang mã `ecl_cfg.ProductType`; không suy đoán chỉ từ `POOL_NAME` |
+| `POOL_NAME` | Lấy trực tiếp từ `SegmentPool.POOL_NAME`; phải khớp danh mục `ecl_cfg.PoolName` |
 | `ACCOUNT_ID` | `ODR_CONTRACT_LEVEL_IRB.CONTRACT_ID`; không dùng `CUSTOMER_ID` thay cho khóa hợp đồng |
 | `MATURITY_DATE` | Nguồn hợp đồng/khoản vay đã phê duyệt |
 | `RUN_ID`, `VERSION_ID`, `IS_ACTIVE` | Do quy trình điều phối và kiểm soát phiên bản upstream cấp |
@@ -191,7 +202,7 @@ Engine vẫn chịu trách nhiệm xác thực hợp đồng canonical, tính to
 
 1. Xác nhận cột segment chuẩn hóa thực tế trong `ODR_CONTRACT_LEVEL_IRB`; ví dụ này tạo `segment_odr_lv1` từ `segment_lv1`, `segment_lv2`, `modul` theo quy tắc đã cung cấp.
 2. Có cần lọc Corporate từ một nguồn/segment khác hay không? Query retail mẫu hiện tại không gồm `Large`, `Medium`, `Small`.
-3. Mapping `SEGMENT` sang `PRODUCT_TYPE` nào được phê duyệt, đặc biệt với `Others`, `CC`, `OD`.
+3. Xác nhận danh sách `POOL_NAME` trong `SegmentPool` khớp danh mục chuẩn, đặc biệt với `Others`, `CC`, `OD`.
 4. `bucket` có phản ánh đầy đủ Stage/SICR theo chính sách IFRS 9 hiện hành không, và quy tắc xử lý bucket NULL/không biết là chặn run hay ngoại lệ được phê duyệt?
 
 Không đưa dữ liệu khách hàng thật vào repo hoặc fixture kiểm thử; chỉ commit mapping cấu hình không nhạy cảm và dữ liệu giả lập.
