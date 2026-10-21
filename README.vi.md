@@ -59,7 +59,7 @@ mindmap
       ECLAccount
         Một dòng mỗi tài khoản mỗi run
       ECLPortfolioSummary
-        Tổng hợp pool và sản phẩm
+        Tổng hợp theo pool
     Kiểm soát chất lượng
       Đối soát
       ValidationError
@@ -84,7 +84,7 @@ flowchart TD
     D -->|Đạt| E[Tính ECL theo tài khoản × kịch bản × kỳ]
     D -->|Không đạt| X[Ghi lỗi / đánh dấu run thất bại]
     E --> F[Tổng hợp kịch bản và ECL tài khoản]
-    F --> G[Tổng hợp theo pool và sản phẩm]
+    F --> G[Tổng hợp theo pool]
     G --> H[Đối soát kết quả và ghi audit]
     H -->|Đạt| I[Xuất bản run hoàn tất]
     H -->|Không đạt| X
@@ -99,7 +99,7 @@ Mỗi lần chạy lại phải sử dụng **`RUN_ID` mới**. Không ghi đè 
 | `ecl_cfg` | Cấu hình có kiểm soát | `PoolName`, `Scenario`, `ScenarioWeightVersion`, `ScenarioWeight` | Pool, kịch bản và bộ trọng số nào được phép dùng cho run? |
 | `ecl_stg` | Hợp đồng dữ liệu đầu vào chuẩn hóa theo run | `AccountSnapshot`, `PDCurve`, `LGDCurve`, `EADCurve`, `EIRCurve` | Run đang sử dụng những tài khoản và đường cong năm nào? |
 | `ecl_core` | Quản lý vòng đời run và logic xử lý | `RunControl`, `usp_CalculateECL`, `usp_PublishECL`, `usp_LoadEADCurve` | Run đang ở trạng thái nào và bước xử lý tiếp theo là gì? |
-| `ecl_result` | Kết quả tính toán | `ECLDetail`, `ECLAccount`, `ECLPortfolioSummary` | Kết quả chi tiết, theo tài khoản, pool và sản phẩm là bao nhiêu? |
+| `ecl_result` | Kết quả tính toán | `ECLDetail`, `ECLAccount`, `ECLPortfolioSummary` | Kết quả chi tiết, theo tài khoản, pool và toàn danh mục là bao nhiêu? |
 | `ecl_audit` | Truy vết và lưu ngoại lệ | `RunEvent`, `ValidationError` | Đã xảy ra việc gì, khi nào, xử lý bao nhiêu dòng và vì sao kiểm tra thất bại? |
 
 ### Grain — khái niệm quan trọng nhất khi thiết kế bảng
