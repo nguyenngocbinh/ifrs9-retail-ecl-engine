@@ -29,7 +29,7 @@ BEGIN
     DECLARE @RUN_STATUS varchar(20);
     DECLARE @WEIGHT_VERSION_ID int;
     DECLARE @RUN_TYPE varchar(20);
-    DECLARE @REQUESTED_PRODUCT_TYPE varchar(30);
+    DECLARE @REQUESTED_POOL_NAME varchar(100);
     DECLARE @REQUESTED_POOL_ID varchar(100);
     DECLARE @MAX_HORIZON int;
     DECLARE @ERROR_COUNT int = 0;
@@ -40,7 +40,7 @@ BEGIN
         @RUN_STATUS = RUN_STATUS,
         @WEIGHT_VERSION_ID = SCENARIO_WEIGHT_VERSION_ID,
         @RUN_TYPE = RUN_TYPE,
-        @REQUESTED_PRODUCT_TYPE = REQUESTED_PRODUCT_TYPE,
+        @REQUESTED_POOL_NAME = REQUESTED_POOL_NAME,
         @REQUESTED_POOL_ID = REQUESTED_POOL_ID
     FROM ecl_core.RunControl
     WHERE RUN_ID = @RUN_ID;
@@ -54,10 +54,10 @@ BEGIN
     /* Every staged input row must use the run's reporting date. The keys intentionally
        exclude PROCESS_DATE, so a wrong-date row can otherwise coexist in a valid RUN_ID. */
     INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID,
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID,
          SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE)
     SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
-           a.PRODUCT_TYPE, a.ACCOUNT_ID, a.POOL_ID, NULL, NULL,
+           a.POOL_NAME, a.ACCOUNT_ID, a.POOL_ID, NULL, NULL,
            N'ACCOUNT input row PROCESS_DATE differs from the run reporting date.'
     FROM ecl_stg.AccountSnapshot a
     WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE <> @PROCESS_DATE
@@ -68,10 +68,10 @@ BEGIN
       );
 
     INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID,
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID,
          SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE)
     SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
-           a.PRODUCT_TYPE, p.ACCOUNT_ID, a.POOL_ID, p.SCENARIO_CODE, p.FORECAST_PERIOD,
+           a.POOL_NAME, p.ACCOUNT_ID, a.POOL_ID, p.SCENARIO_CODE, p.FORECAST_PERIOD,
            N'PD input row PROCESS_DATE differs from the run reporting date.'
     FROM ecl_stg.PDCurve p
     JOIN ecl_stg.AccountSnapshot a ON a.RUN_ID = p.RUN_ID AND a.ACCOUNT_ID = p.ACCOUNT_ID
@@ -85,10 +85,10 @@ BEGIN
       );
 
     INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID,
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID,
          SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE)
     SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
-           a.PRODUCT_TYPE, c.ACCOUNT_ID, a.POOL_ID, NULL, c.FORECAST_PERIOD,
+           a.POOL_NAME, c.ACCOUNT_ID, a.POOL_ID, NULL, c.FORECAST_PERIOD,
            N'LGD input row PROCESS_DATE differs from the run reporting date.'
     FROM ecl_stg.LGDCurve c
     JOIN ecl_stg.AccountSnapshot a ON a.RUN_ID = c.RUN_ID AND a.ACCOUNT_ID = c.ACCOUNT_ID
@@ -101,10 +101,10 @@ BEGIN
       );
 
     INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID,
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID,
          SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE)
     SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
-           a.PRODUCT_TYPE, c.ACCOUNT_ID, a.POOL_ID, NULL, c.FORECAST_PERIOD,
+           a.POOL_NAME, c.ACCOUNT_ID, a.POOL_ID, NULL, c.FORECAST_PERIOD,
            N'EAD input row PROCESS_DATE differs from the run reporting date.'
     FROM ecl_stg.EADCurve c
     JOIN ecl_stg.AccountSnapshot a ON a.RUN_ID = c.RUN_ID AND a.ACCOUNT_ID = c.ACCOUNT_ID
@@ -196,14 +196,14 @@ BEGIN
 
     /* A selective run must contain only the explicitly requested product/pool. */
     INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
     SELECT @RUN_ID, @PROCESS_DATE, 'RUN_SCOPE_MISMATCH', 'FATAL',
-           a.PRODUCT_TYPE, a.ACCOUNT_ID, a.POOL_ID,
+           a.POOL_NAME, a.ACCOUNT_ID, a.POOL_ID,
            N'Account snapshot falls outside the requested selective run scope.'
     FROM ecl_stg.AccountSnapshot a
     WHERE a.RUN_ID = @RUN_ID AND a.IS_ACTIVE = 1
       AND @RUN_TYPE = 'SELECTIVE'
-      AND ((@REQUESTED_PRODUCT_TYPE IS NOT NULL AND a.PRODUCT_TYPE <> @REQUESTED_PRODUCT_TYPE)
+      AND ((@REQUESTED_POOL_NAME IS NOT NULL AND a.POOL_NAME <> @REQUESTED_POOL_NAME)
         OR (@REQUESTED_POOL_ID IS NOT NULL AND a.POOL_ID <> @REQUESTED_POOL_ID))
       AND NOT EXISTS
       (
@@ -213,9 +213,9 @@ BEGIN
       );
 
     INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
     SELECT @RUN_ID, @PROCESS_DATE, 'MATURITY_DATE_INVALID', 'ERROR',
-           a.PRODUCT_TYPE, a.ACCOUNT_ID, a.POOL_ID,
+           a.POOL_NAME, a.ACCOUNT_ID, a.POOL_ID,
            N'Active account maturity date is earlier than the process date.'
     FROM ecl_stg.AccountSnapshot a
     WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
@@ -228,9 +228,9 @@ BEGIN
       );
 
     INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
     SELECT @RUN_ID, @PROCESS_DATE, 'POCI_CLASSIFICATION_MISSING', 'ERROR',
-           a.PRODUCT_TYPE, a.ACCOUNT_ID, a.POOL_ID,
+           a.POOL_NAME, a.ACCOUNT_ID, a.POOL_ID,
            N'POCI classification is NULL. Upstream must explicitly classify the account before calculation.'
     FROM ecl_stg.AccountSnapshot a
     WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
@@ -243,9 +243,9 @@ BEGIN
       );
 
     INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
     SELECT @RUN_ID, @PROCESS_DATE, 'POCI_EXCLUDED', 'ERROR',
-           a.PRODUCT_TYPE, a.ACCOUNT_ID, a.POOL_ID,
+           a.POOL_NAME, a.ACCOUNT_ID, a.POOL_ID,
            N'POCI account is out of v1 calculation scope and must be excluded from ordinary ECL calculation and reconciled.'
     FROM ecl_stg.AccountSnapshot a
     WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
@@ -317,7 +317,7 @@ BEGIN
        reserved for the discount exponent; this validation does not prorate PD or EAD. */
     ;WITH AccountHorizon AS
     (
-        SELECT a.ACCOUNT_ID, a.PRODUCT_TYPE, a.POOL_ID,
+        SELECT a.ACCOUNT_ID, a.POOL_NAME, a.POOL_ID,
                CASE
                  WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                  ELSE
@@ -347,7 +347,7 @@ BEGIN
     BEGIN
         ;WITH AccountHorizon AS
         (
-            SELECT a.ACCOUNT_ID, a.PRODUCT_TYPE, a.POOL_ID,
+            SELECT a.ACCOUNT_ID, a.POOL_NAME, a.POOL_ID,
                    CASE
                      WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                      ELSE CEILING(CONVERT(decimal(10,2),
@@ -367,14 +367,14 @@ BEGIN
         ),
         ExpectedPeriod AS
         (
-            SELECT h.ACCOUNT_ID, h.PRODUCT_TYPE, h.POOL_ID, n.N AS FORECAST_PERIOD
+            SELECT h.ACCOUNT_ID, h.POOL_NAME, h.POOL_ID, n.N AS FORECAST_PERIOD
             FROM AccountHorizon h
             JOIN Numbers n ON n.N <= h.HORIZON
         )
         INSERT INTO ecl_audit.ValidationError
-            (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID, FORECAST_PERIOD, ERROR_MESSAGE)
+            (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID, FORECAST_PERIOD, ERROR_MESSAGE)
         SELECT @RUN_ID, @PROCESS_DATE, 'CURVE_COVERAGE_MISSING', 'ERROR',
-               e.PRODUCT_TYPE, e.ACCOUNT_ID, e.POOL_ID, e.FORECAST_PERIOD,
+               e.POOL_NAME, e.ACCOUNT_ID, e.POOL_ID, e.FORECAST_PERIOD,
                CONCAT(N'Missing or inactive ', f.CURVE_FAMILY, N' curve coverage for required forecast period.')
         FROM ExpectedPeriod e
         CROSS JOIN (VALUES ('LGD'), ('EAD')) f(CURVE_FAMILY)
@@ -398,7 +398,7 @@ BEGIN
 
         ;WITH AccountHorizon AS
         (
-            SELECT a.ACCOUNT_ID, a.PRODUCT_TYPE, a.POOL_ID,
+            SELECT a.ACCOUNT_ID, a.POOL_NAME, a.POOL_ID,
                    CASE
                      WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                      ELSE CEILING(CONVERT(decimal(10,2),
@@ -418,13 +418,13 @@ BEGIN
         ),
         ExpectedPeriod AS
         (
-            SELECT h.ACCOUNT_ID, h.PRODUCT_TYPE, h.POOL_ID, n.N AS FORECAST_PERIOD
+            SELECT h.ACCOUNT_ID, h.POOL_NAME, h.POOL_ID, n.N AS FORECAST_PERIOD
             FROM AccountHorizon h JOIN Numbers n ON n.N <= h.HORIZON
         )
         INSERT INTO ecl_audit.ValidationError
-            (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, PRODUCT_TYPE, ACCOUNT_ID, POOL_ID, SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE)
+            (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID, SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE)
         SELECT @RUN_ID, @PROCESS_DATE, 'PD_COVERAGE_MISSING', 'ERROR',
-               e.PRODUCT_TYPE, e.ACCOUNT_ID, e.POOL_ID, s.SCENARIO_CODE, e.FORECAST_PERIOD,
+               e.POOL_NAME, e.ACCOUNT_ID, e.POOL_ID, s.SCENARIO_CODE, e.FORECAST_PERIOD,
                N'Missing or inactive PD curve coverage for required account/scenario/forecast period.'
         FROM ExpectedPeriod e
         CROSS JOIN (VALUES ('DOWNTURN'), ('BASE'), ('UPTURN')) s(SCENARIO_CODE)
