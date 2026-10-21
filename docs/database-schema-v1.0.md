@@ -5,6 +5,7 @@
 This is a logical/canonical contract, not a claim about existing source tables. It is designed for SQL Server 2016 and T-SQL.
 
 - Schemas: `ecl_cfg`, `ecl_stg`, `ecl_core`, `ecl_result`, `ecl_audit`.
+- `ecl_cfg.PoolName` stores `POOL_NAME` and its business `SEGMENT`; `SEGMENT` maps to `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` for PD-curve lookup.
 - Inputs are normalized into separate tables.
 - Pool names share one model and one set of result tables; `POOL_NAME` is the upstream-mapped pool code (for example `RETAIL_LN_AUTO` or `RETAIL_LN_MORTGAGE`).
 - Primary business grain is `PROCESS_DATE + ACCOUNT_ID`; every execution is isolated by `RUN_ID`.
@@ -23,7 +24,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 
 | Schema | Table | Purpose / grain |
 |---|---|---|
-| ecl_cfg | PoolName | Approved pool-name code list used by canonical inputs |
+| ecl_cfg | PoolName | Approved mapping from `POOL_NAME` to its business `SEGMENT`, used by canonical inputs and upstream PD mapping |
 | ecl_cfg | Scenario | Downturn/Base/Upturn code list |
 | ecl_cfg | ScenarioWeightVersion | Version/effective period for scenario weights |
 | ecl_cfg | ScenarioWeight | One row per version/scenario; process-date trace |
