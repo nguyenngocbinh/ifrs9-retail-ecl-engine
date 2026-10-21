@@ -20,6 +20,8 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - POCI is excluded from v1. If a POCI account is detected, persist a configured validation finding and never process it as a regular account. Severity controls run handling: ERROR/FATAL blocks the run; WARN may allow continuation only when the POCI account is excluded from calculation and its exclusion is visible in reconciliation.
 - Calculation procedures are not included.
 
+The `ecl_cfg.PoolName` reference table includes both `POOL_NAME` and `SEGMENT`. `SEGMENT` is the business segment label and maps to `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` when loading account-level PD curves.
+
 ## Schemas and tables
 
 | Schema | Table | Purpose / grain |
