@@ -38,12 +38,12 @@ BEGIN TRY
         @EVENT_MESSAGE = N'Synthetic shared EAD loader test';
 
     INSERT INTO ecl_stg.AccountSnapshot
-        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, PRODUCT_TYPE, STAGE,
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE,
          POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE)
     VALUES
-        (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-AUTO-001', NULL, 'AUTO', 2,
+        (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-AUTO-001', NULL, 'RETAIL_LN_AUTO', 2,
          'POOL-AUTO', '20271015', 1, 1),
-        (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-PL-001', NULL, 'PERSONALLOAN', 2,
+        (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-PL-001', NULL, 'RETAIL_LN_CONS_UNSEC', 2,
          'POOL-PL', '20281015', 1, 1);
 
     /* Product-specific ETL inserts its calculated annual curve into the canonical table. */
