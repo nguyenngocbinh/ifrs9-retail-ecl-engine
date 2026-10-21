@@ -123,6 +123,26 @@ WHERE c.PROCESS_DATE = @PROCESS_DATE;
 
 Dùng LEFT JOIN để hợp đồng không tìm được Stage hoặc Pool vẫn xuất hiện trong kết quả kiểm tra. Không loại bỏ âm thầm các dòng lỗi trước khi nạp. Stage được đọc từ bucket đã xử lý xong trong bảng customer-level; không tính lại Stage từ DPD/MOB hợp đồng, vì các quy tắc nguồn còn có điều chỉnh riêng cho OD và Corporate.
 
+### SQL procedure triển khai tham khảo
+
+Đã bổ sung script `database/upstream/001_load_account_stage_pool_source.sql`. Sau khi chạy các migration core để tạo schema và bảng RunControl, script này tạo:
+
+- `ecl_stg.AccountStagePoolSource`: kết quả mapping Stage/Pool ở cấp hợp đồng, theo `RUN_ID + ACCOUNT_ID`.
+- `ecl_core.usp_LoadAccountStagePoolSource`: procedure đọc PROCESS_DATE từ RunControl, chuẩn hóa segment từ các trường nguồn, JOIN theo ba khóa yêu cầu và lưu kết quả mapping.
+
+Procedure sẽ chặn trường hợp trùng khóa nguồn, bucket không hợp lệ, hợp đồng thuộc segment được hỗ trợ nhưng không có bản ghi Stage, hoặc nạp lặp RUN_ID khi chưa yêu cầu thay thế. Các segment ngoài 10 pool đã cấu hình không được nạp vào bảng này.
+
+Ví dụ chạy trên môi trường dev/test sau khi tạo run:
+
+```sql
+EXEC ecl_core.usp_LoadAccountStagePoolSource
+    @RUN_ID = 123,       -- thay bằng RUN_ID đã tạo
+    @VERSION_ID = 1,     -- thay bằng version nguồn đã phê duyệt
+    @REPLACE_EXISTING = 0;
+```
+
+Đây là bước staging Stage/Pool, chưa phải loader hoàn chỉnh cho `ecl_stg.AccountSnapshot`. Không chạy trực tiếp trên production trước khi xác minh tên cột vật lý, xử lý khóa trùng và kiểm thử trên database disposable. Cần bổ sung mapping `PRODUCT_TYPE` và `MATURITY_DATE` được phê duyệt trước khi hoàn tất canonical load.
+
 ## 5. Kiểm tra chất lượng trước khi nạp
 
 Chạy truy vấn tương tự dưới đây trên dữ liệu nguồn để phát hiện bucket hoặc segment chưa được cấu hình:
