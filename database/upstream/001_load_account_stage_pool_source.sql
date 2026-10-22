@@ -5,7 +5,7 @@ Run after the core schema migrations have created ecl_core.RunControl and ecl_st
 
 Purpose:
 - Expand finalized customer-level Stage/bucket to contract-level rows.
-- Join on PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1.
+- Join on PROCESS_DATE + CUSTOMER_ID + CUSTOMER_TYPE + SEGMENT_ODR_LV1.
 - Use CONTRACT_ID as ACCOUNT_ID.
 - Preserve the finalized bucket from VW_CUSTOMER_ODR_LRA_IRB; do not recalculate DPD/MOB rules here.
 
@@ -117,6 +117,14 @@ BEGIN
         CASE
             WHEN c.segment_lv1 IN
                 ('bigcorp 1','bigcorp 2','medium 1','medium 2',
+                 'micro','small','upper 1','upper 2','micro sme') THEN 'c'
+            WHEN c.segment_lv1 = 'khcn' THEN 'i'
+            WHEN c.segment_lv1 IS NULL AND c.modul = 'cc' THEN 'i'
+            ELSE NULL
+        END AS CUSTOMER_TYPE,
+        CASE
+            WHEN c.segment_lv1 IN
+                ('bigcorp 1','bigcorp 2','medium 1','medium 2',
                  'micro','small','upper 1','upper 2','micro sme')
                 THEN CASE
                     WHEN c.segment_lv1 IN ('bigcorp 1','bigcorp 2','upper 1','upper 2') THEN N'Large'
@@ -152,10 +160,10 @@ BEGIN
     */
     IF EXISTS
     (
-        SELECT s.PROCESS_DATE, s.CUSTOMER_ID, s.segment_odr_lv1
+        SELECT s.PROCESS_DATE, s.CUSTOMER_ID, s.customer_type, s.segment_odr_lv1
         FROM dbo.VW_CUSTOMER_ODR_LRA_IRB AS s
         WHERE s.PROCESS_DATE = @PROCESS_DATE
-        GROUP BY s.PROCESS_DATE, s.CUSTOMER_ID, s.segment_odr_lv1
+        GROUP BY s.PROCESS_DATE, s.CUSTOMER_ID, s.customer_type, s.segment_odr_lv1
         HAVING COUNT_BIG(*) > 1
     )
         THROW 51206, 'VW_CUSTOMER_ODR_LRA_IRB has duplicate PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1 keys; resolve upstream duplicates before loading.', 1;
@@ -204,6 +212,7 @@ BEGIN
     INNER JOIN dbo.VW_CUSTOMER_ODR_LRA_IRB AS s
         ON  s.PROCESS_DATE = c.PROCESS_DATE
         AND s.CUSTOMER_ID = c.CUSTOMER_ID
+        AND s.customer_type = c.CUSTOMER_TYPE
         AND s.segment_odr_lv1 = c.SEGMENT_ODR_LV1
     LEFT JOIN StageMap AS sm
         ON sm.BUCKET = s.bucket
@@ -242,10 +251,11 @@ BEGIN
               FROM dbo.VW_CUSTOMER_ODR_LRA_IRB AS s
               WHERE s.PROCESS_DATE = c.PROCESS_DATE
                 AND s.CUSTOMER_ID = c.CUSTOMER_ID
+                AND s.customer_type = c.CUSTOMER_TYPE
                 AND s.segment_odr_lv1 = c.SEGMENT_ODR_LV1
           )
     )
-        THROW 51208, 'One or more supported contracts have no matching customer-level Stage row on PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1.', 1;
+        THROW 51208, 'One or more supported contracts have no matching customer-level Stage row on PROCESS_DATE + CUSTOMER_ID + CUSTOMER_TYPE + SEGMENT_ODR_LV1.', 1;
 
     IF NOT EXISTS (SELECT 1 FROM #Mapped)
         THROW 51209, 'No contracts matched the configured Stage/Pool mappings and requested run scope.', 1;
