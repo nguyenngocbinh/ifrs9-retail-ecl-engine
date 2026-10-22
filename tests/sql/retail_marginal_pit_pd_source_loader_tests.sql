@@ -3,7 +3,8 @@ Integration test for ecl_core.usp_LoadRetailMarginalPITPD.
 Creates isolated synthetic source rows. Uses a source PROCESS_DATE different
 from the run date to verify the source-version warning and selection behavior.
 All engine data is rolled back; the disposable IRB_MHRR fixture database is
-created only for CI/dev testing.
+created only for CI/dev testing. Approved source scenario mapping is 1=BASE,
+2=UPTURN, 3=DOWNTURN.
 */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
@@ -123,13 +124,13 @@ BEGIN TRY
         (@RUN_ID, @PROCESS_DATE, 'SYN-PD-SOURCE-001', 'SYN-CUST-001',
          'RETAIL_CARD', 1, '105', '20270630', 1, 1);
 
-    /* Explicit test mapping only; production mapping remains caller-approved. */
+    /* Approved source scenario mapping: 1=BASE, 2=UPTURN, 3=DOWNTURN. */
     EXEC ecl_core.usp_LoadRetailMarginalPITPD
         @RUN_ID = @RUN_ID,
         @VERSION_ID = 1,
         @SCENARIO_1_CODE = 'BASE',
-        @SCENARIO_2_CODE = 'DOWNTURN',
-        @SCENARIO_3_CODE = 'UPTURN';
+        @SCENARIO_2_CODE = 'UPTURN',
+        @SCENARIO_3_CODE = 'DOWNTURN';
 
     SELECT @ROWS = COUNT_BIG(*)
     FROM ecl_stg.PDCurve
@@ -145,7 +146,7 @@ BEGIN TRY
           AND SCENARIO_CODE = 'BASE' AND FORECAST_PERIOD = 1
           AND MARGINAL_PD = 0.010000000000
     )
-        THROW 51891, 'Source SCENARIO 1 should follow the explicit test mapping to BASE.', 1;
+        THROW 51891, 'Source SCENARIO 1 should map to BASE.', 1;
 
     IF NOT EXISTS
     (
