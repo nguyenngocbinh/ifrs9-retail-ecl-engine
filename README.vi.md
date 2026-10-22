@@ -115,7 +115,7 @@ Mỗi lần chạy lại phải sử dụng **RUN_ID mới**; không ghi đè đ
 - Stage 1: ECL 12 tháng. Stage 2 và Stage 3: đến maturity.
 - Stage 3: PD dùng trong công thức bằng 1; sử dụng curve EAD/LGD/EIR như quy ước v1.
 - Chiết khấu: `DF(t) = 1 / (1 + EIR(t))^t`. Với kỳ cuối lẻ, chỉ điều chỉnh `t`, không prorate PD/EAD.
-- Trọng số thiết kế: Downturn 15.68%, Base 68.64%, Upturn 15.68%; phải sử dụng version hiệu lực, đủ ba kịch bản và tổng bằng 1.
+- Trọng số thiết kế: Downturn 15.68%, Base 68.64%, Upturn 15.68%; phải sử dụng version có hiệu lực tại `RunControl.PROCESS_DATE`, đủ ba kịch bản và tổng bằng 1. Bảng `ScenarioWeight` không lưu `PROCESS_DATE` vì trọng số gắn với phiên bản.
 - Đơn vị báo cáo VND; POCI ngoài phạm vi v1 và không được âm thầm xử lý như khoản vay thông thường.
 
 ## 7. Đọc repo theo thứ tự

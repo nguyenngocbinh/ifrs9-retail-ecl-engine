@@ -73,10 +73,10 @@ BEGIN
         ) THROW 51516, 'Selected scenario-weight version is not effective for this run.', 1;
 
         IF (SELECT COUNT(*) FROM ecl_cfg.ScenarioWeight
-            WHERE VERSION_ID=@WEIGHT_VERSION_ID AND PROCESS_DATE=@PROCESS_DATE AND IS_ACTIVE=1
+            WHERE VERSION_ID=@WEIGHT_VERSION_ID AND IS_ACTIVE=1
               AND SCENARIO_CODE IN ('DOWNTURN','BASE','UPTURN')) <> 3
            OR ABS((SELECT SUM(SCENARIO_WEIGHT) FROM ecl_cfg.ScenarioWeight
-                   WHERE VERSION_ID=@WEIGHT_VERSION_ID AND PROCESS_DATE=@PROCESS_DATE AND IS_ACTIVE=1
+                   WHERE VERSION_ID=@WEIGHT_VERSION_ID AND IS_ACTIVE=1
                      AND SCENARIO_CODE IN ('DOWNTURN','BASE','UPTURN'))-1.0) > 0.00000001
             THROW 51517, 'Selected scenario weights must contain Downturn/Base/Upturn and sum to one.', 1;
 
@@ -195,7 +195,7 @@ BEGIN
             JOIN ecl_stg.EIRCurve ir ON ir.RUN_ID=@RUN_ID AND ir.FORECAST_PERIOD=p.FORECAST_PERIOD
               AND ir.PROCESS_DATE=@PROCESS_DATE AND ir.IS_ACTIVE=1
             JOIN ecl_cfg.ScenarioWeight sw ON sw.VERSION_ID=@WEIGHT_VERSION_ID
-              AND sw.PROCESS_DATE=@PROCESS_DATE AND sw.IS_ACTIVE=1 AND sw.SCENARIO_CODE=s.SCENARIO_CODE
+              AND sw.IS_ACTIVE=1 AND sw.SCENARIO_CODE=s.SCENARIO_CODE
         )
         INSERT INTO #Calc
         SELECT ACCOUNT_ID,SCENARIO_CODE,FORECAST_PERIOD,STAGE,POOL_NAME,POOL_ID,PD_USED,LGD_USED,EAD_USED,EIR_USED,

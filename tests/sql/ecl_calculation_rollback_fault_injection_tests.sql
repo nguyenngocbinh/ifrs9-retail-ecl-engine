@@ -21,8 +21,8 @@ BEGIN TRY
     VALUES(@W,N'Fault injection rollback test',@D,@D,0);
 
     INSERT INTO ecl_cfg.ScenarioWeight
-        (VERSION_ID,SCENARIO_CODE,SCENARIO_WEIGHT,PROCESS_DATE,IS_ACTIVE)
-    VALUES(@W,'DOWNTURN',0.1568,@D,1),(@W,'BASE',0.6864,@D,1),(@W,'UPTURN',0.1568,@D,1);
+        (VERSION_ID,SCENARIO_CODE,SCENARIO_WEIGHT,IS_ACTIVE)
+    VALUES(@W,'DOWNTURN',0.1568,1),(@W,'BASE',0.6864,1),(@W,'UPTURN',0.1568,1);
 
     EXEC ecl_core.usp_CreateRun
         @PROCESS_DATE=@D,@RUN_TYPE='FULL',

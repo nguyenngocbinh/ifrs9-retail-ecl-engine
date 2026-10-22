@@ -8,7 +8,7 @@ Review required before production deployment:
 - EAD grain approved: account/forecast period.
 - EIR remains shared by forecast period; selected discount factor is DF(t) = 1 / (1 + EIR(t))^t, with t as forecast year.
 - Lifetime horizon ends at each account's MATURITY_DATE.
-- Scenario weights are user-confirmed: Downturn=15.68%, Base=68.64%, Upturn=15.68%; store them in immutable versioned configuration with VERSION_ID, PROCESS_DATE, effective dates and audit history. Official external source/provenance will be added later.
+- Scenario weights are user-confirmed: Downturn=15.68%, Base=68.64%, Upturn=15.68%; store them in immutable versioned configuration with VERSION_ID, effective dates and audit history. Official external source/provenance will be added later.
 - Scenario-weighted ECL = ECL_DOWNTURN * 0.1568 + ECL_BASE * 0.6864 + ECL_UPTURN * 0.1568.
 - Currency/reporting unit is VND; retain calculation precision internally and round final published ECL to the nearest whole VND.
 - Lifetime horizon ends at maturity; for a partial final forecast year, FINAL_PERIOD_FRACTION = remaining months / 12 and applies only to the discounting time/exponent. Do not prorate or otherwise change the supplied annual PD or EAD. Example: 3 full years plus 6 months gives t=3.5 in DF(t) = 1 / (1 + EIR(t))^t. Use the applicable shared EIR curve value for that forecast period. This is the agreed simplified convention for v1.
@@ -62,17 +62,12 @@ CREATE TABLE ecl_cfg.ScenarioWeight (
     VERSION_ID int NOT NULL,
     SCENARIO_CODE varchar(20) NOT NULL,
     SCENARIO_WEIGHT decimal(9,8) NOT NULL,
-    PROCESS_DATE date NOT NULL,
     IS_ACTIVE bit NOT NULL CONSTRAINT DF_ScenarioWeight_IsActive DEFAULT (1),
     CONSTRAINT PK_ScenarioWeight PRIMARY KEY CLUSTERED (VERSION_ID, SCENARIO_CODE),
     CONSTRAINT FK_ScenarioWeight_Version FOREIGN KEY (VERSION_ID) REFERENCES ecl_cfg.ScenarioWeightVersion(VERSION_ID),
     CONSTRAINT FK_ScenarioWeight_Scenario FOREIGN KEY (SCENARIO_CODE) REFERENCES ecl_cfg.Scenario(SCENARIO_CODE),
     CONSTRAINT CK_ScenarioWeight_Range CHECK (SCENARIO_WEIGHT >= 0 AND SCENARIO_WEIGHT <= 1)
 );
-GO
-CREATE INDEX IX_ScenarioWeight_ProcessDate_Active
-    ON ecl_cfg.ScenarioWeight (PROCESS_DATE, IS_ACTIVE, VERSION_ID)
-    INCLUDE (SCENARIO_CODE, SCENARIO_WEIGHT);
 GO
 
 CREATE TABLE ecl_core.RunControl (
@@ -355,7 +350,7 @@ CREATE INDEX IX_ValidationError_Run_Severity
 GO
 
 /* Seed canonical pool names and scenario codes. User-confirmed scenario weights must be
-   loaded as an immutable versioned config set with VERSION_ID, PROCESS_DATE,
+   loaded as an immutable versioned config set with VERSION_ID,
    effective dates, and audit history: DOWNTURN=0.1568, BASE=0.6864, UPTURN=0.1568.
    External official source/provenance is pending and may be added later. */
 INSERT INTO ecl_cfg.PoolName (POOL_NAME, SEGMENT)

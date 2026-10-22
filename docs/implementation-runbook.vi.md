@@ -29,7 +29,7 @@ $Scripts = @(
   "database/005_ecl_calculation.sql",
   "database/006_ead_curve_loader.sql",
   "database/007_pd_curve_loader.sql",
-  "database/008_lgd_curve_loader.sql"
+  "database/008_lgd_curve_loader.sql",
 )
 
 foreach ($Script in $Scripts) {
@@ -69,11 +69,11 @@ Không tự đổi `POOL_NAME`/`SEGMENT` chỉ để làm hết lỗi mapping; x
 
 ### Trọng số kịch bản
 
-Mỗi run cần một `VERSION_ID` hiệu lực tại `PROCESS_DATE` với đúng ba kịch bản và tổng trọng số bằng 1. Cấu hình mặc định đã thống nhất trong thiết kế là DOWNTURN 0.1568, BASE 0.6864, UPTURN 0.1568. Kiểm tra version trước khi tạo run:
+Mỗi run cần một `VERSION_ID` có hiệu lực tại `PROCESS_DATE` theo `ScenarioWeightVersion`, với đúng ba kịch bản và tổng trọng số bằng 1. Các dòng `ScenarioWeight` chỉ phụ thuộc `VERSION_ID + SCENARIO_CODE`, không lưu `PROCESS_DATE`. Cấu hình mặc định đã thống nhất trong thiết kế là DOWNTURN 0.1568, BASE 0.6864, UPTURN 0.1568. Kiểm tra version trước khi tạo run:
 
 ```sql
 SELECT v.VERSION_ID, v.VERSION_NAME, v.EFFECTIVE_FROM, v.EFFECTIVE_TO,
-       w.SCENARIO_CODE, w.SCENARIO_WEIGHT, w.PROCESS_DATE, w.IS_ACTIVE
+       w.SCENARIO_CODE, w.SCENARIO_WEIGHT, w.IS_ACTIVE
 FROM ecl_cfg.ScenarioWeightVersion v
 JOIN ecl_cfg.ScenarioWeight w ON w.VERSION_ID = v.VERSION_ID
 ORDER BY v.VERSION_ID, w.SCENARIO_CODE;
@@ -92,7 +92,7 @@ Mọi bảng đầu vào chuẩn phải được nạp theo cùng `RUN_ID` và `
 | `ecl_stg.LGDCurve` | RUN_ID + ACCOUNT_ID + FORECAST_PERIOD | LGD theo tài khoản và năm |
 | `ecl_stg.EADCurve` | RUN_ID + ACCOUNT_ID + FORECAST_PERIOD | EAD theo tài khoản và năm; currency VND |
 | `ecl_stg.EIRCurve` | RUN_ID + FORECAST_PERIOD | EIR theo năm, dùng chung cho tài khoản |
-| `ecl_cfg.ScenarioWeight` | VERSION_ID + SCENARIO_CODE | Trọng số kịch bản hiệu lực theo PROCESS_DATE |
+| `ecl_cfg.ScenarioWeight` | VERSION_ID + SCENARIO_CODE | Trọng số kịch bản theo phiên bản; không phụ thuộc PROCESS_DATE |
 
 ### Stage/Pool và AccountSnapshot
 

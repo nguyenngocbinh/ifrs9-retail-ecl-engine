@@ -128,21 +128,6 @@ BEGIN
             AND e.ERROR_MESSAGE = N'EIR input row PROCESS_DATE differs from the run reporting date.'
       );
 
-    INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, ERROR_MESSAGE)
-    SELECT @RUN_ID, @PROCESS_DATE, 'INPUT_PROCESS_DATE_MISMATCH', 'FATAL',
-           N'SCENARIO_WEIGHT input row PROCESS_DATE differs from the run reporting date.'
-    WHERE EXISTS (
-        SELECT 1 FROM ecl_cfg.ScenarioWeight w
-        WHERE w.VERSION_ID = @WEIGHT_VERSION_ID AND w.IS_ACTIVE = 1
-          AND w.PROCESS_DATE <> @PROCESS_DATE
-    )
-      AND NOT EXISTS (
-          SELECT 1 FROM ecl_audit.ValidationError e
-          WHERE e.RUN_ID = @RUN_ID AND e.VALIDATION_CODE = 'INPUT_PROCESS_DATE_MISMATCH'
-            AND e.ERROR_MESSAGE = N'SCENARIO_WEIGHT input row PROCESS_DATE differs from the run reporting date.'
-      );
-
     IF NOT EXISTS (SELECT 1 FROM ecl_core.RunInputManifest WHERE RUN_ID = @RUN_ID AND IS_SEALED = 1)
     BEGIN
         INSERT INTO ecl_audit.ValidationError

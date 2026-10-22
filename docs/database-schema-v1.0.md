@@ -13,7 +13,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - PD grain is account × scenario × forecast period; LGD and EAD grains are account × forecast period. EIR is shared by forecast period. Result detail is account × scenario × forecast period. Account output is one row per account/run. Portfolio output stores both portfolio and pool totals.
 - Selected discount factor: `DF(t) = 1 / (1 + EIR(t))^t`, where `t` is the annual forecast period. EIR is shared by period.
 - Lifetime horizon runs through each account's `MATURITY_DATE`. For a partial final forecast year, calculate `FINAL_PERIOD_FRACTION = remaining months / 12` and apply it **only to the discounting time/exponent**. Do not prorate, rescale, or otherwise change the supplied annual PD or EAD for the partial final year. The partial-year discount exponent is the elapsed forecast time including the final fraction (for example, year 3 plus 6 remaining months uses `t = 3.5`); the selected discount formula remains `DF(t) = 1 / (1 + EIR(t))^t`. The applicable period EIR remains sourced from the shared EIR curve. This is the agreed simplified convention for v1.
-- Scenario weights are user-confirmed: Downturn 15.68%, Base 68.64%, Upturn 15.68%. Store them as immutable, versioned configuration with `VERSION_ID`, `PROCESS_DATE`, effective dates and audit history. The official external source/provenance will be added later.
+- Scenario weights are user-confirmed: Downturn 15.68%, Base 68.64%, Upturn 15.68%. Store them as immutable, versioned configuration with `VERSION_ID`, effective dates and audit history. The official external source/provenance will be added later.
 - Scenario-weighted ECL = `ECL_DOWNTURN × 15.68% + ECL_BASE × 68.64% + ECL_UPTURN × 15.68%`.
 - Reporting currency is VND. Retain internal calculation precision and round final published ECL to whole VND.
 - Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual losses discounted using the agreed EIR convention before aggregation.
@@ -29,7 +29,7 @@ The `ecl_cfg.PoolName` reference table includes both `POOL_NAME` and `SEGMENT`. 
 | ecl_cfg | PoolName | Approved mapping from `POOL_NAME` to its business `SEGMENT`, used by canonical inputs and upstream PD mapping |
 | ecl_cfg | Scenario | Downturn/Base/Upturn code list |
 | ecl_cfg | ScenarioWeightVersion | Version/effective period for scenario weights |
-| ecl_cfg | ScenarioWeight | One row per version/scenario; process-date trace |
+| ecl_cfg | ScenarioWeight | One row per version/scenario; weights are independent of reporting date |
 | ecl_core | RunControl | One row per run, including process date, scope, lifecycle, calculation version |
 | ecl_stg | AccountSnapshot | One row per run/account; pool name, Stage, pool ID and contractual maturity date |
 | ecl_stg | PDCurve | One row per run/account/scenario/forecast period |
@@ -74,7 +74,7 @@ A run must transition through controlled states. Only a fully validated, calcula
 2. EAD is annual EAD at expected default using the year-end convention, as selected. The lifetime curve is used through each account's maturity date. In a partial final year, use the supplied annual EAD unchanged; do not multiply it by the remaining-month fraction.
 3. PD is supplied upstream as annual unconditional marginal PD on the original cohort. Use the supplied annual PD unchanged in a partial final year; do not apply a linear or hazard-based prorating transformation.
 4. **EIR curve is shared across pools**. The selected discount factor is `DF(t) = 1 / (1 + EIR(t))^t`, where `t` is elapsed forecast time in years, including the remaining-month fraction for the partial final year. Example: 6 months into the fourth forecast year gives `t = 3.5`. Only discounting time uses the partial-year fraction; PD and EAD remain unchanged. No calculation procedure is implemented here.
-5. `ScenarioWeight` DDL stores weights by version and scenario. Weight-sum and exact effective-version selection are run-time validation rules, not enforced by a row-level CHECK constraint.
+5. `ScenarioWeight` stores one row per version/scenario and does not contain `PROCESS_DATE`. Weight-sum and effective-version selection using the run's reporting date are run-time validation rules, not enforced by a row-level CHECK constraint.
 6. `ECLPortfolioSummary` uses a non-null `AGGREGATION_LEVEL`, `POOL_NAME`, and `POOL_ID`; portfolio-wide rows use `AGGREGATION_LEVEL='PORTFOLIO'`, `POOL_NAME='__ALL_POOLS__'`, and `POOL_ID='__ALL_POOLS__'`, while pool rows use `AGGREGATION_LEVEL='POOL'`, the actual pool name, and a real pool ID.
 7. `IS_ACTIVE` is included on standardized inputs as requested, but each run should snapshot only the selected active version. It is not a substitute for run isolation.
 8. Currency handling is explicit on EAD; all amounts must be in a consistent reporting currency before aggregation. Conversion logic is outside this DDL.
