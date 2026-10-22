@@ -23,11 +23,11 @@ BEGIN TRY
 
     /* Three active scenarios, deliberately invalid total: 0.60 instead of 1.00. */
     INSERT INTO ecl_cfg.ScenarioWeight
-        (VERSION_ID, SCENARIO_CODE, SCENARIO_WEIGHT, PROCESS_DATE, IS_ACTIVE)
+        (VERSION_ID, SCENARIO_CODE, SCENARIO_WEIGHT, IS_ACTIVE)
     VALUES
-        (@WEIGHT_VERSION, 'DOWNTURN', 0.10000000, @PROCESS_DATE, 1),
-        (@WEIGHT_VERSION, 'BASE',     0.20000000, @PROCESS_DATE, 1),
-        (@WEIGHT_VERSION, 'UPTURN',   0.30000000, @PROCESS_DATE, 1);
+        (@WEIGHT_VERSION, 'DOWNTURN', 0.10000000, 1),
+        (@WEIGHT_VERSION, 'BASE',     0.20000000, 1),
+        (@WEIGHT_VERSION, 'UPTURN',   0.30000000, 1);
 
     EXEC ecl_core.usp_CreateRun
         @PROCESS_DATE = @PROCESS_DATE,
