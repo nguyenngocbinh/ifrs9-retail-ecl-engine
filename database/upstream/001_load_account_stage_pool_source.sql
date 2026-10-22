@@ -298,12 +298,34 @@ BEGIN
         THROW;
     END CATCH;
 
+    /*
+      Return a compact run summary instead of every account row.
+      Use a separate TOP (100) query when account-level inspection is needed.
+    */
     SELECT
-        RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, SEGMENT_ODR_LV1,
-        BUCKET, STAGE, POOL_ID, POOL_NAME, CUSTOMER_TYPE_MODEL, VERSION_ID, IS_ACTIVE
+        RUN_ID,
+        PROCESS_DATE,
+        VERSION_ID,
+        SEGMENT_ODR_LV1,
+        POOL_ID,
+        POOL_NAME,
+        STAGE,
+        COUNT_BIG(*) AS ACCOUNT_COUNT,
+        COUNT(DISTINCT CUSTOMER_ID) AS CUSTOMER_COUNT
     FROM ecl_stg.AccountStagePoolSource
     WHERE RUN_ID = @RUN_ID
-    ORDER BY POOL_ID, STAGE, ACCOUNT_ID;
+      AND IS_ACTIVE = 1
+    GROUP BY
+        RUN_ID,
+        PROCESS_DATE,
+        VERSION_ID,
+        SEGMENT_ODR_LV1,
+        POOL_ID,
+        POOL_NAME,
+        STAGE
+    ORDER BY
+        POOL_ID,
+        STAGE;
 END;
 GO
 
