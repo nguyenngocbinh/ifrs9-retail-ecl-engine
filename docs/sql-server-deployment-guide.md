@@ -197,10 +197,15 @@ Before accepting results, verify PUBLISHED status, successful latest input-recon
 
 ## 10. Release readiness checklist
 
-- [ ] Migrations 001–007 deployed to a clean disposable SQL Server 2022 database.
+- [ ] Migrations 001–008 deployed to a clean disposable SQL Server 2022 database.
 - [ ] Object verification queries passed.
 - [ ] Every synthetic SQL test completed successfully on that database.
 - [ ] End-to-end synthetic calculation reached PUBLISHED and its assertions passed.
 - [ ] Fault-injection test confirmed no partial calculation output remained after the injected error.
 - [ ] Actual database version, compatibility level, test date, and results recorded without secrets.
 - [ ] Environment-specific permissions, source mapping, scenario-weight provenance, performance, monitoring, backup/restore, and operational runbooks reviewed separately before production rollout.
+
+
+## Retail PD source-loader deployment notes
+
+Migration 008 requires the run database to contain `dbo.RETAIL_MARGINAL_PIT_PD` and have read access to `[IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING]` (for example, via appropriate cross-database permissions). It selects the latest source PD `PROCESS_DATE` as a dataset version and records a warning with the selected date. Confirm source freshness and the mapping of source scenarios 1/2/3 before operational use. Populate `ecl_cfg.PoolName.SEGMENT` with values that exactly match source `SEGMENT_LV2`.
