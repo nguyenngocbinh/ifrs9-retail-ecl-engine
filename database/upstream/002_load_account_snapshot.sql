@@ -10,7 +10,7 @@ Prerequisites:
 
 Purpose:
   - Reuse Stage/Pool already validated by usp_LoadAccountStagePoolSource.
-  - Read MATURITY_DATE from DEFAULT.dbo.ODR_CONTRACT_LEVEL_IRB.expiry_date.
+  - Read MATURITY_DATE from dbo.VW_ODR_CONTRACT_LEVEL_IRB.expiry_date.
   - Reuse POOL_NAME already mapped by usp_LoadAccountStagePoolSource and validate it against ecl_cfg.PoolName.
   - Insert the canonical account grain RUN_ID + ACCOUNT_ID into AccountSnapshot.
 
@@ -113,7 +113,7 @@ BEGIN
     (
         SELECT s.ACCOUNT_ID
         FROM ecl_stg.AccountStagePoolSource AS s
-        LEFT JOIN [DEFAULT].[dbo].[ODR_CONTRACT_LEVEL_IRB] AS c
+        LEFT JOIN dbo.VW_ODR_CONTRACT_LEVEL_IRB AS c
           ON c.PROCESS_DATE = s.PROCESS_DATE
          AND CONVERT(varchar(100), c.CONTRACT_ID) = s.ACCOUNT_ID
         WHERE s.RUN_ID = @RUN_ID
@@ -121,7 +121,7 @@ BEGIN
         GROUP BY s.ACCOUNT_ID
         HAVING COUNT_BIG(c.CONTRACT_ID) <> 1
     )
-        THROW 51307, 'Each active Stage/Pool account must match exactly one ODR_CONTRACT_LEVEL_IRB row by PROCESS_DATE + CONTRACT_ID.', 1;
+        THROW 51307, 'Each active Stage/Pool account must match exactly one VW_ODR_CONTRACT_LEVEL_IRB row by PROCESS_DATE + CONTRACT_ID.', 1;
 
     DROP TABLE IF EXISTS #SnapshotCandidate;
 
@@ -136,10 +136,10 @@ BEGIN
         TRY_CONVERT(date, c.expiry_date) AS MATURITY_DATE,
         @VERSION_ID AS VERSION_ID,
         CONVERT(bit, 1) AS IS_ACTIVE,
-        CONVERT(nvarchar(200), N'DEFAULT.dbo.ODR_CONTRACT_LEVEL_IRB') AS SOURCE_REFERENCE
+        CONVERT(nvarchar(200), N'dbo.VW_ODR_CONTRACT_LEVEL_IRB') AS SOURCE_REFERENCE
     INTO #SnapshotCandidate
     FROM ecl_stg.AccountStagePoolSource AS s
-    INNER JOIN [DEFAULT].[dbo].[ODR_CONTRACT_LEVEL_IRB] AS c
+    INNER JOIN dbo.VW_ODR_CONTRACT_LEVEL_IRB AS c
       ON c.PROCESS_DATE = s.PROCESS_DATE
      AND CONVERT(varchar(100), c.CONTRACT_ID) = s.ACCOUNT_ID
     LEFT JOIN ecl_cfg.PoolName AS p
