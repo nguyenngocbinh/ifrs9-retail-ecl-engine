@@ -7,8 +7,8 @@ key to the ECL run date. The procedure selects the latest source PROCESS_DATE
 and emits a WARN audit finding/event so operators can see which source version
 is being used. Facility ratings are matched to the run date.
 
-Scenario codes are supplied explicitly by the caller because the source
-mapping 1/2/3 -> DOWNTURN/BASE/UPTURN has not been approved in code.
+Scenario codes are supplied explicitly by the caller using the approved source mapping:
+1 -> BASE, 2 -> UPTURN, 3 -> DOWNTURN.
 */
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
@@ -55,7 +55,7 @@ BEGIN
            OR @SCENARIO_1_CODE = @SCENARIO_2_CODE
            OR @SCENARIO_1_CODE = @SCENARIO_3_CODE
            OR @SCENARIO_2_CODE = @SCENARIO_3_CODE
-            THROW 51803, 'Map source SCENARIO 1/2/3 to three distinct canonical codes: DOWNTURN, BASE, UPTURN.', 1;
+            THROW 51803, 'Map source SCENARIO 1/2/3 to three distinct canonical codes: 1=BASE, 2=UPTURN, 3=DOWNTURN.', 1;
 
         IF NOT EXISTS
         (
