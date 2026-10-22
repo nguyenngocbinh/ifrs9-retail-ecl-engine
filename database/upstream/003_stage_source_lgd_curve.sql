@@ -25,7 +25,7 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @PROCESS_DATE date, @RUN_STATUS varchar(20), @INSERTED bigint;
+    DECLARE @PROCESS_DATE date, @RUN_STATUS varchar(20), @INSERTED bigint, @SOURCE_VERSIONS nvarchar(500);
 
     BEGIN TRY
         BEGIN TRANSACTION;
@@ -122,7 +122,7 @@ BEGIN
             (RUN_ID, PROCESS_DATE, EVENT_TYPE, EVENT_STATUS, EVENT_MESSAGE, ROW_COUNT, ACTOR)
         VALUES
             (@RUN_ID, @PROCESS_DATE, 'LGD_SOURCE_STAGE', 'SUCCEEDED',
-             N'Expanded source calibration_lgd by account to annual periods through maturity. Source version and downturn_lgd are not used as curve dimensions in v1.',
+             CONCAT(N'Expanded source calibration_lgd by account to annual periods through maturity. Source version(s)=', COALESCE(@SOURCE_VERSIONS, N'unknown'), N'; downturn_lgd is not applied in v1.'),
              @INSERTED, SUSER_SNAME());
 
         COMMIT TRANSACTION;
