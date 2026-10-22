@@ -124,13 +124,15 @@ BEGIN TRY
         (@RUN_ID, @PROCESS_DATE, 'SYN-PD-SOURCE-001', 'SYN-CUST-001',
          'RETAIL_CARD', 1, '105', '20270630', 1, 1);
 
-    /* Approved source scenario mapping: 1=BASE, 2=UPTURN, 3=DOWNTURN. */
+    /* The procedure reads the approved mapping from ecl_cfg.PDScenarioMapping. */
     EXEC ecl_core.usp_LoadRetailMarginalPITPD
         @RUN_ID = @RUN_ID,
-        @VERSION_ID = 1,
-        @SCENARIO_1_CODE = 'BASE',
-        @SCENARIO_2_CODE = 'UPTURN',
-        @SCENARIO_3_CODE = 'DOWNTURN';
+        @VERSION_ID = 1;
+
+    IF NOT EXISTS (SELECT 1 FROM ecl_cfg.PDScenarioMapping WHERE SOURCE_SCENARIO = 1 AND SCENARIO_CODE = 'BASE' AND IS_ACTIVE = 1)
+       OR NOT EXISTS (SELECT 1 FROM ecl_cfg.PDScenarioMapping WHERE SOURCE_SCENARIO = 2 AND SCENARIO_CODE = 'UPTURN' AND IS_ACTIVE = 1)
+       OR NOT EXISTS (SELECT 1 FROM ecl_cfg.PDScenarioMapping WHERE SOURCE_SCENARIO = 3 AND SCENARIO_CODE = 'DOWNTURN' AND IS_ACTIVE = 1)
+        THROW 51895, 'PDScenarioMapping must be 1=BASE, 2=UPTURN, 3=DOWNTURN.', 1;
 
     SELECT @ROWS = COUNT_BIG(*)
     FROM ecl_stg.PDCurve
