@@ -16,7 +16,7 @@ The calculation at a high level is:
 
 The engine calculates scenario-specific ECL, applies the versioned Downturn/Base/Upturn weights, aggregates outputs, validates and reconciles them, and publishes only a successful run.
 
-The `ecl_cfg.PoolName` reference table maps each canonical `POOL_NAME` to its business `SEGMENT`. The `SEGMENT` value is intended to match `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` when mapping facility ratings to scenario-specific marginal PIT PD curves.
+The `ecl_cfg.PoolName` reference table maps each canonical `POOL_NAME` to its business `SEGMENT`. The `SEGMENT` value is intended to match `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` when mapping facility ratings to scenario-specific marginal PIT PD curves. The source scenario numbers are mapped centrally by `ecl_cfg.PDScenarioMapping`: `1=BASE`, `2=UPTURN`, `3=DOWNTURN`; the source loader validates this mapping and no longer accepts scenario-code parameters.
 
 ## 2. System mindmap
 
@@ -210,3 +210,21 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 ## Safety
 
 Use synthetic, privacy-safe fixtures only. Do not run deployment scripts against a production database without environment approval, an approved backup/restore plan, and a reviewed deployment procedure.
+
+## Retail marginal PIT PD source ingestion
+
+Migration 008 loads account-level annual marginal PIT PD from `dbo.RETAIL_MARGINAL_PIT_PD` and ratings from `[IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING]`. The join keys are `BUCKET`, `RATING`, and `ecl_cfg.PoolName.SEGMENT = SEGMENT_LV2`; facility ratings must match the run `PROCESS_DATE` and `POOL_NAME`. The source PD `PROCESS_DATE` is treated as a dataset-version marker: the loader selects the latest source date and records a WARN audit finding/event with that date. It does not require this marker to equal the run date.
+
+Scenario mapping is intentionally explicit at call time because the source mapping is not yet approved:
+
+```sql
+EXEC ecl_core.usp_LoadRetailMarginalPITPD
+    @RUN_ID = 123,
+    @VERSION_ID = 1,
+    @SCENARIO_1_CODE = 'BASE',
+    @SCENARIO_2_CODE = 'DOWNTURN',
+    @SCENARIO_3_CODE = 'UPTURN';
+EXEC ecl_core.usp_LoadPDCurve @RUN_ID = 123;
+```
+
+The scenario mapping above is an example only; confirm the production mapping before use. The source loader requires read access to `IRB_MHRR.pd.TBL_MAN_FACILITY_RATING` and to the local PD source table.

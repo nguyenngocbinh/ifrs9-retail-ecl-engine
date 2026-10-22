@@ -16,7 +16,7 @@ Công thức ở mức khái quát:
 
 Engine tính ECL theo từng kịch bản, áp dụng trọng số Downturn/Base/Upturn đã version hóa, tổng hợp kết quả, kiểm tra đối soát và chỉ xuất bản run thành công.
 
-Bảng danh mục `ecl_cfg.PoolName` quản lý mapping giữa `POOL_NAME` chuẩn của engine và `SEGMENT` nghiệp vụ. Giá trị `SEGMENT` được dùng để mapping với `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` khi kết hợp rating tài khoản với đường cong marginal PIT PD theo kỳ và kịch bản.
+Bảng danh mục `ecl_cfg.PoolName` quản lý mapping giữa `POOL_NAME` chuẩn của engine và `SEGMENT` nghiệp vụ. Giá trị `SEGMENT` được dùng để mapping với `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` khi kết hợp rating tài khoản với đường cong marginal PIT PD theo kỳ và kịch bản. Mapping mã kịch bản nguồn được quản lý tập trung trong `ecl_cfg.PDScenarioMapping`: `1=BASE`, `2=UPTURN`, `3=DOWNTURN`. Procedure nạp PD đọc và kiểm tra mapping này; không cần truyền mã kịch bản qua tham số khi gọi procedure.
 
 ## 2. Mindmap tổng thể
 
@@ -215,3 +215,21 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 ## An toàn
 
 Chỉ dùng dữ liệu giả lập không chứa thông tin khách hàng. Không chạy script triển khai vào production nếu chưa có phê duyệt môi trường, phương án backup/restore được duyệt và quy trình triển khai đã được review.
+
+## Nạp marginal PIT PD từ bảng nguồn
+
+Migration 008 nạp PD theo tài khoản từ `dbo.RETAIL_MARGINAL_PIT_PD` và rating từ `[IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING]`. Khóa join gồm `BUCKET`, `RATING` và `ecl_cfg.PoolName.SEGMENT = SEGMENT_LV2`; rating phải khớp `PROCESS_DATE` của run và `POOL_NAME`. Trường `PROCESS_DATE` của bảng PD nguồn được xem là dấu phiên bản dữ liệu: procedure chọn ngày nguồn lớn nhất và ghi cảnh báo WARN vào audit, không yêu cầu ngày này bằng ngày chạy ECL.
+
+Mapping `SCENARIO` chưa được mặc định. Người gọi phải truyền rõ mapping 1/2/3 sang ba mã canonical khi chạy procedure:
+
+```sql
+EXEC ecl_core.usp_LoadRetailMarginalPITPD
+    @RUN_ID = 123,
+    @VERSION_ID = 1,
+    @SCENARIO_1_CODE = 'BASE',
+    @SCENARIO_2_CODE = 'DOWNTURN',
+    @SCENARIO_3_CODE = 'UPTURN';
+EXEC ecl_core.usp_LoadPDCurve @RUN_ID = 123;
+```
+
+Mapping trên chỉ là ví dụ, cần xác nhận trước khi chạy production. Procedure cần quyền đọc `IRB_MHRR.pd.TBL_MAN_FACILITY_RATING` và bảng PD nguồn trong database hiện tại.

@@ -2,9 +2,9 @@
 
 ## 1. Purpose and limits
 
-This guide deploys migrations 001–007 into a **new, disposable SQL Server 2022 database**, verifies objects, and runs the repository's synthetic regression suite. It is a developer/test procedure, not production approval.
+This guide deploys migrations 001–008 into a **new, disposable SQL Server 2022 database**, verifies objects, and runs the repository's synthetic regression suite. It is a developer/test procedure, not production approval.
 
-- The current CI target is SQL Server 2022 (major version 16).
+- The current CI target is SQL Server 2022 (major version 16). Migration 008 creates `ecl_cfg.PDScenarioMapping` with the approved mapping `1=BASE`, `2=UPTURN`, `3=DOWNTURN` and installs the retail marginal PIT PD source loader.
 - CI uses an ephemeral Developer-edition container. A green CI run does not prove production readiness, successful deployment to another instance, production permissions, data mappings, capacity, or operational readiness.
 - The migration files are not a single idempotent migration framework. Do not blindly rerun the full sequence against a partially deployed database.
 - Use synthetic test fixtures only. Never commit customer records, credentials, or secrets.
@@ -49,7 +49,7 @@ $Scripts = @(
     "database/004_input_reconciliation.sql",
     "database/005_ecl_calculation.sql",
     "database/006_ead_curve_loader.sql",
-    "database/007_pd_curve_loader.sql"
+    "database/007_pd_curve_loader.sql",\n    "database/008_retail_marginal_pit_pd_source_loader.sql"
 )
 
 foreach ($Script in $Scripts) {
@@ -197,10 +197,15 @@ Before accepting results, verify PUBLISHED status, successful latest input-recon
 
 ## 10. Release readiness checklist
 
-- [ ] Migrations 001–007 deployed to a clean disposable SQL Server 2022 database.
+- [ ] Migrations 001–008 deployed to a clean disposable SQL Server 2022 database.
 - [ ] Object verification queries passed.
 - [ ] Every synthetic SQL test completed successfully on that database.
 - [ ] End-to-end synthetic calculation reached PUBLISHED and its assertions passed.
 - [ ] Fault-injection test confirmed no partial calculation output remained after the injected error.
 - [ ] Actual database version, compatibility level, test date, and results recorded without secrets.
 - [ ] Environment-specific permissions, source mapping, scenario-weight provenance, performance, monitoring, backup/restore, and operational runbooks reviewed separately before production rollout.
+
+
+## Retail PD source-loader deployment notes
+
+Migration 008 requires the run database to contain `dbo.RETAIL_MARGINAL_PIT_PD` and have read access to `[IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING]` (for example, via appropriate cross-database permissions). It selects the latest source PD `PROCESS_DATE` as a dataset version and records a warning with the selected date. Confirm source freshness and the mapping of source scenarios 1/2/3 before operational use. Populate `ecl_cfg.PoolName.SEGMENT` with values that exactly match source `SEGMENT_LV2`.
