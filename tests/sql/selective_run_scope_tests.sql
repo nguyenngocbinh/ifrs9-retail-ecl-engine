@@ -22,10 +22,10 @@ BEGIN TRY
     VALUES (@WEIGHT_VERSION, N'Selective scope synthetic regression', @PROCESS_DATE, @PROCESS_DATE, 0);
 
     INSERT INTO ecl_cfg.ScenarioWeight
-        (VERSION_ID, SCENARIO_CODE, SCENARIO_WEIGHT, PROCESS_DATE, IS_ACTIVE)
-    VALUES (@WEIGHT_VERSION, 'DOWNTURN', 0.15680000, @PROCESS_DATE, 1),
-           (@WEIGHT_VERSION, 'BASE',     0.68640000, @PROCESS_DATE, 1),
-           (@WEIGHT_VERSION, 'UPTURN',   0.15680000, @PROCESS_DATE, 1);
+        (VERSION_ID, SCENARIO_CODE, SCENARIO_WEIGHT, IS_ACTIVE)
+    VALUES (@WEIGHT_VERSION, 'DOWNTURN', 0.15680000, 1),
+           (@WEIGHT_VERSION, 'BASE',     0.68640000, 1),
+           (@WEIGHT_VERSION, 'UPTURN',   0.15680000, 1);
 
     /* Positive case: every active account matches both requested pool name and pool ID. */
     EXEC ecl_core.usp_CreateRun
