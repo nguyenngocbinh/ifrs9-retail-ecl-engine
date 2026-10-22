@@ -6,7 +6,7 @@ Engine tính **tổn thất tín dụng dự kiến (Expected Credit Loss — EC
 
 **English:** [README.md](README.md)
 
-> **Trạng thái hiện tại:** các migration 001–008 định nghĩa schema, run control, validation/reconciliation, tính toán ECL và kiểm tra các curve dùng chung. CI có bộ test SQL Server 2022 bằng dữ liệu giả lập. Tài liệu triển khai không thay thế việc kiểm thử trên database DEV/UAT và phê duyệt nghiệp vụ/IT trước production.
+> **Trạng thái hiện tại:** các migration 001–009 định nghĩa schema, run control, validation/reconciliation, tính toán ECL và kiểm tra các curve dùng chung. CI có bộ test SQL Server 2022 bằng dữ liệu giả lập. Tài liệu triển khai không thay thế việc kiểm thử trên database DEV/UAT và phê duyệt nghiệp vụ/IT trước production.
 
 ## 1. Hiểu hệ thống trong một phút
 
@@ -125,7 +125,7 @@ Mỗi lần chạy lại phải sử dụng **RUN_ID mới**; không ghi đè đ
 3. [Canonical input contract](docs/canonical-input-contract.md) và [input/output contract](docs/input-output-contract.md) — grain và cấu trúc dữ liệu.
 4. [Stage/segment/pool mapping](docs/stage-segment-pool-mapping.md) — mapping Stage và pool upstream.
 5. [Database schema](docs/database-schema-v1.0.md) và [methodology](docs/methodology-specification-v1.0.md) — chi tiết bảng và phương pháp.
-6. `database/001–008*.sql` — DDL và procedure theo thứ tự migration.
+6. `database/001–009*.sql` — DDL và procedure theo thứ tự migration.
 7. `tests/sql/` — ví dụ kiểm thử/hành vi mong đợi bằng dữ liệu giả lập.
 
 ## 8. Cấu trúc repo
