@@ -16,7 +16,7 @@ Công thức ở mức khái quát:
 
 Engine tính ECL theo từng kịch bản, áp dụng trọng số Downturn/Base/Upturn đã version hóa, tổng hợp kết quả, kiểm tra đối soát và chỉ xuất bản run thành công.
 
-Bảng danh mục `ecl_cfg.PoolName` quản lý mapping giữa `POOL_NAME` chuẩn của engine và `SEGMENT` nghiệp vụ. Giá trị `SEGMENT` được dùng để mapping với `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` khi kết hợp rating tài khoản với đường cong marginal PIT PD theo kỳ và kịch bản.
+Bảng danh mục `ecl_cfg.PoolName` quản lý mapping giữa `POOL_NAME` chuẩn của engine và `SEGMENT` nghiệp vụ. Giá trị `SEGMENT` được dùng để mapping với `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` khi kết hợp rating tài khoản với đường cong marginal PIT PD theo kỳ và kịch bản. Mapping mã kịch bản nguồn được quản lý tập trung trong `ecl_cfg.PDScenarioMapping`: `1=BASE`, `2=UPTURN`, `3=DOWNTURN`. Procedure nạp PD đọc và kiểm tra mapping này; không cần truyền mã kịch bản qua tham số khi gọi procedure.
 
 ## 2. Mindmap tổng thể
 
