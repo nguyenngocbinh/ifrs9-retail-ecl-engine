@@ -364,11 +364,11 @@ VALUES ('RETAIL_LN_AUTO', N'Autoloan'),
        ('RETAIL_LN_CONS_UNSEC', N'Consumer lending - unsecured'),
        ('RETAIL_LN_MORTGAGE', N'Mortgage'),
        ('RETAIL_LN_OTHERS', N'Others'),
-       ('RETAIL_CARD', N'Credit card'),
-       ('RETAIL_OVERDRAFT', N'Overdraft'),
-       ('CORP_LARGE_LOAN', N'Large corporate loan'),
-       ('CORP_MEDIUM_LOAN', N'Medium corporate loan'),
-       ('CORP_SMALL_LOAN', N'Small corporate loan');
+       ('RETAIL_CARD', N'cc'),
+       ('RETAIL_OVERDRAFT', N'od'),
+       ('CORP_LARGE_LOAN', N'Large'),
+       ('CORP_MEDIUM_LOAN', N'Medium'),
+       ('CORP_SMALL_LOAN', N'Small');
 
 INSERT INTO ecl_cfg.Scenario (SCENARIO_CODE, SCENARIO_NAME)
 VALUES ('DOWNTURN', N'Downturn'),
