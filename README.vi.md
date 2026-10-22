@@ -215,3 +215,21 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 ## An toàn
 
 Chỉ dùng dữ liệu giả lập không chứa thông tin khách hàng. Không chạy script triển khai vào production nếu chưa có phê duyệt môi trường, phương án backup/restore được duyệt và quy trình triển khai đã được review.
+
+## Nạp marginal PIT PD từ bảng nguồn
+
+Migration 008 nạp PD theo tài khoản từ `dbo.RETAIL_MARGINAL_PIT_PD` và rating từ `[IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING]`. Khóa join gồm `BUCKET`, `RATING` và `ecl_cfg.PoolName.SEGMENT = SEGMENT_LV2`; rating phải khớp `PROCESS_DATE` của run và `POOL_NAME`. Trường `PROCESS_DATE` của bảng PD nguồn được xem là dấu phiên bản dữ liệu: procedure chọn ngày nguồn lớn nhất và ghi cảnh báo WARN vào audit, không yêu cầu ngày này bằng ngày chạy ECL.
+
+Mapping `SCENARIO` chưa được mặc định. Người gọi phải truyền rõ mapping 1/2/3 sang ba mã canonical khi chạy procedure:
+
+```sql
+EXEC ecl_core.usp_LoadRetailMarginalPITPD
+    @RUN_ID = 123,
+    @VERSION_ID = 1,
+    @SCENARIO_1_CODE = 'BASE',
+    @SCENARIO_2_CODE = 'DOWNTURN',
+    @SCENARIO_3_CODE = 'UPTURN';
+EXEC ecl_core.usp_LoadPDCurve @RUN_ID = 123;
+```
+
+Mapping trên chỉ là ví dụ, cần xác nhận trước khi chạy production. Procedure cần quyền đọc `IRB_MHRR.pd.TBL_MAN_FACILITY_RATING` và bảng PD nguồn trong database hiện tại.
