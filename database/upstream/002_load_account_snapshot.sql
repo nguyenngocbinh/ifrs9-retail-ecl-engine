@@ -115,7 +115,7 @@ BEGIN
         FROM ecl_stg.AccountStagePoolSource AS s
         LEFT JOIN dbo.VW_ODR_CONTRACT_LEVEL_IRB AS c
           ON c.PROCESS_DATE = s.PROCESS_DATE
-         AND CONVERT(varchar(100), c.CONTRACT_ID) = s.ACCOUNT_ID
+         AND c.CONTRACT_ID = s.ACCOUNT_ID
         WHERE s.RUN_ID = @RUN_ID
           AND s.IS_ACTIVE = 1
         GROUP BY s.ACCOUNT_ID
@@ -141,7 +141,7 @@ BEGIN
     FROM ecl_stg.AccountStagePoolSource AS s
     INNER JOIN dbo.VW_ODR_CONTRACT_LEVEL_IRB AS c
       ON c.PROCESS_DATE = s.PROCESS_DATE
-     AND CONVERT(varchar(100), c.CONTRACT_ID) = s.ACCOUNT_ID
+     AND c.CONTRACT_ID = s.ACCOUNT_ID
     LEFT JOIN ecl_cfg.PoolName AS p
       ON p.POOL_NAME = s.POOL_NAME
      AND p.IS_ACTIVE = 1
