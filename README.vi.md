@@ -4,7 +4,7 @@ Engine tính **tổn thất tín dụng dự kiến (Expected Credit Loss — EC
 
 **English:** [README.md](README.md)
 
-> **Trạng thái hiện tại:** Phần tính toán và xuất bản ECL v1 nằm trong migration 001–005; migration 006 bổ sung kiểm tra đường cong EAD dùng chung, migration 007 bổ sung kiểm tra đường cong PD dùng chung. CI có kiểm thử SQL Server 2022 bằng dữ liệu giả lập về công thức, vòng đời run, chất lượng đầu vào, đối soát và rollback khi lỗi tính toán. Hướng dẫn triển khai có thể lặp lại và kiểm chứng end-to-end trên database sạch vẫn là các việc cần hoàn thiện.
+> **Trạng thái hiện tại:** Phần tính toán và xuất bản ECL v1 nằm trong migration 001–005; migration 006 bổ sung kiểm tra đường cong EAD dùng chung, migration 007 bổ sung kiểm tra đường cong PD dùng chung, migration 008 bổ sung kiểm tra đường cong LGD dùng chung. CI có kiểm thử SQL Server 2022 bằng dữ liệu giả lập về công thức, vòng đời run, chất lượng đầu vào, đối soát và rollback khi lỗi tính toán. Hướng dẫn triển khai có thể lặp lại và kiểm chứng end-to-end trên database sạch vẫn là các việc cần hoàn thiện.
 
 ## 1. Hiểu hệ thống trong một phút
 
@@ -131,7 +131,7 @@ Các trường điều khiển cần nhớ:
 | `ecl_core.usp_LoadAccountStagePoolSource` | Mở rộng Stage từ cấp khách hàng xuống hợp đồng và nạp Stage/Pool staging theo khóa PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. | Sau khi dữ liệu Stage nguồn sẵn sàng. |
 | `ecl_core.usp_LoadAccountSnapshot` | Nạp snapshot chuẩn từ bảng Stage/Pool, lấy `expiry_date` làm `MATURITY_DATE`, kiểm tra `POOL_NAME` với danh mục `ecl_cfg.PoolName`. | Sau khi nạp Stage/Pool. |
 | `ecl_core.usp_LoadEADCurve` | Kiểm tra EAD đã được nạp trực tiếp vào `ecl_stg.EADCurve`: ngày xử lý, đơn vị VND, EAD không âm, tài khoản khớp snapshot và đủ các kỳ năm đến đáo hạn; ghi audit. Procedure **không** tự tính EAD theo sản phẩm và không sao chép từ một bảng staging trung gian khác. | Sau ETL EAD theo sản phẩm, trước bước tính ECL. |
-| `ecl_core.usp_LoadPDCurve` | Kiểm tra PD biên theo kịch bản đã nạp vào `ecl_stg.PDCurve`: ngày xử lý, tài khoản khớp snapshot, PD trong [0,1], đủ Downturn/Base/Upturn và đủ kỳ năm đến đáo hạn; ghi audit. Procedure **không** tự suy luận mapping scenario nguồn hoặc tính PD. | Sau ETL PD nguồn, trước bước tính ECL. |
+| `ecl_core.usp_LoadLGDCurve` kiểm tra các dòng LGD năm đã nạp vào `ecl_stg.LGDCurve`, gồm reporting date, miền giá trị LGD, mapping tài khoản, độ phủ đến ngày đáo hạn và audit. ETL nguồn mở rộng `calibration_lgd` tại reporting date thành đường cong năm; `downturn_lgd` chưa áp dụng vì LGD v1 giữ cố định giữa các kịch bản.\n\n`ecl_core.usp_LoadPDCurve` | Kiểm tra PD biên theo kịch bản đã nạp vào `ecl_stg.PDCurve`: ngày xử lý, tài khoản khớp snapshot, PD trong [0,1], đủ Downturn/Base/Upturn và đủ kỳ năm đến đáo hạn; ghi audit. Procedure **không** tự suy luận mapping scenario nguồn hoặc tính PD. | Sau ETL PD nguồn, trước bước tính ECL. |
 | `ecl_core.usp_CalculateECL` | Kiểm tra trạng thái run và độ đầy đủ đường cong; tính đóng góp ECL theo kịch bản × tài khoản × kỳ; ghi kết quả detail/account/summary và audit trong transaction. | Bước tính toán chính sau khi nạp và kiểm tra đầu vào. |
 | `ecl_core.usp_PublishECL` | Chỉ cho phép xuất bản run thành công, kiểm tra kết quả tồn tại, làm tròn số tiền kết quả tài khoản/tổng hợp về VND nguyên tại ranh giới xuất bản và chuyển trạng thái sang `PUBLISHED`. | Sau khi tính toán và đối soát đạt. |
 | Các procedure quản lý run/validation | Tạo run, quản lý chuyển trạng thái, kiểm tra đầu vào chuẩn hóa, lưu lỗi kiểm tra và các mốc xử lý. Xem migration và định nghĩa procedure để biết chính xác tên/tham số. | Trước và trong quá trình tính toán/xuất bản. |
@@ -178,7 +178,7 @@ ECL tổng hợp theo kịch bản bằng cách nhân ECL từng kịch bản v�
 | Đường dẫn | Nội dung |
 |---|---|
 | `README.md` / `README.vi.md` | Tổng quan tiếng Anh / tiếng Việt |
-| `database/001–007*.sql` | Các migration SQL Server theo thứ tự |
+| `database/001–008*.sql` | Các migration SQL Server theo thứ tự |
 | `database/db2/` | Script bảng và procedure EAD Non-Revolving upstream trên DB2 |
 | `database/upstream/` | SQL loader upstream trên SQL Server cho Stage/Pool staging và nạp AccountSnapshot chuẩn |
 | `docs/architecture.md` | Kiến trúc logic |
