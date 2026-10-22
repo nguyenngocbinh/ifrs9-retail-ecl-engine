@@ -16,7 +16,7 @@ The calculation at a high level is:
 
 The engine calculates scenario-specific ECL, applies the versioned Downturn/Base/Upturn weights, aggregates outputs, validates and reconciles them, and publishes only a successful run.
 
-The `ecl_cfg.PoolName` reference table maps each canonical `POOL_NAME` to its business `SEGMENT`. The `SEGMENT` value is intended to match `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` when mapping facility ratings to scenario-specific marginal PIT PD curves.
+The `ecl_cfg.PoolName` reference table maps each canonical `POOL_NAME` to its business `SEGMENT`. The `SEGMENT` value is intended to match `RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2` when mapping facility ratings to scenario-specific marginal PIT PD curves. The source scenario numbers are mapped centrally by `ecl_cfg.PDScenarioMapping`: `1=BASE`, `2=UPTURN`, `3=DOWNTURN`; the source loader validates this mapping and no longer accepts scenario-code parameters.
 
 ## 2. System mindmap
 
