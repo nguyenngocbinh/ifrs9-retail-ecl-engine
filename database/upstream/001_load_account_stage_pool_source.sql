@@ -154,9 +154,9 @@ BEGIN
         THROW 51205, 'Contract source has duplicate PROCESS_DATE + CONTRACT_ID rows.', 1;
 
     /*
-      The customer view is grouped by DEFAULT_FLAG as well as customer and
-      segment in its upstream procedure. Do not silently duplicate contracts
-      if that creates more than one row for the required three-column join.
+      The customer view includes CUSTOMER_TYPE. Use it as part of the matching
+      key because SEGMENT_LV2 can be shared by KHCN and KHDN. Do not silently
+      duplicate contracts if the four-column key is not unique.
     */
     IF EXISTS
     (
@@ -166,7 +166,7 @@ BEGIN
         GROUP BY s.PROCESS_DATE, s.CUSTOMER_ID, s.customer_type, s.segment_odr_lv1
         HAVING COUNT_BIG(*) > 1
     )
-        THROW 51206, 'VW_CUSTOMER_ODR_LRA_IRB has duplicate PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1 keys; resolve upstream duplicates before loading.', 1;
+        THROW 51206, 'VW_CUSTOMER_ODR_LRA_IRB has duplicate PROCESS_DATE + CUSTOMER_ID + CUSTOMER_TYPE + SEGMENT_ODR_LV1 keys; resolve upstream duplicates before loading.', 1;
 
     DROP TABLE IF EXISTS #Mapped;
 
