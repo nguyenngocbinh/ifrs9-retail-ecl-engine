@@ -35,11 +35,17 @@ BEGIN
 
     DECLARE @PROCESS_DATE date;
     DECLARE @RUN_STATUS varchar(20);
+    DECLARE @RUN_TYPE varchar(20);
+    DECLARE @REQUESTED_POOL_NAME varchar(100);
+    DECLARE @REQUESTED_POOL_ID varchar(100);
     DECLARE @ROW_COUNT bigint;
 
     SELECT
         @PROCESS_DATE = PROCESS_DATE,
-        @RUN_STATUS = RUN_STATUS
+        @RUN_STATUS = RUN_STATUS,
+        @RUN_TYPE = RUN_TYPE,
+        @REQUESTED_POOL_NAME = REQUESTED_POOL_NAME,
+        @REQUESTED_POOL_ID = REQUESTED_POOL_ID
     FROM ecl_core.RunControl
     WHERE RUN_ID = @RUN_ID;
 
@@ -80,6 +86,23 @@ BEGIN
           AND (STAGE IS NULL OR STAGE NOT IN (1,2,3) OR POOL_ID IS NULL OR POOL_NAME IS NULL OR ACCOUNT_ID IS NULL)
     )
         THROW 51306, 'Stage/Pool source contains a missing or invalid STAGE, POOL_ID, or ACCOUNT_ID.', 1;
+
+    /* Defense in depth: do not materialize a snapshot outside the run's requested pool. */
+    IF @RUN_TYPE = 'SELECTIVE'
+       AND EXISTS
+       (
+           SELECT 1
+           FROM ecl_stg.AccountStagePoolSource AS s
+           WHERE s.RUN_ID = @RUN_ID
+             AND s.IS_ACTIVE = 1
+             AND
+             (
+                 (@REQUESTED_POOL_NAME IS NOT NULL AND s.POOL_NAME <> @REQUESTED_POOL_NAME)
+                 OR
+                 (@REQUESTED_POOL_ID IS NOT NULL AND s.POOL_ID <> @REQUESTED_POOL_ID)
+             )
+       )
+        THROW 51316, 'Stage/Pool source contains accounts outside the requested selective-run scope.', 1;
 
     /*
       A contract must resolve to exactly one source row for this process date.
@@ -132,6 +155,16 @@ BEGIN
         WHERE POOL_NAME IS NULL
     )
         THROW 51308, 'At least one source POOL_NAME is missing or inactive in ecl_cfg.PoolName. Configure the pool name before loading AccountSnapshot.', 1;
+
+    IF @RUN_TYPE = 'SELECTIVE'
+       AND EXISTS
+       (
+           SELECT 1
+           FROM #SnapshotCandidate AS s
+           WHERE (@REQUESTED_POOL_NAME IS NOT NULL AND s.POOL_NAME <> @REQUESTED_POOL_NAME)
+              OR (@REQUESTED_POOL_ID IS NOT NULL AND s.POOL_ID <> @REQUESTED_POOL_ID)
+       )
+        THROW 51317, 'Snapshot candidates contain accounts outside the requested selective-run scope.', 1;
 
     IF EXISTS
     (
