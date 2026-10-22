@@ -103,26 +103,42 @@ Hai script upstream tham chiếu bảng nguồn mẫu trong database `[DEFAULT]`
 
 **Trước khi chạy:** sửa/đối chiếu các tên database, schema, bảng, cột và mapping trong hai script theo môi trường thật. Không giả định chúng chạy nguyên trạng nếu nguồn không phải `[DEFAULT].dbo.ODR_CONTRACT_LEVEL_IRB` và `[DEFAULT].dbo.CUSTOMER_ODR_LRA_IRB`.
 
-Gọi hai procedure theo thứ tự (sau khi đã tạo RUN_ID và chuyển run sang VALIDATING):
+Gọi hai procedure theo thứ tự **sau khi tạo run và chuyển trạng thái sang `VALIDATING`**. `RUN_ID` được tự sinh; không tự đặt số và không dùng số ví dụ cố định:
 
 ```sql
+DECLARE @RUN_ID bigint;
+
+EXEC ecl_core.usp_CreateRun
+  @PROCESS_DATE = '2026-10-15',
+  @RUN_TYPE = 'FULL',
+  @SCENARIO_WEIGHT_VERSION_ID = 1, -- phải xác nhận version đang có hiệu lực
+  @CALCULATION_VERSION = 'ECL-V1',
+  @RUN_ID = @RUN_ID OUTPUT;
+
+SELECT @RUN_ID AS RUN_ID; -- ghi nhận ID được sinh
+
+EXEC ecl_core.usp_TransitionRunStatus
+  @RUN_ID = @RUN_ID,
+  @NEW_STATUS = 'VALIDATING',
+  @EVENT_MESSAGE = N'Load Stage/Pool and AccountSnapshot';
+
 EXEC ecl_core.usp_LoadAccountStagePoolSource
-     @RUN_ID = 12345, @VERSION_ID = 1;
+  @RUN_ID = @RUN_ID, @VERSION_ID = 1;
 
 EXEC ecl_core.usp_LoadAccountSnapshot
-     @RUN_ID = 12345, @VERSION_ID = 1;
+  @RUN_ID = @RUN_ID, @VERSION_ID = 1;
 ```
 
-Thay RUN_ID và VERSION_ID bằng giá trị thực tế.
+Chạy các lệnh trong cùng một session/batch để biến `@RUN_ID` còn hiệu lực. Nếu chạy các bước ở cửa sổ/query session khác, lưu ID được trả về rồi truyền giá trị đó vào các procedure.
 
 ### PD, LGD, EAD và EIR
 
 ETL theo từng nguồn/sản phẩm cần chuyển dữ liệu về grain ở bảng trên. Sau khi nạp PD/LGD/EAD, gọi các procedure kiểm tra:
 
 ```sql
-EXEC ecl_core.usp_LoadPDCurve  @RUN_ID = 12345;
-EXEC ecl_core.usp_LoadLGDCurve @RUN_ID = 12345;
-EXEC ecl_core.usp_LoadEADCurve @RUN_ID = 12345;
+EXEC ecl_core.usp_LoadPDCurve  @RUN_ID = @RUN_ID;
+EXEC ecl_core.usp_LoadLGDCurve @RUN_ID = @RUN_ID;
+EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
 ```
 
 Các curve phải phủ **mọi kỳ năm cần thiết đến maturity**; PD phải đủ cả ba scenario. Với kỳ cuối không tròn năm, theo quy ước v1 chỉ thời gian chiết khấu được điều chỉnh; không tự prorate PD hoặc EAD. EIR phải được nạp trực tiếp vào `ecl_stg.EIRCurve`; không có loader EIR riêng trong migration hiện tại.
@@ -154,19 +170,19 @@ EXEC ecl_core.usp_TransitionRunStatus
 Tiếp theo, nạp sáu nhóm dữ liệu của run đó. Ghi nhận mỗi nhóm bằng `usp_RegisterRunInput` với `INPUT_FAMILY` tương ứng `ACCOUNT`, `PD`, `LGD`, `EAD`, `EIR`, `SCENARIO_WEIGHT`; khai báo đúng source/version, số dòng snapshot và `IS_COMPLETE=1` chỉ khi dữ liệu thực sự đầy đủ. Sau đó:
 
 ```sql
-EXEC ecl_core.usp_SealRunInputs @RUN_ID = 12345;
-EXEC ecl_core.usp_ValidateRunInputs @RUN_ID = 12345;
-EXEC ecl_core.usp_ReconcileInputSnapshots @RUN_ID = 12345;
+EXEC ecl_core.usp_SealRunInputs @RUN_ID = @RUN_ID;
+EXEC ecl_core.usp_ValidateRunInputs @RUN_ID = @RUN_ID;
+EXEC ecl_core.usp_ReconcileInputSnapshots @RUN_ID = @RUN_ID;
 ```
 
 Không tính nếu có finding severity ERROR/FATAL hoặc reconciliation chưa SUCCEEDED. Sau khi kiểm tra audit và xác nhận đầu vào hợp lệ:
 
 ```sql
 EXEC ecl_core.usp_TransitionRunStatus
-  @RUN_ID = 12345, @NEW_STATUS = 'CALCULATING';
+  @RUN_ID = @RUN_ID, @NEW_STATUS = 'CALCULATING';
 
-EXEC ecl_core.usp_CalculateECL @RUN_ID = 12345;
-EXEC ecl_core.usp_PublishECL @RUN_ID = 12345;
+EXEC ecl_core.usp_CalculateECL @RUN_ID = @RUN_ID;
+EXEC ecl_core.usp_PublishECL @RUN_ID = @RUN_ID;
 ```
 
 Đây là mẫu lệnh điều phối: chỉ chạy calculate khi đã thật sự nạp đủ dữ liệu và đăng ký đúng row count của cả sáu nhóm. Không dùng `VERSION_ID=1` hay `SCENARIO_WEIGHT_VERSION_ID=1` nếu chưa xác nhận version thực tế.
@@ -174,7 +190,7 @@ EXEC ecl_core.usp_PublishECL @RUN_ID = 12345;
 ## 6. Kiểm tra kết quả và lỗi
 
 ```sql
-DECLARE @RUN_ID bigint = 12345; -- thay bằng RUN_ID thực tế
+DECLARE @RUN_ID bigint = 12345; -- nếu mở session mới, thay bằng RUN_ID thực tế đã lưu
 
 SELECT * FROM ecl_core.RunControl WHERE RUN_ID = @RUN_ID;
 
