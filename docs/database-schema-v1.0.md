@@ -13,7 +13,7 @@ This is a logical/canonical contract, not a claim about existing source tables. 
 - PD grain is account × scenario × forecast period; LGD and EAD grains are account × forecast period. EIR is shared by forecast period. Result detail is account × scenario × forecast period. Account output is one row per account/run. Portfolio output stores both portfolio and pool totals.
 - Selected discount factor: `DF(t) = 1 / (1 + EIR(t))^t`, where `t` is the annual forecast period. EIR is shared by period.
 - Lifetime horizon runs through each account's `MATURITY_DATE`. For a partial final forecast year, calculate `FINAL_PERIOD_FRACTION = remaining months / 12` and apply it **only to the discounting time/exponent**. Do not prorate, rescale, or otherwise change the supplied annual PD or EAD for the partial final year. The partial-year discount exponent is the elapsed forecast time including the final fraction (for example, year 3 plus 6 remaining months uses `t = 3.5`); the selected discount formula remains `DF(t) = 1 / (1 + EIR(t))^t`. The applicable period EIR remains sourced from the shared EIR curve. This is the agreed simplified convention for v1.
-- Scenario weights are user-confirmed: Downturn 15.68%, Base 68.64%, Upturn 15.68%. Store them as immutable, versioned configuration with `VERSION_ID`, `PROCESS_DATE`, effective dates and audit history. The official external source/provenance will be added later.
+- Scenario weights are user-confirmed: Downturn 15.68%, Base 68.64%, Upturn 15.68%. Store them as immutable, versioned configuration with `VERSION_ID`, effective dates and audit history. The official external source/provenance will be added later.
 - Scenario-weighted ECL = `ECL_DOWNTURN × 15.68% + ECL_BASE × 68.64% + ECL_UPTURN × 15.68%`.
 - Reporting currency is VND. Retain internal calculation precision and round final published ECL to whole VND.
 - Stage 3 uses PD=1, the same annual EAD/LGD curves as Stage 2, and annual losses discounted using the agreed EIR convention before aggregation.
@@ -29,7 +29,7 @@ The `ecl_cfg.PoolName` reference table includes both `POOL_NAME` and `SEGMENT`. 
 | ecl_cfg | PoolName | Approved mapping from `POOL_NAME` to its business `SEGMENT`, used by canonical inputs and upstream PD mapping |
 | ecl_cfg | Scenario | Downturn/Base/Upturn code list |
 | ecl_cfg | ScenarioWeightVersion | Version/effective period for scenario weights |
-| ecl_cfg | ScenarioWeight | One row per version/scenario; process-date trace |
+| ecl_cfg | ScenarioWeight | One row per version/scenario; weights are independent of reporting date |
 | ecl_core | RunControl | One row per run, including process date, scope, lifecycle, calculation version |
 | ecl_stg | AccountSnapshot | One row per run/account; pool name, Stage, pool ID and contractual maturity date |
 | ecl_stg | PDCurve | One row per run/account/scenario/forecast period |
