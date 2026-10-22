@@ -103,7 +103,55 @@ Hai script upstream tham chiếu bảng nguồn mẫu trong database `[DEFAULT]`
 
 **Trước khi chạy:** sửa/đối chiếu các tên database, schema, bảng, cột và mapping trong hai script theo môi trường thật. Không giả định chúng chạy nguyên trạng nếu nguồn không phải `[DEFAULT].dbo.ODR_CONTRACT_LEVEL_IRB` và `[DEFAULT].dbo.CUSTOMER_ODR_LRA_IRB`.
 
-Gọi hai procedure theo thứ tự **sau khi tạo run và chuyển trạng thái sang `VALIDATING`**. `RUN_ID` được tự sinh; không tự đặt số và không dùng số ví dụ cố định:
+Gọi hai procedure theo thứ tự **sau khi tạo run và chuyển trạng thái sang `VALIDATING`**. `RUN_ID` được tự sinh; không tự đặt số và không dùng số ví dụ cố định.
+
+### Chạy riêng từng danh mục (mỗi danh mục một RUN_ID)
+
+Selective run dùng `RUN_TYPE='SELECTIVE'` cùng `REQUESTED_POOL_NAME` hoặc `REQUESTED_POOL_ID`. Ví dụ tạo run riêng cho Auto:
+
+```sql
+DECLARE @RUN_ID bigint;
+
+EXEC ecl_core.usp_CreateRun
+  @PROCESS_DATE = '2026-10-15', -- thay bằng ngày có dữ liệu nguồn
+  @RUN_TYPE = 'SELECTIVE',
+  @SCENARIO_WEIGHT_VERSION_ID = 1, -- xác nhận version có hiệu lực
+  @CALCULATION_VERSION = 'ECL-AUTO-V1',
+  @REQUESTED_POOL_NAME = 'RETAIL_LN_AUTO',
+  @REQUESTED_POOL_ID = NULL,
+  @RUN_NOTE = N'Run riêng danh mục Auto',
+  @RUN_ID = @RUN_ID OUTPUT;
+
+SELECT @RUN_ID AS RUN_ID;
+
+EXEC ecl_core.usp_TransitionRunStatus
+  @RUN_ID = @RUN_ID,
+  @NEW_STATUS = 'VALIDATING',
+  @EVENT_MESSAGE = N'Load Stage/Pool and AccountSnapshot for RETAIL_LN_AUTO';
+
+EXEC ecl_core.usp_LoadAccountStagePoolSource
+  @RUN_ID = @RUN_ID, @VERSION_ID = 1;
+
+EXEC ecl_core.usp_LoadAccountSnapshot
+  @RUN_ID = @RUN_ID, @VERSION_ID = 1;
+
+-- Bắt buộc kiểm tra phạm vi trước khi nạp curve:
+SELECT POOL_NAME, POOL_ID, STAGE, COUNT_BIG(*) AS ACCOUNT_COUNT
+FROM ecl_stg.AccountSnapshot
+WHERE RUN_ID = @RUN_ID AND IS_ACTIVE = 1
+GROUP BY POOL_NAME, POOL_ID, STAGE;
+
+IF EXISTS (
+  SELECT 1 FROM ecl_stg.AccountSnapshot
+  WHERE RUN_ID = @RUN_ID AND IS_ACTIVE = 1
+    AND POOL_NAME <> 'RETAIL_LN_AUTO'
+)
+  THROW 52001, 'AccountSnapshot contains non-Auto accounts.', 1;
+```
+
+Chạy cùng mẫu cho danh mục khác bằng một `RUN_ID` mới và thay `REQUESTED_POOL_NAME`. Không tái sử dụng `RUN_ID` của lần chạy lỗi. Hai upstream loader lọc và kiểm tra phạm vi selective; bộ kiểm soát input tiếp tục chặn `RUN_SCOPE_MISMATCH` ở giai đoạn validation.
+
+Điều này chỉ tách danh mục ở lớp Stage/Pool và AccountSnapshot. Các curve PD/LGD/EAD cùng EIR vẫn phải được nạp với đúng `RUN_ID`, `PROCESS_DATE`, tài khoản trong snapshot của run đó và đủ kỳ dự báo. Các loader curve dùng chung kiểm tra dữ liệu đã nạp, không tự thực hiện ETL nguồn.
 
 ```sql
 DECLARE @RUN_ID bigint;
