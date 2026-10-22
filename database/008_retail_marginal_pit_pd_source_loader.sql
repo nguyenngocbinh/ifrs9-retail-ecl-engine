@@ -7,19 +7,41 @@ key to the ECL run date. The procedure selects the latest source PROCESS_DATE
 and emits a WARN audit finding/event so operators can see which source version
 is being used. Facility ratings are matched to the run date.
 
-Scenario codes are supplied explicitly by the caller using the approved source mapping:
+The approved source scenario mapping is stored centrally in ecl_cfg.PDScenarioMapping:
 1 -> BASE, 2 -> UPTURN, 3 -> DOWNTURN.
 */
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
+/* Central, approved mapping from source SCENARIO numbers to canonical scenario codes. */
+IF OBJECT_ID(N'ecl_cfg.PDScenarioMapping', N'U') IS NULL
+BEGIN
+    CREATE TABLE ecl_cfg.PDScenarioMapping
+    (
+        SOURCE_SCENARIO tinyint NOT NULL,
+        SCENARIO_CODE varchar(20) NOT NULL,
+        IS_ACTIVE bit NOT NULL CONSTRAINT DF_PDScenarioMapping_IsActive DEFAULT (1),
+        CREATED_AT datetime2(0) NOT NULL CONSTRAINT DF_PDScenarioMapping_CreatedAt DEFAULT (SYSUTCDATETIME()),
+        CREATED_BY sysname NOT NULL CONSTRAINT DF_PDScenarioMapping_CreatedBy DEFAULT (SUSER_SNAME()),
+        CONSTRAINT PK_PDScenarioMapping PRIMARY KEY CLUSTERED (SOURCE_SCENARIO),
+        CONSTRAINT FK_PDScenarioMapping_Scenario FOREIGN KEY (SCENARIO_CODE)
+            REFERENCES ecl_cfg.Scenario(SCENARIO_CODE),
+        CONSTRAINT CK_PDScenarioMapping_SourceScenario CHECK (SOURCE_SCENARIO IN (1,2,3))
+    );
+
+    CREATE UNIQUE INDEX UX_PDScenarioMapping_ActiveScenarioCode
+        ON ecl_cfg.PDScenarioMapping (SCENARIO_CODE)
+        WHERE IS_ACTIVE = 1;
+
+    INSERT INTO ecl_cfg.PDScenarioMapping (SOURCE_SCENARIO, SCENARIO_CODE)
+    VALUES (1, 'BASE'), (2, 'UPTURN'), (3, 'DOWNTURN');
+END;
+GO
+
 CREATE OR ALTER PROCEDURE ecl_core.usp_LoadRetailMarginalPITPD
     @RUN_ID bigint,
-    @VERSION_ID int,
-    @SCENARIO_1_CODE varchar(20),
-    @SCENARIO_2_CODE varchar(20),
-    @SCENARIO_3_CODE varchar(20)
+    @VERSION_ID int
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -48,14 +70,11 @@ BEGIN
         IF @VERSION_ID IS NULL OR @VERSION_ID < 1
             THROW 51802, 'Retail PD source loader requires a positive VERSION_ID.', 1;
 
-        IF @SCENARIO_1_CODE IS NULL OR @SCENARIO_2_CODE IS NULL OR @SCENARIO_3_CODE IS NULL
-           OR @SCENARIO_1_CODE NOT IN ('DOWNTURN','BASE','UPTURN')
-           OR @SCENARIO_2_CODE NOT IN ('DOWNTURN','BASE','UPTURN')
-           OR @SCENARIO_3_CODE NOT IN ('DOWNTURN','BASE','UPTURN')
-           OR @SCENARIO_1_CODE = @SCENARIO_2_CODE
-           OR @SCENARIO_1_CODE = @SCENARIO_3_CODE
-           OR @SCENARIO_2_CODE = @SCENARIO_3_CODE
-            THROW 51803, 'Map source SCENARIO 1/2/3 to three distinct canonical codes: 1=BASE, 2=UPTURN, 3=DOWNTURN.', 1;
+        IF (SELECT COUNT(*) FROM ecl_cfg.PDScenarioMapping WHERE IS_ACTIVE = 1) <> 3
+           OR NOT EXISTS (SELECT 1 FROM ecl_cfg.PDScenarioMapping WHERE SOURCE_SCENARIO = 1 AND SCENARIO_CODE = 'BASE' AND IS_ACTIVE = 1)
+           OR NOT EXISTS (SELECT 1 FROM ecl_cfg.PDScenarioMapping WHERE SOURCE_SCENARIO = 2 AND SCENARIO_CODE = 'UPTURN' AND IS_ACTIVE = 1)
+           OR NOT EXISTS (SELECT 1 FROM ecl_cfg.PDScenarioMapping WHERE SOURCE_SCENARIO = 3 AND SCENARIO_CODE = 'DOWNTURN' AND IS_ACTIVE = 1)
+            THROW 51803, 'PDScenarioMapping must contain active mappings 1=BASE, 2=UPTURN, 3=DOWNTURN.', 1;
 
         IF NOT EXISTS
         (
@@ -164,12 +183,11 @@ BEGIN
                     + CASE WHEN @PROCESS_DATE < DATEFROMPARTS(YEAR(@PROCESS_DATE), 12, 31)
                            THEN 1 ELSE 0 END
                 ) AS FORECAST_PERIOD,
-                CASE pd.SCENARIO
-                    WHEN 1 THEN @SCENARIO_1_CODE
-                    WHEN 2 THEN @SCENARIO_2_CODE
-                    WHEN 3 THEN @SCENARIO_3_CODE
-                END AS SCENARIO_CODE
+                sm.SCENARIO_CODE AS SCENARIO_CODE
             FROM dbo.RETAIL_MARGINAL_PIT_PD pd
+            JOIN ecl_cfg.PDScenarioMapping sm
+              ON sm.SOURCE_SCENARIO = pd.SCENARIO
+             AND sm.IS_ACTIVE = 1
             WHERE pd.PROCESS_DATE = @PD_SOURCE_PROCESS_DATE
               AND pd.PERIOD > @PROCESS_DATE
               AND pd.SCENARIO IN (1,2,3)
