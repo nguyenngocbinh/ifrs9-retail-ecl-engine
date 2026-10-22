@@ -7,7 +7,7 @@ Purpose:
 - Expand finalized customer-level Stage/bucket to contract-level rows.
 - Join on PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1.
 - Use CONTRACT_ID as ACCOUNT_ID.
-- Preserve the finalized bucket from CUSTOMER_ODR_LRA_IRB; do not recalculate DPD/MOB rules here.
+- Preserve the finalized bucket from VW_CUSTOMER_ODR_LRA_IRB; do not recalculate DPD/MOB rules here.
 
 This loader writes to a separate staging table, NOT ecl_stg.AccountSnapshot.
 The canonical AccountSnapshot also requires approved POOL_NAME and MATURITY_DATE mappings;
@@ -101,7 +101,7 @@ BEGIN
 
     /*
       Normalize contract segment using the same source rules supplied for
-      ##odr_lra_irb. Customer-level segment_odr_lv1 is derived from segment_lv2
+      VW_CUSTOMER_ODR_LRA_IRB. Customer-level segment_odr_lv1 is derived from segment_lv2
       after this normalization:
         corporate -> Large / Medium / Small
         individual (KHCN or CC with NULL segment_lv1) -> segment_lv2
@@ -130,7 +130,7 @@ BEGIN
             ELSE N'x'
         END AS SEGMENT_ODR_LV1
     INTO #ContractNormalized
-    FROM [DEFAULT].[dbo].[ODR_CONTRACT_LEVEL_IRB] AS c
+    FROM dbo.VW_ODR_CONTRACT_LEVEL_IRB AS c
     WHERE c.PROCESS_DATE = @PROCESS_DATE;
 
     IF NOT EXISTS (SELECT 1 FROM #ContractNormalized)
@@ -146,19 +146,19 @@ BEGIN
         THROW 51205, 'Contract source has duplicate PROCESS_DATE + CONTRACT_ID rows.', 1;
 
     /*
-      The customer table is grouped by DEFAULT_FLAG as well as customer and
+      The customer view is grouped by DEFAULT_FLAG as well as customer and
       segment in its upstream procedure. Do not silently duplicate contracts
       if that creates more than one row for the required three-column join.
     */
     IF EXISTS
     (
         SELECT s.PROCESS_DATE, s.CUSTOMER_ID, s.segment_odr_lv1
-        FROM [DEFAULT].[dbo].[CUSTOMER_ODR_LRA_IRB] AS s
+        FROM dbo.VW_CUSTOMER_ODR_LRA_IRB AS s
         WHERE s.PROCESS_DATE = @PROCESS_DATE
         GROUP BY s.PROCESS_DATE, s.CUSTOMER_ID, s.segment_odr_lv1
         HAVING COUNT_BIG(*) > 1
     )
-        THROW 51206, 'CUSTOMER_ODR_LRA_IRB has duplicate PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1 keys; resolve upstream duplicates before loading.', 1;
+        THROW 51206, 'VW_CUSTOMER_ODR_LRA_IRB has duplicate PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1 keys; resolve upstream duplicates before loading.', 1;
 
     DROP TABLE IF EXISTS #Mapped;
 
@@ -201,7 +201,7 @@ BEGIN
         sp.CUSTOMER_TYPE_MODEL
     INTO #Mapped
     FROM #ContractNormalized AS c
-    INNER JOIN [DEFAULT].[dbo].[CUSTOMER_ODR_LRA_IRB] AS s
+    INNER JOIN dbo.VW_CUSTOMER_ODR_LRA_IRB AS s
         ON  s.PROCESS_DATE = c.PROCESS_DATE
         AND s.CUSTOMER_ID = c.CUSTOMER_ID
         AND s.segment_odr_lv1 = c.SEGMENT_ODR_LV1
@@ -239,7 +239,7 @@ BEGIN
           AND NOT EXISTS
           (
               SELECT 1
-              FROM [DEFAULT].[dbo].[CUSTOMER_ODR_LRA_IRB] AS s
+              FROM dbo.VW_CUSTOMER_ODR_LRA_IRB AS s
               WHERE s.PROCESS_DATE = c.PROCESS_DATE
                 AND s.CUSTOMER_ID = c.CUSTOMER_ID
                 AND s.segment_odr_lv1 = c.SEGMENT_ODR_LV1
