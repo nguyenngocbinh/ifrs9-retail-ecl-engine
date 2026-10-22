@@ -1,5 +1,5 @@
 /*
-Source-specific ETL: IRB_MHRR.lgd.irb_tt14_nhnn_lgd_upload -> ecl_stg.LGDCurve.
+Source-specific ETL: dbo.VW_IRB_TT14_NHNN_LGD_UPLOAD -> ecl_stg.LGDCurve.
 
 The source supplies one LGD observation per account at reporting_date, not a
 multi-year curve. This procedure repeats calibration_lgd across each required
@@ -9,7 +9,7 @@ not applied; it remains a source attribute for a future approved scenario-LGD
 enhancement. Source version is retained in the audit message; canonical
 VERSION_ID comes from AccountSnapshot.VERSION_ID.
 
-Requires the source database/table to be queryable from this SQL Server.
+Requires the source database/view to be queryable from this SQL Server.
 */
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
@@ -44,7 +44,7 @@ BEGIN
         IF EXISTS
         (
             SELECT 1
-            FROM IRB_MHRR.lgd.irb_tt14_nhnn_lgd_upload s
+            FROM dbo.VW_IRB_TT14_NHNN_LGD_UPLOAD s
             JOIN ecl_stg.AccountSnapshot a
               ON a.RUN_ID = @RUN_ID AND a.ACCOUNT_ID = s.account_id
              AND a.PROCESS_DATE = @PROCESS_DATE
@@ -63,7 +63,7 @@ BEGIN
               AND a.IS_ACTIVE = 1
               AND NOT EXISTS
               (
-                  SELECT 1 FROM IRB_MHRR.lgd.irb_tt14_nhnn_lgd_upload s
+                  SELECT 1 FROM dbo.VW_IRB_TT14_NHNN_LGD_UPLOAD s
                   WHERE s.reporting_date = @PROCESS_DATE
                     AND s.account_id = a.ACCOUNT_ID
               )
@@ -73,7 +73,7 @@ BEGIN
         IF EXISTS
         (
             SELECT 1
-            FROM IRB_MHRR.lgd.irb_tt14_nhnn_lgd_upload s
+            FROM dbo.VW_IRB_TT14_NHNN_LGD_UPLOAD s
             JOIN ecl_stg.AccountSnapshot a
               ON a.RUN_ID = @RUN_ID AND a.ACCOUNT_ID = s.account_id
              AND a.PROCESS_DATE = @PROCESS_DATE AND a.IS_ACTIVE = 1
@@ -95,7 +95,7 @@ BEGIN
                                 THEN 1 ELSE 0 END) / 12.0))
                 END AS HORIZON
             FROM ecl_stg.AccountSnapshot a
-            JOIN IRB_MHRR.lgd.irb_tt14_nhnn_lgd_upload s
+            JOIN dbo.VW_IRB_TT14_NHNN_LGD_UPLOAD s
               ON s.account_id = a.ACCOUNT_ID
              AND s.reporting_date = @PROCESS_DATE
             WHERE a.RUN_ID = @RUN_ID
