@@ -173,7 +173,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 | Path | Purpose |
 |---|---|
 | `README.md` / `README.vi.md` | English overview / Vietnamese overview |
-| `database/001–009*.sql` | Ordered SQL Server schema and procedure migrations |
+| `database/001–008*.sql` | Ordered SQL Server schema and procedure migrations |
 | `database/db2/` | DB2 upstream Non-Revolving EAD table/procedure scripts |
 | `database/upstream/` | SQL Server upstream loaders for Stage/Pool staging and canonical AccountSnapshot loading |
 | `docs/architecture.md` | Logical architecture |
