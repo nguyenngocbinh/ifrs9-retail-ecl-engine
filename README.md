@@ -4,7 +4,7 @@ Production-oriented IFRS 9 expected credit loss (ECL) engine for retail lending,
 
 **Read in another language:** [Tiếng Việt — README.vi.md](README.vi.md)
 
-> **Status:** ECL calculation and publication v1 are implemented in migrations 001–005; migration 006 adds shared EAD curve validation and migration 007 adds shared PD curve validation. SQL Server 2022 regression coverage includes synthetic formula, lifecycle, input-quality, reconciliation, and calculation rollback tests. A reproducible database deployment guide and clean-database end-to-end verification remain outstanding.
+> **Status:** ECL calculation and publication v1 are implemented in migrations 001–005; migration 006 adds shared EAD curve validation and migration 007 adds shared PD curve validation, and migration 008 adds shared LGD curve validation. SQL Server 2022 regression coverage includes synthetic formula, lifecycle, input-quality, reconciliation, and calculation rollback tests. A reproducible database deployment guide and clean-database end-to-end verification remain outstanding.
 
 ## 1. Understand the system in one minute
 
@@ -126,7 +126,7 @@ A rerun must use a **new `RUN_ID`**. Do not overwrite the inputs or results of a
 | `ecl_core.usp_LoadAccountStagePoolSource` | Expands customer-level Stage to contract-level Stage/Pool staging, joining by PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1. | After upstream Stage data is ready. |
 | `ecl_core.usp_LoadAccountSnapshot` | Loads canonical account rows from Stage/Pool staging, reads contract `expiry_date` as MATURITY_DATE, and validates `POOL_NAME` against `ecl_cfg.PoolName`. | After Stage/Pool staging. |
 | `ecl_core.usp_LoadEADCurve` | Validates EAD rows already loaded into canonical `ecl_stg.EADCurve`: run/date alignment, VND, non-negative values, account matching, and annual coverage through maturity; records an audit event. It does **not** calculate product-specific EAD or copy from a second staging table. | After product-specific ETL loads EAD, before calculation. |
-| `ecl_core.usp_LoadPDCurve` | Validates scenario-specific marginal PD rows already loaded into canonical `ecl_stg.PDCurve`, including run/date, active account matching, PD range, all three scenarios, annual coverage through maturity, and audit. It does **not** infer source scenario mapping or calculate PD. | After PD source ETL loads canonical PDCurve, before calculation. |
+| `ecl_core.usp_LoadLGDCurve` | Validates annual account-level LGD rows already loaded into canonical `ecl_stg.LGDCurve`, including reporting date, LGD range, account matching, annual coverage through maturity, and audit. | After source LGD ETL stages the annual curve. |\n| `ecl_core.usp_LoadPDCurve` | Validates scenario-specific marginal PD rows already loaded into canonical `ecl_stg.PDCurve`, including run/date, active account matching, PD range, all three scenarios, annual coverage through maturity, and audit. It does **not** infer source scenario mapping or calculate PD. | After PD source ETL loads canonical PDCurve, before calculation. |
 | `ecl_core.usp_CalculateECL` | Checks run state and required curves, calculates scenario × account × period contributions, writes detail/account/summary results, and records lifecycle/audit milestones in a transaction. | Main calculation step after input validation and loading. |
 | `ecl_core.usp_PublishECL` | Allows only a successful run to be published, checks that outputs exist, rounds account/summary amounts to whole VND at the publication boundary, and transitions the run to `PUBLISHED`. | After calculation and reconciliation succeed. |
 | Run-control / validation procedures | Create and transition runs, validate canonical inputs, persist validation findings and milestones. See migration headers and procedure definitions for exact names and contracts. | Before and around calculation/publication. |
@@ -173,7 +173,7 @@ Scenario-weighted ECL is the sum of each scenario's ECL contribution multiplied 
 | Path | Purpose |
 |---|---|
 | `README.md` / `README.vi.md` | English overview / Vietnamese overview |
-| `database/001–007*.sql` | Ordered SQL Server schema and procedure migrations |
+| `database/001–008*.sql` | Ordered SQL Server schema and procedure migrations |
 | `database/db2/` | DB2 upstream Non-Revolving EAD table/procedure scripts |
 | `database/upstream/` | SQL Server upstream loaders for Stage/Pool staging and canonical AccountSnapshot loading |
 | `docs/architecture.md` | Logical architecture |
