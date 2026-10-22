@@ -58,10 +58,16 @@ BEGIN
 
     DECLARE @PROCESS_DATE date;
     DECLARE @RUN_STATUS varchar(20);
+    DECLARE @RUN_TYPE varchar(20);
+    DECLARE @REQUESTED_POOL_NAME varchar(100);
+    DECLARE @REQUESTED_POOL_ID varchar(100);
 
     SELECT
         @PROCESS_DATE = PROCESS_DATE,
-        @RUN_STATUS = RUN_STATUS
+        @RUN_STATUS = RUN_STATUS,
+        @RUN_TYPE = RUN_TYPE,
+        @REQUESTED_POOL_NAME = REQUESTED_POOL_NAME,
+        @REQUESTED_POOL_ID = REQUESTED_POOL_ID
     FROM ecl_core.RunControl
     WHERE RUN_ID = @RUN_ID;
 
@@ -73,6 +79,25 @@ BEGIN
 
     IF @RUN_STATUS NOT IN ('CREATED','VALIDATING')
         THROW 51203, 'Stage/Pool source can only be loaded while the run is CREATED or VALIDATING.', 1;
+
+    IF @RUN_TYPE = 'SELECTIVE'
+       AND @REQUESTED_POOL_NAME IS NULL
+       AND @REQUESTED_POOL_ID IS NULL
+        THROW 51212, 'Selective run requires REQUESTED_POOL_NAME or REQUESTED_POOL_ID.', 1;
+
+    IF @REQUESTED_POOL_NAME IS NOT NULL
+       AND NOT EXISTS
+       (
+           SELECT 1
+           FROM ecl_cfg.PoolName
+           WHERE POOL_NAME = @REQUESTED_POOL_NAME
+             AND IS_ACTIVE = 1
+       )
+        THROW 51213, 'Requested POOL_NAME is not active in ecl_cfg.PoolName.', 1;
+
+    IF @REQUESTED_POOL_ID IS NOT NULL
+       AND NULLIF(LTRIM(RTRIM(@REQUESTED_POOL_ID)), '') IS NULL
+        THROW 51214, 'REQUESTED_POOL_ID cannot be blank.', 1;
 
     /*
       Normalize contract segment using the same source rules supplied for
@@ -184,7 +209,17 @@ BEGIN
         ON sm.BUCKET = s.bucket
     LEFT JOIN SegmentPool AS sp
         ON sp.SEGMENT = c.SEGMENT_ODR_LV1
-    WHERE sp.POOL_ID IS NOT NULL;
+    WHERE sp.POOL_ID IS NOT NULL
+      AND
+      (
+          @RUN_TYPE = 'FULL'
+          OR
+          (
+              (@REQUESTED_POOL_NAME IS NULL OR sp.POOL_NAME = @REQUESTED_POOL_NAME)
+              AND
+              (@REQUESTED_POOL_ID IS NULL OR CONVERT(varchar(100), sp.POOL_ID) = @REQUESTED_POOL_ID)
+          )
+      );
 
     IF EXISTS (SELECT 1 FROM #Mapped WHERE STAGE IS NULL)
         THROW 51207, 'One or more matched customer rows have NULL or unrecognized BUCKET values.', 1;
@@ -213,7 +248,7 @@ BEGIN
         THROW 51208, 'One or more supported contracts have no matching customer-level Stage row on PROCESS_DATE + CUSTOMER_ID + SEGMENT_ODR_LV1.', 1;
 
     IF NOT EXISTS (SELECT 1 FROM #Mapped)
-        THROW 51209, 'No contracts matched the configured Stage and Pool mappings.', 1;
+        THROW 51209, 'No contracts matched the configured Stage/Pool mappings and requested run scope.', 1;
 
     BEGIN TRY
         BEGIN TRANSACTION;
@@ -263,8 +298,16 @@ END;
 GO
 
 /*
-Example:
-DECLARE @RUN_ID bigint = 123; -- existing run with PROCESS_DATE matching source
+Example — full run:
+DECLARE @RUN_ID bigint = 123; -- existing FULL run with PROCESS_DATE matching source
+EXEC ecl_core.usp_LoadAccountStagePoolSource
+    @RUN_ID = @RUN_ID,
+    @VERSION_ID = 1,
+    @REPLACE_EXISTING = 0;
+
+Example — one portfolio:
+-- Create the run with RUN_TYPE='SELECTIVE' and
+-- @REQUESTED_POOL_NAME='RETAIL_LN_AUTO' in usp_CreateRun first.
 EXEC ecl_core.usp_LoadAccountStagePoolSource
     @RUN_ID = @RUN_ID,
     @VERSION_ID = 1,
