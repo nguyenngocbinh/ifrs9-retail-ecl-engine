@@ -83,3 +83,13 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 - Every active account must have active rows for `DOWNTURN`, `BASE`, and `UPTURN` for each annual forecast period through maturity (maximum 120 periods).
 - The approved source `RETAIL_MARGINAL_PIT_PD` stores `FINAL_MARGINAL_PIT_PD` by `SEGMENT_LV1`, `SEGMENT_LV2`, `BUCKET`, `RATING`, and `SCENARIO`. Source-to-canonical scenario mapping and all join-key semantics must be explicit in source ETL; the shared loader does not guess whether source scenario codes 1/2/3 mean Downturn/Base/Upturn.
 - This migration completes shared contract validation. The source-specific transformation from `TBL_MAN_FACILITY_RATING` and `RETAIL_MARGINAL_PIT_PD` into `PDCurve` remains a separate upstream implementation.
+
+
+## 10. Shared LGD loading
+
+- The source `IRB_MHRR.lgd.irb_tt14_nhnn_lgd_upload` provides one account-level observation at `reporting_date`, not a multi-year curve.
+- Source ETL `ecl_core.usp_StageSourceLGDCurve @RUN_ID` matches `account_id` to the run's `AccountSnapshot.ACCOUNT_ID`, requires a source row at the run `PROCESS_DATE`, and expands `calibration_lgd` into each full annual forecast period through `MATURITY_DATE` (maximum 120 periods).
+- The v1 canonical LGD contract is flat across scenarios, so `calibration_lgd` is used for all periods and scenarios. Source `downturn_lgd` is intentionally not used until scenario-specific LGD is approved as a separate methodology change.
+- Canonical `VERSION_ID` is copied from the account snapshot; the source's text `version` is retained as source provenance in operational lineage rather than converted to the integer canonical version.
+- Run `ecl_core.usp_LoadLGDCurve @RUN_ID` after source ETL. It validates reporting date, LGD range [0,1], account matching and active annual coverage through maturity, then records `LGD_LOAD` in `ecl_audit.RunEvent`.
+- Duplicate source rows for an account/reporting date, missing account LGD, or invalid `calibration_lgd` fail the source ETL. Use a new `RUN_ID` for reruns; the loader will not overwrite existing canonical curve rows.
