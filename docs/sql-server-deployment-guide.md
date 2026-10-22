@@ -2,7 +2,7 @@
 
 ## 1. Purpose and limits
 
-This guide deploys migrations 001–005 into a **new, disposable SQL Server 2022 database**, verifies objects, and runs the repository's synthetic regression suite. It is a developer/test procedure, not production approval.
+This guide deploys migrations 001–007 into a **new, disposable SQL Server 2022 database**, verifies objects, and runs the repository's synthetic regression suite. It is a developer/test procedure, not production approval.
 
 - The current CI target is SQL Server 2022 (major version 16).
 - CI uses an ephemeral Developer-edition container. A green CI run does not prove production readiness, successful deployment to another instance, production permissions, data mappings, capacity, or operational readiness.
@@ -47,7 +47,9 @@ $Scripts = @(
     "database/002_run_control.sql",
     "database/003_input_validation.sql",
     "database/004_input_reconciliation.sql",
-    "database/005_ecl_calculation.sql"
+    "database/005_ecl_calculation.sql",
+    "database/006_ead_curve_loader.sql",
+    "database/007_pd_curve_loader.sql"
 )
 
 foreach ($Script in $Scripts) {
@@ -70,7 +72,7 @@ This example uses Windows integrated authentication. If using SQL authentication
 
 ## 5. Verify deployed objects
 
-Run after all five migrations. The five functional schemas and eight listed procedures should exist.
+Run after all seven migrations. The five functional schemas and ten listed procedures should exist.
 
 ```sql
 SELECT name AS schema_name
@@ -84,7 +86,8 @@ WHERE SCHEMA_NAME(schema_id) = N'ecl_core'
   AND name IN (N'usp_CreateRun', N'usp_TransitionRunStatus',
                N'usp_RegisterRunInput', N'usp_SealRunInputs',
                N'usp_ValidateRunInputs', N'usp_ReconcileInputSnapshots',
-               N'usp_CalculateECL', N'usp_PublishECL')
+               N'usp_CalculateECL', N'usp_PublishECL',
+               N'usp_LoadEADCurve', N'usp_LoadPDCurve')
 ORDER BY name;
 
 SELECT name, state_desc, compatibility_level
@@ -102,6 +105,8 @@ The authoritative test sequence is maintained in the [SQL Server 2022 GitHub Act
 $Server = "localhost"
 $Database = "IFRS9_ECL_DEV"
 $Scripts = @(
+    "tests/sql/ead_curve_loader_tests.sql",
+    "tests/sql/pd_curve_loader_tests.sql",
     "tests/sql/run_control_smoke_tests.sql",
     "tests/sql/input_validation_smoke_tests.sql",
     "tests/sql/input_reconciliation_smoke_tests.sql",
@@ -192,7 +197,7 @@ Before accepting results, verify PUBLISHED status, successful latest input-recon
 
 ## 10. Release readiness checklist
 
-- [ ] Migrations 001–005 deployed to a clean disposable SQL Server 2022 database.
+- [ ] Migrations 001–007 deployed to a clean disposable SQL Server 2022 database.
 - [ ] Object verification queries passed.
 - [ ] Every synthetic SQL test completed successfully on that database.
 - [ ] End-to-end synthetic calculation reached PUBLISHED and its assertions passed.

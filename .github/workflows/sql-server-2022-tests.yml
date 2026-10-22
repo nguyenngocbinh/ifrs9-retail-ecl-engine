@@ -97,6 +97,8 @@ jobs:
             "database/005_ecl_calculation.sql"
             "database/006_ead_curve_loader.sql"
             "tests/sql/ead_curve_loader_tests.sql"
+            "database/007_pd_curve_loader.sql"
+            "tests/sql/pd_curve_loader_tests.sql"
             "tests/sql/input_contract_regression_tests.sql"
             "tests/sql/maturity_curve_coverage_tests.sql"
             "tests/sql/canonical_input_happy_path_tests.sql"
