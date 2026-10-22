@@ -2,9 +2,9 @@
 
 ## 1. Purpose and limits
 
-This guide deploys migrations 001–007 into a **new, disposable SQL Server 2022 database**, verifies objects, and runs the repository's synthetic regression suite. It is a developer/test procedure, not production approval.
+This guide deploys migrations 001–008 into a **new, disposable SQL Server 2022 database**, verifies objects, and runs the repository's synthetic regression suite. It is a developer/test procedure, not production approval.
 
-- The current CI target is SQL Server 2022 (major version 16).
+- The current CI target is SQL Server 2022 (major version 16). Migration 008 creates `ecl_cfg.PDScenarioMapping` with the approved mapping `1=BASE`, `2=UPTURN`, `3=DOWNTURN` and installs the retail marginal PIT PD source loader.
 - CI uses an ephemeral Developer-edition container. A green CI run does not prove production readiness, successful deployment to another instance, production permissions, data mappings, capacity, or operational readiness.
 - The migration files are not a single idempotent migration framework. Do not blindly rerun the full sequence against a partially deployed database.
 - Use synthetic test fixtures only. Never commit customer records, credentials, or secrets.
@@ -49,7 +49,7 @@ $Scripts = @(
     "database/004_input_reconciliation.sql",
     "database/005_ecl_calculation.sql",
     "database/006_ead_curve_loader.sql",
-    "database/007_pd_curve_loader.sql"
+    "database/007_pd_curve_loader.sql",\n    "database/008_retail_marginal_pit_pd_source_loader.sql"
 )
 
 foreach ($Script in $Scripts) {
