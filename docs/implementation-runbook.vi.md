@@ -6,12 +6,13 @@
 
 1. **Chuẩn bị database sạch** trên SQL Server 2022; bảo đảm đã có quyền tạo schema/table/procedure. Không chạy thử lần đầu trên database thật.
 2. **Triển khai engine** bằng các script `database/001` đến `database/008`, đúng thứ tự ở mục 2.
-3. **Kiểm tra cấu hình** trong `ecl_cfg.PoolName`, `ecl_cfg.Scenario`, `ecl_cfg.ScenarioWeightVersion` và `ecl_cfg.ScenarioWeight`.
-4. **Nạp Stage/Pool và AccountSnapshot** từ dữ liệu upstream; xác nhận `POOL_NAME`, `STAGE`, `POOL_ID` và `MATURITY_DATE`.
-5. **Nạp PD, LGD, EAD, EIR** vào các bảng chuẩn `ecl_stg.*Curve`. Các procedure `usp_LoadPDCurve`, `usp_LoadLGDCurve`, `usp_LoadEADCurve` là bước **kiểm tra dữ liệu đã nạp**, không tự tính PD/LGD/EAD và không tự ETL dữ liệu từ hệ thống nguồn.
-6. **Tạo RUN_ID và kiểm soát đầu vào**: đăng ký đủ sáu nhóm ACCOUNT, PD, LGD, EAD, EIR, SCENARIO_WEIGHT; seal manifest; chạy validate và reconcile.
-7. **Tính và xuất bản ECL**: chuyển trạng thái CALCULATING → chạy tính ECL → xác nhận đối soát thành công → publish.
-8. **Đối chiếu kết quả** theo tài khoản, pool, Stage và nhật ký audit; lưu bằng chứng chạy thử.
+3. **Nạp cấu hình trọng số mặc định** bằng `database/seed_scenario_weight_config.sql` sau khi triển khai xong 001–008; script này tạo version 1 và ba trọng số đã thống nhất. `PoolName` và `Scenario` đã được seed trong migration 001.
+4. **Kiểm tra cấu hình** trong `ecl_cfg.PoolName`, `ecl_cfg.Scenario`, `ecl_cfg.ScenarioWeightVersion` và `ecl_cfg.ScenarioWeight`.
+5. **Nạp Stage/Pool và AccountSnapshot** từ dữ liệu upstream; xác nhận `POOL_NAME`, `STAGE`, `POOL_ID` và `MATURITY_DATE`.
+6. **Nạp PD, LGD, EAD, EIR** vào các bảng chuẩn `ecl_stg.*Curve`. Các procedure `usp_LoadPDCurve`, `usp_LoadLGDCurve`, `usp_LoadEADCurve` là bước **kiểm tra dữ liệu đã nạp**, không tự tính PD/LGD/EAD và không tự ETL dữ liệu từ hệ thống nguồn.
+7. **Tạo RUN_ID và kiểm soát đầu vào**: đăng ký đủ sáu nhóm ACCOUNT, PD, LGD, EAD, EIR, SCENARIO_WEIGHT; seal manifest; chạy validate và reconcile.
+8. **Tính và xuất bản ECL**: chuyển trạng thái CALCULATING → chạy tính ECL → xác nhận đối soát thành công → publish.
+9. **Đối chiếu kết quả** theo tài khoản, pool, Stage và nhật ký audit; lưu bằng chứng chạy thử.
 
 ## 2. Triển khai database
 
@@ -54,6 +55,17 @@ SELECT SERVERPROPERTY('ProductVersion') AS product_version,
 Mục tiêu kiểm thử hiện tại là SQL Server 2022 (major version 16).
 
 ## 3. Cấu hình trước khi nạp dữ liệu
+
+### Nạp cấu hình mặc định
+
+Sau khi chạy đủ `database/001`–`database/008`, chạy script seed riêng (không phải migration đánh số):
+
+```powershell
+sqlcmd -S $Server -d $Database -E -b -i "database/seed_scenario_weight_config.sql"
+if ($LASTEXITCODE -ne 0) { throw "Scenario-weight configuration seed failed." }
+```
+
+Script dùng `VERSION_ID = 1`, `VERSION_NAME = SCENARIO_WEIGHT_V1`, `EFFECTIVE_FROM = 2026-01-01`, `EFFECTIVE_TO = NULL`; trọng số là DOWNTURN 0.1568, BASE 0.6864, UPTURN 0.1568. Script có thể chạy lại nếu cấu hình hiện có khớp; nếu version 1 đã có giá trị khác hoặc bị nạp thiếu, script dừng để tránh sửa ngược cấu hình lịch sử. Xác nhận ngày hiệu lực với chủ sở hữu mô hình trước khi dùng cho ngày báo cáo ngoài DEV/UAT.
 
 ### Pool
 
