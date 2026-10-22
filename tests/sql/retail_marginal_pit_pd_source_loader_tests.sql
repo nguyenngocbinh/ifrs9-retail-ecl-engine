@@ -12,10 +12,13 @@ GO
 IF DB_ID(N'IRB_MHRR') IS NULL
     EXEC(N'CREATE DATABASE IRB_MHRR');
 GO
-IF SCHEMA_ID(N'pd') IS NULL
-    EXEC(N'CREATE SCHEMA pd');
-GO
-IF OBJECT_ID(N'[IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING]', N'U') IS NULL
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM [IRB_MHRR].sys.tables t
+    JOIN [IRB_MHRR].sys.schemas s ON s.schema_id = t.schema_id
+    WHERE s.name = N'pd' AND t.name = N'TBL_MAN_FACILITY_RATING'
+)
 BEGIN
     EXEC(N'USE IRB_MHRR;
         IF SCHEMA_ID(N''pd'') IS NULL EXEC(N''CREATE SCHEMA pd'');
