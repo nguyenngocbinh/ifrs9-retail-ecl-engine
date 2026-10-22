@@ -13,6 +13,9 @@ DECLARE @RUN_INVALID bigint;
 DECLARE @EXPECTED_ERROR int;
 DECLARE @STATUS varchar(20);
 DECLARE @SCOPE_FINDINGS int;
+DECLARE @RUN_SELECTIVE_AUTO bigint;
+DECLARE @AUTO_SOURCE_ROWS int;
+DECLARE @AUTO_OUT_OF_SCOPE_ROWS int;
 
 BEGIN TRY
     BEGIN TRANSACTION;
@@ -26,6 +29,31 @@ BEGIN TRY
     VALUES (@WEIGHT_VERSION, 'DOWNTURN', 0.15680000, 1),
            (@WEIGHT_VERSION, 'BASE',     0.68640000, 1),
            (@WEIGHT_VERSION, 'UPTURN',   0.15680000, 1);
+
+    /*
+      Loader-scope regression: prove a selective Auto run carries the requested
+      pool into RunControl and can only accept Auto-mapped rows at the staging
+      boundary. This test targets the same selector contract used by the loader.
+      Full upstream loader integration requires the configured DEFAULT source tables.
+    */
+    EXEC ecl_core.usp_CreateRun
+        @PROCESS_DATE = @PROCESS_DATE, @RUN_TYPE = 'SELECTIVE',
+        @SCENARIO_WEIGHT_VERSION_ID = @WEIGHT_VERSION,
+        @CALCULATION_VERSION = 'SELECTIVE-AUTO-SCOPE',
+        @REQUESTED_POOL_NAME = 'RETAIL_LN_AUTO', @REQUESTED_POOL_ID = NULL,
+        @RUN_ID = @RUN_SELECTIVE_AUTO OUTPUT;
+    EXEC ecl_core.usp_TransitionRunStatus
+        @RUN_SELECTIVE_AUTO, 'VALIDATING', N'Selective RETAIL_LN_AUTO scope contract';
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM ecl_core.RunControl
+        WHERE RUN_ID = @RUN_SELECTIVE_AUTO
+          AND RUN_TYPE = 'SELECTIVE'
+          AND REQUESTED_POOL_NAME = 'RETAIL_LN_AUTO'
+          AND REQUESTED_POOL_ID IS NULL
+    )
+        THROW 52306, 'Auto selective run did not retain the requested pool scope.', 1;
 
     /* Positive case: every active account matches both requested pool name and pool ID. */
     EXEC ecl_core.usp_CreateRun
@@ -142,7 +170,7 @@ BEGIN TRY
        OR EXISTS (SELECT 1 FROM ecl_result.ECLPortfolioSummary WHERE RUN_ID IN (@RUN_VALID, @RUN_INVALID))
         THROW 52305, 'Selective-run scope tests must not generate ECL output rows.', 1;
 
-    PRINT 'PASS: valid pool-name/pool-ID selective scope is accepted; pool-name and pool-ID mismatches are flagged and block calculation; no ECL outputs.';
+    PRINT 'PASS: RETAIL_LN_AUTO selector is retained; valid pool-name/pool-ID selective scope is accepted; pool-name and pool-ID mismatches are flagged and block calculation; no ECL outputs.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
