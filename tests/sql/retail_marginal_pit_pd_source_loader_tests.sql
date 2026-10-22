@@ -35,6 +35,26 @@ BEGIN
 END;
 GO
 
+IF OBJECT_ID(N'dbo.RETAIL_MARGINAL_PIT_PD', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.RETAIL_MARGINAL_PIT_PD
+    (
+        PROCESS_DATE date NOT NULL,
+        PERIOD date NOT NULL,
+        SEGMENT_LV1 nvarchar(100) NOT NULL,
+        SEGMENT_LV2 nvarchar(100) NOT NULL,
+        BUCKET nvarchar(200) NOT NULL,
+        RATING varchar(20) NOT NULL,
+        SCENARIO tinyint NOT NULL,
+        MARGINAL_PIT_PD decimal(19,12) NULL,
+        SUM_MPD decimal(19,12) NULL,
+        FINAL_MARGINAL_PIT_PD decimal(19,12) NOT NULL,
+        MODIFY_BY nvarchar(128) NULL,
+        MODIFY_DATE datetime2(0) NULL
+    );
+END;
+GO
+
 DECLARE @RUN_ID bigint;
 DECLARE @PROCESS_DATE date = '20260630';
 DECLARE @SOURCE_PROCESS_DATE date = '20261231';
