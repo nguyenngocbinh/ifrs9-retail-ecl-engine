@@ -6,7 +6,7 @@ Engine tính **tổn thất tín dụng dự kiến (Expected Credit Loss — EC
 
 **English:** [README.md](README.md)
 
-> **Trạng thái hiện tại:** các migration 001–008 định nghĩa schema, run control, validation/reconciliation, tính toán ECL và kiểm tra các curve dùng chung. CI có bộ test SQL Server 2022 bằng dữ liệu giả lập. Tài liệu triển khai không thay thế việc kiểm thử trên database DEV/UAT và phê duyệt nghiệp vụ/IT trước production.
+> **Trạng thái hiện tại:** các migration 001–008 định nghĩa schema, run control, validation/reconciliation, tính toán ECL và kiểm tra các curve dùng chung. Sau khi chạy 001–008, chạy thêm `database/seed_scenario_weight_config.sql` để nạp version trọng số mặc định (VERSION_ID=1; Downturn 15.68%, Base 68.64%, Upturn 15.68%). Script seed này không phải migration đánh số và không thay thế dữ liệu đầu vào PD/LGD/EAD/EIR. CI có bộ test SQL Server 2022 bằng dữ liệu giả lập. Tài liệu triển khai không thay thế việc kiểm thử trên database DEV/UAT và phê duyệt nghiệp vụ/IT trước production.
 
 ## 1. Hiểu hệ thống trong một phút
 
