@@ -146,7 +146,7 @@ Stage assignment from source buckets and segment-to-pool mapping are upstream re
 - **Horizon:** Stage 1 uses 12-month ECL; Stage 2 and Stage 3 run to contractual maturity.
 - **Stage 3:** PD is set to 1; annual EAD/LGD/EIR curve conventions follow Stage 2.
 - **Discounting:** `DF(t) = 1 / (1 + EIR(t))^t`. For a partial final year, the remaining-month fraction changes only discounting time/exponent.
-- **Scenario weights:** Downturn 15.68%, Base 68.64%, Upturn 15.68%, selected from an immutable/versioned configuration set. Official external provenance remains a follow-up.
+- **Scenario weights:** Downturn 15.68%, Base 68.64%, Upturn 15.68%, selected from an immutable/versioned configuration set. `ScenarioWeight` is keyed by `VERSION_ID + SCENARIO_CODE` and has no `PROCESS_DATE`; the run's `PROCESS_DATE` is used only to select an effective `ScenarioWeightVersion`. Official external provenance remains a follow-up.
 - **Currency:** VND; retain detail precision and round published account/summary ECL to whole VND.
 - **POCI:** excluded from v1. Validation must not silently treat POCI as a regular loan.
 
