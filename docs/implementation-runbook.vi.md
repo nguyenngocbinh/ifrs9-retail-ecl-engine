@@ -183,7 +183,7 @@ Chạy các lệnh trong cùng một session/batch để biến `@RUN_ID` còn h
 
 #### Nạp PD từ nguồn
 
-Chạy script `database/upstream/003_load_pd_curve_source.sql` sau khi đã triển khai schema và `database/007_pd_curve_loader.sql`. Procedure giả định hai bảng nguồn nằm trong cùng database với engine, schema `dbo`. Mapping scenario cố định: `1 = BASE`, `2 = DOWNTURN`, `3 = UPTURN`.
+Chạy script `database/upstream/003_load_pd_curve_source.sql` sau khi đã triển khai schema và `database/007_pd_curve_loader.sql`. Procedure giả định hai bảng nguồn nằm trong cùng database với engine, schema `dbo`. Mapping scenario cố định: `1 = BASE`, `2 = UPTURN`, `3 = DOWNTURN`.
 
 ```sql
 -- Chạy trong database IFRS9 ECL Engine; thay VERSION_ID theo cấu hình thực tế.
@@ -195,7 +195,7 @@ EXEC ecl_core.usp_StageSourcePDCurve
 EXEC ecl_core.usp_LoadPDCurve @RUN_ID = @RUN_ID;
 ```
 
-Procedure ghép `TBL_MAN_FACILITY_RATING` với snapshot đang active theo `ACCOUNT_ID` và `REPORTING_DATE = RunControl.PROCESS_DATE`; ghép PD theo `BUCKET`, `RATING` và `ecl_cfg.PoolName.SEGMENT = RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2`. `PERIOD` thành `FORECAST_PERIOD`; `FINAL_MARGINAL_PIT_PD` thành `MARGINAL_PD`. Mapping scenario cố định: `1 = BASE`, `2 = DOWNTURN`, `3 = UPTURN`. `RETAIL_MARGINAL_PIT_PD.PROCESS_DATE` không được lọc vì nguồn hiện cố định theo năm.
+Procedure ghép `TBL_MAN_FACILITY_RATING` với snapshot đang active theo `ACCOUNT_ID` và `REPORTING_DATE = RunControl.PROCESS_DATE`; ghép PD theo `BUCKET`, `RATING` và `ecl_cfg.PoolName.SEGMENT = RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2`. `PERIOD` thành `FORECAST_PERIOD`; `FINAL_MARGINAL_PIT_PD` thành `MARGINAL_PD`. Mapping scenario cố định: `1 = BASE`, `2 = UPTURN`, `3 = DOWNTURN`. `RETAIL_MARGINAL_PIT_PD.PROCESS_DATE` không được lọc vì nguồn hiện cố định theo năm.
 
 Procedure thay dữ liệu PD hiện có của chính `RUN_ID` trong một transaction. Nếu chạy lại sau lỗi, cần kiểm tra trạng thái/audit trước khi quyết định; theo quy trình chung, ưu tiên tạo `RUN_ID` mới.
 
