@@ -19,8 +19,7 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 CREATE OR ALTER PROCEDURE ecl_core.usp_StageSourceLGDCurve
-    @RUN_ID bigint,
-    @REPLACE_EXISTING bit = 0
+    @RUN_ID bigint
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -57,31 +56,6 @@ BEGIN
         )
             THROW 51902, 'LGD source ETL: no active AccountSnapshot rows exist for this run.', 1;
 
-        /* Never overwrite canonical inputs by accident. */
-        IF EXISTS
-        (
-            SELECT 1
-            FROM ecl_stg.LGDCurve
-            WHERE RUN_ID = @RUN_ID
-        )
-        BEGIN
-            IF @REPLACE_EXISTING = 0
-                THROW 51903, 'LGD source ETL: LGDCurve rows already exist for RUN_ID. Set @REPLACE_EXISTING = 1 to replace before the run manifest is sealed.', 1;
-
-            IF EXISTS
-            (
-                SELECT 1
-                FROM ecl_core.RunInputManifest
-                WHERE RUN_ID = @RUN_ID
-                  AND IS_SEALED = 1
-            )
-                THROW 51904, 'LGD source ETL: cannot replace LGDCurve after the run input manifest is sealed.', 1;
-
-            IF EXISTS (SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID = @RUN_ID)
-               OR EXISTS (SELECT 1 FROM ecl_result.ECLAccount WHERE RUN_ID = @RUN_ID)
-               OR EXISTS (SELECT 1 FROM ecl_result.ECLPortfolioSummary WHERE RUN_ID = @RUN_ID)
-                THROW 51905, 'LGD source ETL: cannot replace LGDCurve after ECL results exist; use a new RUN_ID or approved reset.', 1;
-        END;
 
         /* Exactly one source observation per account for the reporting date. */
         IF EXISTS
@@ -300,9 +274,9 @@ BEGIN
         )
             THROW 51911, 'LGD source ETL: mapped data contains duplicate canonical LGD keys.', 1;
 
-        IF @REPLACE_EXISTING = 1
-            DELETE FROM ecl_stg.LGDCurve
-            WHERE RUN_ID = @RUN_ID;
+        /* Match PD source-loader behavior: replace this RUN_ID after all validations pass. */
+        DELETE FROM ecl_stg.LGDCurve
+        WHERE RUN_ID = @RUN_ID;
 
         INSERT INTO ecl_stg.LGDCurve
         (
@@ -353,8 +327,7 @@ GO
 /*
 Example:
 EXEC ecl_core.usp_StageSourceLGDCurve
-    @RUN_ID = 123,
-    @REPLACE_EXISTING = 0;
+    @RUN_ID = 123;
 
 Then run database/008_lgd_curve_loader.sql's ecl_core.usp_LoadLGDCurve
 to validate the canonical LGD curve contract.
