@@ -9,10 +9,7 @@ GO
 
 CREATE OR ALTER PROCEDURE ecl_core.usp_StageSourcePDCurve
     @RUN_ID bigint,
-    @VERSION_ID int,
-    @SOURCE_SCENARIO_DOWNTURN varchar(50),
-    @SOURCE_SCENARIO_BASE varchar(50),
-    @SOURCE_SCENARIO_UPTURN varchar(50)
+    @VERSION_ID int
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -27,14 +24,6 @@ BEGIN
 
     IF @PROCESS_DATE IS NULL
         THROW 51800, 'RUN_ID không tồn tại hoặc run không ở trạng thái CREATED/VALIDATING.', 1;
-
-    IF NULLIF(@SOURCE_SCENARIO_DOWNTURN, '') IS NULL
-       OR NULLIF(@SOURCE_SCENARIO_BASE, '') IS NULL
-       OR NULLIF(@SOURCE_SCENARIO_UPTURN, '') IS NULL
-       OR @SOURCE_SCENARIO_DOWNTURN = @SOURCE_SCENARIO_BASE
-       OR @SOURCE_SCENARIO_DOWNTURN = @SOURCE_SCENARIO_UPTURN
-       OR @SOURCE_SCENARIO_BASE = @SOURCE_SCENARIO_UPTURN
-        THROW 51801, 'Cần truyền đủ ba mã scenario nguồn khác nhau.', 1;
 
     BEGIN TRY
         BEGIN TRANSACTION;
@@ -51,10 +40,10 @@ BEGIN
             @RUN_ID,
             @PROCESS_DATE,
             CONVERT(varchar(100), fr.ACCOUNT_ID),
-            CASE CONVERT(varchar(50), pd.SCENARIO)
-                WHEN @SOURCE_SCENARIO_DOWNTURN THEN 'DOWNTURN'
-                WHEN @SOURCE_SCENARIO_BASE     THEN 'BASE'
-                WHEN @SOURCE_SCENARIO_UPTURN   THEN 'UPTURN'
+            CASE pd.SCENARIO
+                WHEN 1 THEN 'BASE'
+                WHEN 2 THEN 'DOWNTURN'
+                WHEN 3 THEN 'UPTURN'
             END,
             TRY_CONVERT(smallint, pd.PERIOD),
             TRY_CONVERT(decimal(19,12), pd.FINAL_MARGINAL_PIT_PD),
@@ -73,8 +62,7 @@ BEGIN
             ON pd.BUCKET = fr.BUCKET
            AND pd.RATING = fr.RATING
            AND pd.SEGMENT_LV2 = pn.SEGMENT
-           AND CONVERT(varchar(50), pd.SCENARIO) IN
-               (@SOURCE_SCENARIO_DOWNTURN, @SOURCE_SCENARIO_BASE, @SOURCE_SCENARIO_UPTURN)
+           AND pd.SCENARIO IN (1, 2, 3)
         WHERE fr.REPORTING_DATE = @PROCESS_DATE;
 
         SET @ROW_COUNT = @@ROWCOUNT;
