@@ -140,7 +140,7 @@ BEGIN
                   WHERE pd.SEGMENT_LV2 = pn.SEGMENT
                     AND pd.BUCKET = fr.BUCKET
                     AND pd.RATING = fr.RATING_FIX
-                    AND pd.PERIOD > @PROCESS_DATE
+                    AND pd.PERIOD > pd.PROCESS_DATE
               )
         )
             THROW 51808, 'No future PD period exists for at least one account segment/bucket/rating relative to the ECL run date.', 1;
@@ -154,9 +154,9 @@ BEGIN
             a.ACCOUNT_ID,
             sm.SCENARIO_CODE,
             CONVERT(smallint,
-                DATEDIFF(year, @PROCESS_DATE, pd.PERIOD)
+                DATEDIFF(year, pd.PROCESS_DATE, pd.PERIOD)
                 + CASE
-                    WHEN @PROCESS_DATE < DATEFROMPARTS(YEAR(@PROCESS_DATE), 12, 31)
+                    WHEN pd.PROCESS_DATE < DATEFROMPARTS(YEAR(pd.PROCESS_DATE), 12, 31)
                     THEN 1 ELSE 0
                   END
             ) AS FORECAST_PERIOD,
@@ -176,7 +176,7 @@ BEGIN
           ON pd.SEGMENT_LV2 = pn.SEGMENT
          AND pd.BUCKET = fr.BUCKET
          AND pd.RATING = fr.RATING_FIX
-         AND pd.PERIOD > @PROCESS_DATE
+         AND pd.PERIOD > pd.PROCESS_DATE
         JOIN ecl_cfg.Scenario AS sm
           ON sm.SOURCE_SCENARIO_CODE = TRY_CONVERT(int, pd.SCENARIO)
          AND sm.IS_ACTIVE = 1
