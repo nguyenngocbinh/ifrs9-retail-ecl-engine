@@ -76,6 +76,14 @@ BEGIN
               ON CONVERT(varchar(100), fr.ACCOUNT_ID) = a.ACCOUNT_ID
              AND fr.REPORTING_DATE = @PROCESS_DATE
              AND fr.POOL_NAME = a.POOL_NAME
+            CROSS APPLY
+            (
+                SELECT RATING_FIX =
+                    CASE
+                        WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
+                        ELSE fr.RATING
+                    END
+            ) AS rf
             WHERE a.RUN_ID = @RUN_ID
               AND a.PROCESS_DATE = @PROCESS_DATE
               AND a.IS_ACTIVE = 1
@@ -92,6 +100,14 @@ BEGIN
               ON CONVERT(varchar(100), fr.ACCOUNT_ID) = a.ACCOUNT_ID
              AND fr.REPORTING_DATE = @PROCESS_DATE
              AND fr.POOL_NAME = a.POOL_NAME
+            CROSS APPLY
+            (
+                SELECT RATING_FIX =
+                    CASE
+                        WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
+                        ELSE fr.RATING
+                    END
+            ) AS rf
             WHERE a.RUN_ID = @RUN_ID
               AND a.PROCESS_DATE = @PROCESS_DATE
               AND a.IS_ACTIVE = 1
@@ -108,6 +124,14 @@ BEGIN
               ON CONVERT(varchar(100), fr.ACCOUNT_ID) = a.ACCOUNT_ID
              AND fr.REPORTING_DATE = @PROCESS_DATE
              AND fr.POOL_NAME = a.POOL_NAME
+            CROSS APPLY
+            (
+                SELECT RATING_FIX =
+                    CASE
+                        WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
+                        ELSE fr.RATING
+                    END
+            ) AS rf
             JOIN ecl_cfg.PoolName AS pn
               ON pn.POOL_NAME = a.POOL_NAME
              AND pn.IS_ACTIVE = 1
@@ -120,7 +144,7 @@ BEGIN
                   FROM dbo.RETAIL_MARGINAL_PIT_PD AS pd
                   WHERE pd.SEGMENT_LV2 = pn.SEGMENT
                     AND pd.BUCKET = fr.BUCKET
-                    AND pd.RATING = fr.RATING
+                    AND pd.RATING = rf.RATING_FIX
                     AND pd.PERIOD > @PROCESS_DATE
               )
         )
@@ -156,7 +180,7 @@ BEGIN
         JOIN dbo.RETAIL_MARGINAL_PIT_PD AS pd
           ON pd.SEGMENT_LV2 = pn.SEGMENT
          AND pd.BUCKET = fr.BUCKET
-         AND pd.RATING = fr.RATING
+         AND pd.RATING = rf.RATING_FIX
          AND pd.PERIOD > @PROCESS_DATE
         JOIN ecl_cfg.Scenario AS sm
           ON sm.SOURCE_SCENARIO_CODE = TRY_CONVERT(int, pd.SCENARIO)
