@@ -42,8 +42,8 @@ BEGIN
             CONVERT(varchar(100), fr.ACCOUNT_ID),
             CASE pd.SCENARIO
                 WHEN 1 THEN 'BASE'
-                WHEN 2 THEN 'DOWNTURN'
-                WHEN 3 THEN 'UPTURN'
+                WHEN 2 THEN 'UPTURN'
+                WHEN 3 THEN 'DOWNTURN'
             END,
             TRY_CONVERT(smallint, pd.PERIOD),
             TRY_CONVERT(decimal(19,12), pd.FINAL_MARGINAL_PIT_PD),
