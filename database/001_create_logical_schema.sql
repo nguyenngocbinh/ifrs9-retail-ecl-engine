@@ -39,9 +39,11 @@ GO
 CREATE TABLE ecl_cfg.Scenario (
     SCENARIO_CODE varchar(20) NOT NULL,
     SCENARIO_NAME nvarchar(100) NOT NULL,
+    SOURCE_SCENARIO_CODE int NOT NULL,
     IS_ACTIVE bit NOT NULL CONSTRAINT DF_Scenario_IsActive DEFAULT (1),
     CONSTRAINT PK_Scenario PRIMARY KEY CLUSTERED (SCENARIO_CODE),
-    CONSTRAINT UQ_Scenario_Name UNIQUE (SCENARIO_NAME)
+    CONSTRAINT UQ_Scenario_Name UNIQUE (SCENARIO_NAME),
+    CONSTRAINT UQ_Scenario_SourceScenarioCode UNIQUE (SOURCE_SCENARIO_CODE)
 );
 GO
 
@@ -365,8 +367,8 @@ VALUES ('RETAIL_LN_AUTO', N'Autoloan'),
        ('CORP_MEDIUM_LOAN', N'Medium'),
        ('CORP_SMALL_LOAN', N'Small');
 
-INSERT INTO ecl_cfg.Scenario (SCENARIO_CODE, SCENARIO_NAME)
-VALUES ('DOWNTURN', N'Downturn'),
-       ('BASE', N'Base'),
-       ('UPTURN', N'Upturn');
+INSERT INTO ecl_cfg.Scenario (SCENARIO_CODE, SCENARIO_NAME, SOURCE_SCENARIO_CODE)
+VALUES ('DOWNTURN', N'Downturn', 3),
+       ('BASE', N'Base', 1),
+       ('UPTURN', N'Upturn', 2);
 
