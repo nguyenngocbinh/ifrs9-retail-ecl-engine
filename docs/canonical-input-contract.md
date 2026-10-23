@@ -81,10 +81,10 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 - `ecl_core.usp_LoadPDCurve @RUN_ID` validates the rows already loaded into `ecl_stg.PDCurve`; it does not calculate PD or silently infer source scenario codes.
 - Every PD row must match the run `PROCESS_DATE` and an active account snapshot. Values must be within [0,1].
 - Every active account must have active rows for `DOWNTURN`, `BASE`, and `UPTURN` for each annual forecast period through maturity (maximum 120 periods).
-- The approved source `RETAIL_MARGINAL_PIT_PD` stores `FINAL_MARGINAL_PIT_PD` by `SEGMENT_LV1`, `SEGMENT_LV2`, `BUCKET`, `RATING`, and `SCENARIO`. The source `SCENARIO` is a fixed numeric code: `1 = BASE`, `2 = DOWNTURN`, `3 = UPTURN`. The source ETL maps these codes directly to canonical `SCENARIO_CODE`; the shared loader does not perform this mapping.
+- The approved source `RETAIL_MARGINAL_PIT_PD` stores `FINAL_MARGINAL_PIT_PD` by `SEGMENT_LV1`, `SEGMENT_LV2`, `BUCKET`, `RATING`, and `SCENARIO`. The source `SCENARIO` is a fixed numeric code: `1 = BASE`, `2 = UPTURN`, `3 = DOWNTURN`. The source ETL maps these codes directly to canonical `SCENARIO_CODE`; the shared loader does not perform this mapping.
 - The source ETL procedure is `ecl_core.usp_StageSourcePDCurve`, defined in `database/upstream/003_load_pd_curve_source.sql`. It joins facility rating to the active run snapshot by `ACCOUNT_ID` and `REPORTING_DATE`, then joins PD by `BUCKET`, `RATING`, and `ecl_cfg.PoolName.SEGMENT = SEGMENT_LV2`. It uses `PERIOD` as `FORECAST_PERIOD` and `FINAL_MARGINAL_PIT_PD` as `MARGINAL_PD`.
 - Deploy the upstream script after the core schema and shared PD validator exist, and only after confirming the actual source database/schema and column definitions. The procedure defaults to source schema `dbo`; pass `@SOURCE_DATABASE` and `@SOURCE_SCHEMA` when needed.
-- Scenario codes are fixed in the procedure: `1 = BASE`, `2 = DOWNTURN`, `3 = UPTURN`; no scenario parameters are needed. The source `PROCESS_DATE` is not filtered because it is fixed by year.
+- Scenario codes are fixed in the procedure: `1 = BASE`, `2 = UPTURN`, `3 = DOWNTURN`; no scenario parameters are needed. The source `PROCESS_DATE` is not filtered because it is fixed by year.
 - The procedure replaces PD rows for the supplied `RUN_ID` transactionally and does not call `usp_LoadPDCurve`; call that validator only after the ETL succeeds.
 
 
