@@ -79,7 +79,7 @@ BEGIN
     (
         ACCOUNT_ID varchar(100) NOT NULL,
         SCENARIO_CODE varchar(20) NOT NULL,
-        FORECAST_PERIOD smallint NOT NULL,
+        FORECAST_PERIOD smallint NULL,
         MARGINAL_PD decimal(19,12) NULL,
         SOURCE_PROCESS_DATE date NULL
     );
