@@ -216,9 +216,7 @@ BEGIN
         VALUES
         (
             @RUN_ID, @PROCESS_DATE, 'PD_SOURCE_ETL', 'SUCCEEDED',
-            CONCAT(
-                N'Loaded source PD rows using PERIOD relative to ECL run PROCESS_DATE into ecl_stg.PDCurve.'
-            ),
+            N'Loaded source PD rows using PERIOD relative to ECL run PROCESS_DATE into ecl_stg.PDCurve.',
             @ROW_COUNT, SUSER_SNAME()
         );
 
