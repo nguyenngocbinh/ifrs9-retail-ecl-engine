@@ -81,7 +81,7 @@ BEGIN
         FROM ecl_stg.AccountSnapshot AS a
         JOIN STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE AS s
           ON s.PROCESS_DATE = @PROCESS_DATE
-         AND CONVERT(varchar(100), s.ACCOUNT_NUMBER) = a.ACCOUNT_ID
+         AND s.ACCOUNT_NUMBER = a.ACCOUNT_ID
         WHERE a.RUN_ID = @RUN_ID
           AND a.PROCESS_DATE = @PROCESS_DATE
           AND a.IS_ACTIVE = 1
@@ -114,7 +114,7 @@ BEGIN
             SELECT 1
             FROM STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE AS s
             JOIN #SourceAccounts AS a
-              ON CONVERT(varchar(100), s.ACCOUNT_NUMBER) = a.ACCOUNT_ID
+              ON s.ACCOUNT_NUMBER = a.ACCOUNT_ID
              AND s.PROCESS_DATE = @PROCESS_DATE
             WHERE s.EAD_AFTER_REPAYMENT IS NOT NULL
               AND TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT) < 0
@@ -179,7 +179,7 @@ BEGIN
                 s.EAD_AFTER_REPAYMENT
             FROM STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE AS s
             WHERE s.PROCESS_DATE = p.PROCESS_DATE
-              AND CONVERT(varchar(100), s.ACCOUNT_NUMBER) = p.ACCOUNT_ID
+              AND s.ACCOUNT_NUMBER = p.ACCOUNT_ID
               AND s.SCHEDULE_DUE_DATE <= p.PERIOD_END_DATE
               AND TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT) IS NOT NULL
             ORDER BY
