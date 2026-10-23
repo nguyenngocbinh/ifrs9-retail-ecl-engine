@@ -1,4 +1,23 @@
 /*
+Create a stable projection of facility rating with the bucket-specific rating override.
+This avoids repeating CASE/CROSS APPLY logic in each loader query.
+*/
+CREATE OR ALTER VIEW ecl_core.vw_FacilityRatingFixed
+AS
+SELECT
+    fr.ACCOUNT_ID,
+    fr.REPORTING_DATE,
+    fr.POOL_NAME,
+    fr.BUCKET,
+    fr.RATING,
+    CASE
+        WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
+        ELSE fr.RATING
+    END AS RATING_FIX
+FROM ecl_core.vw_FacilityRatingFixed AS fr;
+GO
+
+/*
 IFRS 9 Retail ECL Engine — source PD loader
 Purpose:
 - Load source marginal PIT PD into the canonical ecl_stg.PDCurve contract.
@@ -72,18 +91,10 @@ BEGIN
         (
             SELECT a.ACCOUNT_ID
             FROM ecl_stg.AccountSnapshot AS a
-            JOIN [IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING] AS fr
+            JOIN ecl_core.vw_FacilityRatingFixed AS fr
               ON CONVERT(varchar(100), fr.ACCOUNT_ID) = a.ACCOUNT_ID
              AND fr.REPORTING_DATE = @PROCESS_DATE
              AND fr.POOL_NAME = a.POOL_NAME
-            CROSS APPLY
-            (
-                SELECT RATING_FIX =
-                    CASE
-                        WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
-                        ELSE fr.RATING
-                    END
-            ) AS rf
             WHERE a.RUN_ID = @RUN_ID
               AND a.PROCESS_DATE = @PROCESS_DATE
               AND a.IS_ACTIVE = 1
@@ -96,18 +107,10 @@ BEGIN
         (
             SELECT 1
             FROM ecl_stg.AccountSnapshot AS a
-            LEFT JOIN [IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING] AS fr
+            LEFT JOIN ecl_core.vw_FacilityRatingFixed AS fr
               ON CONVERT(varchar(100), fr.ACCOUNT_ID) = a.ACCOUNT_ID
              AND fr.REPORTING_DATE = @PROCESS_DATE
              AND fr.POOL_NAME = a.POOL_NAME
-            CROSS APPLY
-            (
-                SELECT RATING_FIX =
-                    CASE
-                        WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
-                        ELSE fr.RATING
-                    END
-            ) AS rf
             WHERE a.RUN_ID = @RUN_ID
               AND a.PROCESS_DATE = @PROCESS_DATE
               AND a.IS_ACTIVE = 1
@@ -120,18 +123,10 @@ BEGIN
         (
             SELECT 1
             FROM ecl_stg.AccountSnapshot AS a
-            JOIN [IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING] AS fr
+            JOIN ecl_core.vw_FacilityRatingFixed AS fr
               ON CONVERT(varchar(100), fr.ACCOUNT_ID) = a.ACCOUNT_ID
              AND fr.REPORTING_DATE = @PROCESS_DATE
              AND fr.POOL_NAME = a.POOL_NAME
-            CROSS APPLY
-            (
-                SELECT RATING_FIX =
-                    CASE
-                        WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
-                        ELSE fr.RATING
-                    END
-            ) AS rf
             JOIN ecl_cfg.PoolName AS pn
               ON pn.POOL_NAME = a.POOL_NAME
              AND pn.IS_ACTIVE = 1
@@ -144,7 +139,7 @@ BEGIN
                   FROM dbo.RETAIL_MARGINAL_PIT_PD AS pd
                   WHERE pd.SEGMENT_LV2 = pn.SEGMENT
                     AND pd.BUCKET = fr.BUCKET
-                    AND pd.RATING = rf.RATING_FIX
+                    AND pd.RATING = fr.RATING_FIX
                     AND pd.PERIOD > @PROCESS_DATE
               )
         )
@@ -170,25 +165,17 @@ BEGIN
             CONVERT(bit, 1) AS IS_ACTIVE
         INTO #MappedRows
         FROM ecl_stg.AccountSnapshot AS a
-        JOIN [IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING] AS fr
+        JOIN ecl_core.vw_FacilityRatingFixed AS fr
           ON CONVERT(varchar(100), fr.ACCOUNT_ID) = a.ACCOUNT_ID
          AND fr.REPORTING_DATE = @PROCESS_DATE
          AND fr.POOL_NAME = a.POOL_NAME
-        CROSS APPLY
-        (
-            SELECT RATING_FIX =
-                CASE
-                    WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
-                    ELSE fr.RATING
-                END
-        ) AS rf
         JOIN ecl_cfg.PoolName AS pn
           ON pn.POOL_NAME = a.POOL_NAME
          AND pn.IS_ACTIVE = 1
         JOIN dbo.RETAIL_MARGINAL_PIT_PD AS pd
           ON pd.SEGMENT_LV2 = pn.SEGMENT
          AND pd.BUCKET = fr.BUCKET
-         AND pd.RATING = rf.RATING_FIX
+         AND pd.RATING = fr.RATING_FIX
          AND pd.PERIOD > @PROCESS_DATE
         JOIN ecl_cfg.Scenario AS sm
           ON sm.SOURCE_SCENARIO_CODE = TRY_CONVERT(int, pd.SCENARIO)
