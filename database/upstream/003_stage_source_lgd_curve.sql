@@ -3,16 +3,16 @@ IFRS 9 Retail ECL Engine — upstream LGD source loader
 
 Purpose:
 - Read the reporting-date LGD observation from dbo.VW_IRB_TT14_NHNN_LGD_UPLOAD.
-- Match source accounts to the active ecl_stg.AccountSnapshot for RUN_ID.
-- Expand calibration_lgd into the canonical annual ecl_stg.LGDCurve contract
-  through MATURITY_DATE, following the source-loader pattern used by PD/EAD.
-- Keep LGD flat across scenarios in v1. downturn_lgd is intentionally not applied.
+- Match source accounts to active ecl_stg.AccountSnapshot rows for RUN_ID.
+- Expand calibration_lgd to annual periods through MATURITY_DATE and load
+  the canonical ecl_stg.LGDCurve contract, consistent with PD/EAD ETL structure.
+- Keep LGD flat across scenarios in v1; downturn_lgd is not applied.
 
 Prerequisites:
   database/001_create_logical_schema.sql
   database/002_run_control.sql
   database/upstream/002_load_account_snapshot.sql
-Source contract must be queryable in the same SQL Server database as this procedure.
+The source view must be queryable from the same SQL Server database.
 */
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
@@ -57,6 +57,7 @@ BEGIN
         )
             THROW 51902, 'LGD source ETL: no active AccountSnapshot rows exist for this run.', 1;
 
+        /* Never overwrite canonical inputs by accident. */
         IF EXISTS
         (
             SELECT 1
@@ -79,10 +80,10 @@ BEGIN
             IF EXISTS (SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID = @RUN_ID)
                OR EXISTS (SELECT 1 FROM ecl_result.ECLAccount WHERE RUN_ID = @RUN_ID)
                OR EXISTS (SELECT 1 FROM ecl_result.ECLPortfolioSummary WHERE RUN_ID = @RUN_ID)
-                THROW 51905, 'LGD source ETL: cannot replace LGDCurve after ECL results exist; use a new RUN_ID or an approved reset.', 1;
+                THROW 51905, 'LGD source ETL: cannot replace LGDCurve after ECL results exist; use a new RUN_ID or approved reset.', 1;
         END;
 
-        /* One and only one source row per active account for the run date. */
+        /* Exactly one source observation per account for the reporting date. */
         IF EXISTS
         (
             SELECT s.account_id
@@ -98,7 +99,7 @@ BEGIN
         )
             THROW 51906, 'LGD source ETL: duplicate source observations for an account and reporting date.', 1;
 
-        /* Fail closed if any active account lacks a same-date LGD source row. */
+        /* Every active account must have a source observation for the run date. */
         IF EXISTS
         (
             SELECT 1
@@ -135,21 +136,45 @@ BEGIN
         )
             THROW 51908, 'LGD source ETL: calibration_lgd must be non-null and within [0,1].', 1;
 
-        /* Retain source version provenance in the audit event when available. */
-        SELECT @SOURCE_VERSIONS =
-            STRING_AGG(CONVERT(nvarchar(50), q.source_version), N',')
-        FROM
+        /*
+          Source version is optional: dynamically inspect the source metadata first,
+          so this loader works whether or not the upload view exposes SOURCE_VERSION.
+          Values, when available, are added to the audit event below.
+        */
+        IF EXISTS
         (
-            SELECT DISTINCT s.source_version
-            FROM dbo.VW_IRB_TT14_NHNN_LGD_UPLOAD AS s
-            INNER JOIN ecl_stg.AccountSnapshot AS a
-              ON a.RUN_ID = @RUN_ID
-             AND a.PROCESS_DATE = @PROCESS_DATE
-             AND a.ACCOUNT_ID = s.account_id
-             AND a.IS_ACTIVE = 1
-            WHERE s.reporting_date = @PROCESS_DATE
-              AND s.source_version IS NOT NULL
-        ) AS q;
+            SELECT 1
+            FROM sys.columns AS c
+            INNER JOIN sys.views AS v
+              ON v.object_id = c.object_id
+            INNER JOIN sys.schemas AS sc
+              ON sc.schema_id = v.schema_id
+            WHERE sc.name = N'dbo'
+              AND v.name = N'VW_IRB_TT14_NHNN_LGD_UPLOAD'
+              AND c.name = N'source_version'
+        )
+        BEGIN
+            DECLARE @VersionSql nvarchar(max) =
+                N'SELECT @Versions = STRING_AGG(CONVERT(nvarchar(50), q.source_version), N'','')
+                  FROM
+                  (
+                      SELECT DISTINCT s.source_version
+                      FROM dbo.VW_IRB_TT14_NHNN_LGD_UPLOAD AS s
+                      INNER JOIN ecl_stg.AccountSnapshot AS a
+                        ON a.RUN_ID = @RunId
+                       AND a.PROCESS_DATE = @ProcessDate
+                       AND a.ACCOUNT_ID = s.account_id
+                       AND a.IS_ACTIVE = 1
+                      WHERE s.reporting_date = @ProcessDate
+                        AND s.source_version IS NOT NULL
+                  ) AS q;';
+            EXEC sys.sp_executesql
+                @VersionSql,
+                N'@RunId bigint, @ProcessDate date, @Versions nvarchar(500) OUTPUT',
+                @RunId = @RUN_ID,
+                @ProcessDate = @PROCESS_DATE,
+                @Versions = @SOURCE_VERSIONS OUTPUT;
+        END;
 
         DROP TABLE IF EXISTS #MappedLGD;
 
@@ -203,13 +228,7 @@ BEGIN
             CROSS JOIN sys.all_objects AS y
         ) AS n;
 
-        IF EXISTS
-        (
-            SELECT 1 FROM #MappedLGD
-            WHERE LGD IS NULL OR LGD < 0 OR LGD > 1 OR FORECAST_PERIOD < 1
-        )
-            THROW 51909, 'LGD source ETL: mapped rows contain invalid LGD or forecast periods.', 1;
-
+        /* Validate all horizons before replacing/committing any rows. */
         IF EXISTS
         (
             SELECT 1
@@ -220,7 +239,18 @@ BEGIN
               AND
               (
                   a.MATURITY_DATE IS NULL
-                  OR a.MATURITY_DATE > DATEADD(year, 120, @PROCESS_DATE)
+                  OR
+                  (
+                      a.MATURITY_DATE > @PROCESS_DATE
+                      AND
+                      (
+                          DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE)
+                          + CASE
+                              WHEN DATEADD(month, DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE), @PROCESS_DATE) < a.MATURITY_DATE
+                              THEN 1 ELSE 0
+                            END
+                      ) > 120 * 12
+                  )
                   OR NOT EXISTS
                   (
                       SELECT 1
@@ -229,9 +259,37 @@ BEGIN
                         AND l.ACCOUNT_ID = a.ACCOUNT_ID
                         AND l.FORECAST_PERIOD = 1
                   )
+                  OR EXISTS
+                  (
+                      SELECT 1
+                      FROM #MappedLGD AS l
+                      WHERE l.RUN_ID = a.RUN_ID
+                        AND l.ACCOUNT_ID = a.ACCOUNT_ID
+                      GROUP BY l.RUN_ID, l.ACCOUNT_ID
+                      HAVING MAX(l.FORECAST_PERIOD) <>
+                          CASE
+                              WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
+                              ELSE CONVERT(int, CEILING(
+                                  (
+                                      DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE)
+                                      + CASE
+                                          WHEN DATEADD(month, DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE), @PROCESS_DATE) < a.MATURITY_DATE
+                                          THEN 1 ELSE 0
+                                        END
+                                  ) / 12.0
+                              ))
+                          END
+                  )
               )
         )
-            THROW 51910, 'LGD source ETL: maturity horizon is invalid or no annual LGD rows were generated for an active account.', 1;
+            THROW 51909, 'LGD source ETL: invalid maturity horizon or generated annual LGD periods do not cover each active account through maturity.', 1;
+
+        IF EXISTS
+        (
+            SELECT 1 FROM #MappedLGD
+            WHERE LGD IS NULL OR LGD < 0 OR LGD > 1 OR FORECAST_PERIOD < 1
+        )
+            THROW 51910, 'LGD source ETL: mapped rows contain invalid LGD or forecast periods.', 1;
 
         IF EXISTS
         (
@@ -271,7 +329,7 @@ BEGIN
             @RUN_ID, @PROCESS_DATE, 'LGD_SOURCE_ETL', 'SUCCEEDED',
             CONCAT(
                 N'Loaded source calibration_lgd into annual ecl_stg.LGDCurve through maturity. Source version(s)=',
-                COALESCE(@SOURCE_VERSIONS, N'unknown'),
+                COALESCE(@SOURCE_VERSIONS, N'not exposed by source view'),
                 N'; downturn_lgd is not applied in v1.'
             ),
             @ROW_COUNT, SUSER_SNAME()
@@ -291,3 +349,13 @@ BEGIN
     END CATCH;
 END;
 GO
+
+/*
+Example:
+EXEC ecl_core.usp_StageSourceLGDCurve
+    @RUN_ID = 123,
+    @REPLACE_EXISTING = 0;
+
+Then run database/008_lgd_curve_loader.sql's ecl_core.usp_LoadLGDCurve
+to validate the canonical LGD curve contract.
+*/
