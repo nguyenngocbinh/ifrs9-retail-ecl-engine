@@ -174,13 +174,12 @@ BEGIN
     )
         THROW 51309, 'At least one source contract has NULL or unconvertible expiry_date; MATURITY_DATE cannot be loaded.', 1;
 
-    IF EXISTS
-    (
-        SELECT 1
-        FROM #SnapshotCandidate
-        WHERE MATURITY_DATE < PROCESS_DATE
-    )
-        THROW 51310, 'At least one contract MATURITY_DATE is earlier than PROCESS_DATE. Resolve matured/invalid contracts before loading.', 1;
+    /*
+      Matured but unpaid contracts remain eligible for ECL assessment.
+      Do not reject a contract solely because MATURITY_DATE < PROCESS_DATE.
+      Keep the NULL/unconvertible MATURITY_DATE validation above, since a usable
+      contractual maturity date is still required by the downstream ECL horizon.
+    */
 
     IF EXISTS
     (
