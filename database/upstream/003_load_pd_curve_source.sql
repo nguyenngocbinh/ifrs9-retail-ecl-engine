@@ -42,14 +42,13 @@ BEGIN
             ON pd.BUCKET = fr.BUCKET
            AND pd.RATING = fr.RATING
            AND pd.SEGMENT_LV2 = pn.SEGMENT
-        LEFT JOIN ecl_cfg.SourceScenarioMapping AS sm
-            ON sm.SOURCE_SYSTEM = 'RETAIL_MARGINAL_PIT_PD'
-           AND sm.SOURCE_SCENARIO_CODE = TRY_CONVERT(int, pd.SCENARIO)
+        LEFT JOIN ecl_cfg.Scenario AS sm
+            ON sm.SOURCE_SCENARIO_CODE = TRY_CONVERT(int, pd.SCENARIO)
            AND sm.IS_ACTIVE = 1
         WHERE fr.REPORTING_DATE = @PROCESS_DATE
           AND sm.SOURCE_SCENARIO_CODE IS NULL
     )
-        THROW 51801, 'Có mã SCENARIO nguồn chưa được cấu hình trong ecl_cfg.SourceScenarioMapping.', 1;
+        THROW 51801, 'Có mã SCENARIO nguồn chưa được cấu hình trong ecl_cfg.Scenario.', 1;
 
     BEGIN TRY
         BEGIN TRANSACTION;
@@ -84,9 +83,8 @@ BEGIN
             ON pd.BUCKET = fr.BUCKET
            AND pd.RATING = fr.RATING
            AND pd.SEGMENT_LV2 = pn.SEGMENT
-        INNER JOIN ecl_cfg.SourceScenarioMapping AS sm
-            ON sm.SOURCE_SYSTEM = 'RETAIL_MARGINAL_PIT_PD'
-           AND sm.SOURCE_SCENARIO_CODE = TRY_CONVERT(int, pd.SCENARIO)
+        INNER JOIN ecl_cfg.Scenario AS sm
+            ON sm.SOURCE_SCENARIO_CODE = TRY_CONVERT(int, pd.SCENARIO)
            AND sm.IS_ACTIVE = 1
         WHERE fr.REPORTING_DATE = @PROCESS_DATE;
 
