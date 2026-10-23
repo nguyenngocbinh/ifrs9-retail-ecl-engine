@@ -9,11 +9,11 @@ SELECT
     fr.REPORTING_DATE,
     fr.POOL_NAME,
     fr.BUCKET,
-    fr.RATING,
+    fr.RATING AS ASCORE_RATING,
     CASE
         WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
         ELSE fr.RATING
-    END AS RATING_FIX
+    END AS RATING
 FROM [IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING] AS fr;
 GO
 
@@ -139,7 +139,7 @@ BEGIN
                   FROM dbo.RETAIL_MARGINAL_PIT_PD AS pd
                   WHERE pd.SEGMENT_LV2 = pn.SEGMENT
                     AND pd.BUCKET = fr.BUCKET
-                    AND pd.RATING = fr.RATING_FIX
+                    AND pd.RATING = fr.RATING
                     AND pd.PERIOD > pd.PROCESS_DATE
               )
         )
@@ -175,7 +175,7 @@ BEGIN
         JOIN dbo.RETAIL_MARGINAL_PIT_PD AS pd
           ON pd.SEGMENT_LV2 = pn.SEGMENT
          AND pd.BUCKET = fr.BUCKET
-         AND pd.RATING = fr.RATING_FIX
+         AND pd.RATING = fr.RATING
          AND pd.PERIOD > pd.PROCESS_DATE
         JOIN ecl_cfg.Scenario AS sm
           ON sm.SOURCE_SCENARIO_CODE = TRY_CONVERT(int, pd.SCENARIO)
