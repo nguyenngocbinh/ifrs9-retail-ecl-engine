@@ -14,7 +14,7 @@ SELECT
         WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
         ELSE fr.RATING
     END AS RATING_FIX
-FROM ecl_core.vw_FacilityRatingFixed AS fr;
+FROM [IRB_MHRR].[pd].[TBL_MAN_FACILITY_RATING] AS fr;
 GO
 
 /*
