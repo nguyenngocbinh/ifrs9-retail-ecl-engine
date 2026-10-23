@@ -124,8 +124,7 @@ BEGIN
               (
                   SELECT 1
                   FROM dbo.RETAIL_MARGINAL_PIT_PD AS pd
-                  WHERE pd.PROCESS_DATE = @PD_SOURCE_PROCESS_DATE
-                    AND pd.SEGMENT_LV2 = pn.SEGMENT
+                  WHERE pd.SEGMENT_LV2 = pn.SEGMENT
                     AND pd.BUCKET = fr.BUCKET
                     AND pd.RATING = fr.RATING
                     AND pd.PERIOD > @PROCESS_DATE
@@ -161,8 +160,7 @@ BEGIN
           ON pn.POOL_NAME = a.POOL_NAME
          AND pn.IS_ACTIVE = 1
         JOIN dbo.RETAIL_MARGINAL_PIT_PD AS pd
-          ON 1 = 1
-         AND pd.SEGMENT_LV2 = pn.SEGMENT
+          ON pd.SEGMENT_LV2 = pn.SEGMENT
          AND pd.BUCKET = fr.BUCKET
          AND pd.RATING = fr.RATING
          AND pd.PERIOD > @PROCESS_DATE
