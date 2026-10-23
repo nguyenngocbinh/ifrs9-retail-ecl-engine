@@ -111,8 +111,7 @@ BEGIN
          AND pd.RATING = fr.RATING
          AND pd.SEGMENT_LV2 = pn.SEGMENT
          AND CONVERT(varchar(50), pd.SCENARIO) IN (@SRC_DOWN, @SRC_BASE, @SRC_UP)
-      WHERE fr.REPORTING_DATE = @P_PROCESS_DATE
-        AND TRY_CONVERT(smallint, pd.PERIOD) BETWEEN 1 AND 120;';
+      WHERE fr.REPORTING_DATE = @P_PROCESS_DATE;'
 
     EXEC sys.sp_executesql
         @SQL,
