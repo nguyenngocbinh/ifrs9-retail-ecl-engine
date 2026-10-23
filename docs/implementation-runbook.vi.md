@@ -30,7 +30,6 @@ $Scripts = @(
   "database/006_ead_curve_loader.sql",
   "database/007_pd_curve_loader.sql",
   "database/008_lgd_curve_loader.sql",
-  "database/009_source_scenario_mapping.sql",
 )
 
 foreach ($Script in $Scripts) {
@@ -184,7 +183,7 @@ Chạy các lệnh trong cùng một session/batch để biến `@RUN_ID` còn h
 
 #### Nạp PD từ nguồn
 
-Chạy script `database/upstream/003_load_pd_curve_source.sql` sau khi đã triển khai schema, `database/007_pd_curve_loader.sql` và migration `database/009_source_scenario_mapping.sql`. Procedure giả định hai bảng nguồn nằm trong cùng database với engine, schema `dbo`. Mapping scenario được lưu trong `ecl_cfg.SourceScenarioMapping` và được seed bởi `database/009_source_scenario_mapping.sql`: `RETAIL_MARGINAL_PIT_PD` có mapping `1 = BASE`, `2 = UPTURN`, `3 = DOWNTURN`. Procedure đọc mapping từ bảng cấu hình, không hard-code mã số.
+Chạy script `database/upstream/003_load_pd_curve_source.sql` sau khi đã triển khai schema, `database/007_pd_curve_loader.sql` và schema/configuration in `database/001_create_logical_schema.sql`. Procedure giả định hai bảng nguồn nằm trong cùng database với engine, schema `dbo`. Mapping scenario được lưu trong `ecl_cfg.Scenario` và được seed bởi `database/009_source_scenario_mapping.sql`: `RETAIL_MARGINAL_PIT_PD` có mapping `1 = BASE`, `2 = UPTURN`, `3 = DOWNTURN`. Procedure đọc mapping từ bảng cấu hình, không hard-code mã số.
 
 ```sql
 -- Chạy trong database IFRS9 ECL Engine; thay VERSION_ID theo cấu hình thực tế.
@@ -196,7 +195,7 @@ EXEC ecl_core.usp_StageSourcePDCurve
 EXEC ecl_core.usp_LoadPDCurve @RUN_ID = @RUN_ID;
 ```
 
-Procedure ghép `TBL_MAN_FACILITY_RATING` với snapshot đang active theo `ACCOUNT_ID` và `REPORTING_DATE = RunControl.PROCESS_DATE`; ghép PD theo `BUCKET`, `RATING` và `ecl_cfg.PoolName.SEGMENT = RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2`. `PERIOD` thành `FORECAST_PERIOD`; `FINAL_MARGINAL_PIT_PD` thành `MARGINAL_PD`. Mapping scenario được lấy từ `ecl_cfg.SourceScenarioMapping`; nếu có mã nguồn chưa cấu hình, procedure dừng với lỗi thay vì âm thầm bỏ dòng. Khi mapping thay đổi, cập nhật bảng cấu hình theo quy trình kiểm soát thay đổi, không sửa procedure. `RETAIL_MARGINAL_PIT_PD.PROCESS_DATE` không được lọc vì nguồn hiện cố định theo năm.
+Procedure ghép `TBL_MAN_FACILITY_RATING` với snapshot đang active theo `ACCOUNT_ID` và `REPORTING_DATE = RunControl.PROCESS_DATE`; ghép PD theo `BUCKET`, `RATING` và `ecl_cfg.PoolName.SEGMENT = RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2`. `PERIOD` thành `FORECAST_PERIOD`; `FINAL_MARGINAL_PIT_PD` thành `MARGINAL_PD`. Mapping scenario được lấy từ `ecl_cfg.Scenario`; nếu có mã nguồn chưa cấu hình, procedure dừng với lỗi thay vì âm thầm bỏ dòng. Khi mapping thay đổi, cập nhật bảng cấu hình theo quy trình kiểm soát thay đổi, không sửa procedure. `RETAIL_MARGINAL_PIT_PD.PROCESS_DATE` không được lọc vì nguồn hiện cố định theo năm.
 
 Procedure thay dữ liệu PD hiện có của chính `RUN_ID` trong một transaction. Nếu chạy lại sau lỗi, cần kiểm tra trạng thái/audit trước khi quyết định; theo quy trình chung, ưu tiên tạo `RUN_ID` mới.
 
