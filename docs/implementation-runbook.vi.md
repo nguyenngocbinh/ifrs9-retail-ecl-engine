@@ -30,6 +30,7 @@ $Scripts = @(
   "database/006_ead_curve_loader.sql",
   "database/007_pd_curve_loader.sql",
   "database/008_lgd_curve_loader.sql",
+  "database/009_source_scenario_mapping.sql",
 )
 
 foreach ($Script in $Scripts) {
