@@ -183,24 +183,21 @@ Chạy các lệnh trong cùng một session/batch để biến `@RUN_ID` còn h
 
 #### Nạp PD từ nguồn
 
-Chạy script `database/upstream/003_load_pd_curve_source.sql` sau khi đã triển khai schema và `database/007_pd_curve_loader.sql`. Bản đơn giản giả định hai bảng nguồn nằm trong cùng database với engine, schema `dbo`. Trước khi chạy, xác nhận mã `SCENARIO` được chủ sở hữu mô hình phê duyệt; **không mặc định 1/2/3 tương ứng Downturn/Base/Upturn**.
+Chạy script `database/upstream/003_load_pd_curve_source.sql` sau khi đã triển khai schema và `database/007_pd_curve_loader.sql`. Procedure giả định hai bảng nguồn nằm trong cùng database với engine, schema `dbo`. Mapping scenario cố định: `1 = BASE`, `2 = DOWNTURN`, `3 = UPTURN`.
 
 ```sql
--- Chạy trong database IFRS9 ECL Engine; thay các giá trị placeholder.
+-- Chạy trong database IFRS9 ECL Engine; thay VERSION_ID theo cấu hình thực tế.
 EXEC ecl_core.usp_StageSourcePDCurve
   @RUN_ID = @RUN_ID,
-  @VERSION_ID = 1, -- thay bằng VERSION_ID đầu vào đã thống nhất
-  @SOURCE_SCENARIO_DOWNTURN = N'<approved_source_code_for_downturn>',
-  @SOURCE_SCENARIO_BASE = N'<approved_source_code_for_base>',
-  @SOURCE_SCENARIO_UPTURN = N'<approved_source_code_for_upturn>';
+  @VERSION_ID = 1;
 
 -- Chỉ gọi sau khi procedure ETL thành công:
 EXEC ecl_core.usp_LoadPDCurve @RUN_ID = @RUN_ID;
 ```
 
-Procedure ghép `TBL_MAN_FACILITY_RATING` với snapshot đang active theo `ACCOUNT_ID` và `REPORTING_DATE = RunControl.PROCESS_DATE`; ghép PD theo `BUCKET`, `RATING` và `ecl_cfg.PoolName.SEGMENT = RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2`. `PERIOD` thành `FORECAST_PERIOD`; `FINAL_MARGINAL_PIT_PD` thành `MARGINAL_PD`. `RETAIL_MARGINAL_PIT_PD.PROCESS_DATE` không được lọc vì nguồn hiện cố định theo năm; kết quả ETL trả về các ngày nguồn đã quan sát và ghi vào audit để người chạy xác nhận.
+Procedure ghép `TBL_MAN_FACILITY_RATING` với snapshot đang active theo `ACCOUNT_ID` và `REPORTING_DATE = RunControl.PROCESS_DATE`; ghép PD theo `BUCKET`, `RATING` và `ecl_cfg.PoolName.SEGMENT = RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2`. `PERIOD` thành `FORECAST_PERIOD`; `FINAL_MARGINAL_PIT_PD` thành `MARGINAL_PD`. Mapping scenario cố định: `1 = BASE`, `2 = DOWNTURN`, `3 = UPTURN`. `RETAIL_MARGINAL_PIT_PD.PROCESS_DATE` không được lọc vì nguồn hiện cố định theo năm.
 
-Procedure từ chối khóa trùng và giá trị PD/kỳ không hợp lệ, đồng thời thay dữ liệu PD hiện có của chính `RUN_ID` trong một transaction. Nếu chạy lại sau lỗi, cần kiểm tra trạng thái/audit trước khi quyết định; theo quy trình chung, ưu tiên tạo `RUN_ID` mới.
+Procedure thay dữ liệu PD hiện có của chính `RUN_ID` trong một transaction. Nếu chạy lại sau lỗi, cần kiểm tra trạng thái/audit trước khi quyết định; theo quy trình chung, ưu tiên tạo `RUN_ID` mới.
 
 Sau khi nạp PD/LGD/EAD, gọi các procedure kiểm tra:
 
