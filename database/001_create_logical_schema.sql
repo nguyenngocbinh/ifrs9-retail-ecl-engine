@@ -45,6 +45,19 @@ CREATE TABLE ecl_cfg.Scenario (
 );
 GO
 
+CREATE TABLE ecl_cfg.SourceScenarioMapping (
+    SOURCE_SYSTEM varchar(100) NOT NULL,
+    SOURCE_SCENARIO_CODE int NOT NULL,
+    SCENARIO_CODE varchar(20) NOT NULL,
+    IS_ACTIVE bit NOT NULL CONSTRAINT DF_SourceScenarioMapping_IsActive DEFAULT (1),
+    CREATED_AT datetime2(0) NOT NULL CONSTRAINT DF_SourceScenarioMapping_CreatedAt DEFAULT (SYSUTCDATETIME()),
+    CREATED_BY sysname NOT NULL CONSTRAINT DF_SourceScenarioMapping_CreatedBy DEFAULT (SUSER_SNAME()),
+    CONSTRAINT PK_SourceScenarioMapping PRIMARY KEY CLUSTERED (SOURCE_SYSTEM, SOURCE_SCENARIO_CODE),
+    CONSTRAINT FK_SourceScenarioMapping_Scenario FOREIGN KEY (SCENARIO_CODE)
+        REFERENCES ecl_cfg.Scenario(SCENARIO_CODE)
+);
+GO
+
 CREATE TABLE ecl_cfg.ScenarioWeightVersion (
     VERSION_ID int NOT NULL,
     VERSION_NAME nvarchar(100) NOT NULL,
@@ -369,4 +382,11 @@ INSERT INTO ecl_cfg.Scenario (SCENARIO_CODE, SCENARIO_NAME)
 VALUES ('DOWNTURN', N'Downturn'),
        ('BASE', N'Base'),
        ('UPTURN', N'Upturn');
+
+/* Fixed source-code mapping is data configuration, not procedure logic. */
+INSERT INTO ecl_cfg.SourceScenarioMapping
+    (SOURCE_SYSTEM, SOURCE_SCENARIO_CODE, SCENARIO_CODE)
+VALUES ('RETAIL_MARGINAL_PIT_PD', 1, 'BASE'),
+       ('RETAIL_MARGINAL_PIT_PD', 2, 'UPTURN'),
+       ('RETAIL_MARGINAL_PIT_PD', 3, 'DOWNTURN');
 GO
