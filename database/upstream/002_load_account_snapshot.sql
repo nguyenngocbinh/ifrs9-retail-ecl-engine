@@ -175,19 +175,11 @@ BEGIN
         THROW 51309, 'At least one source contract has NULL or unconvertible expiry_date; MATURITY_DATE cannot be loaded.', 1;
 
     /*
-      A maturity date earlier than PROCESS_DATE is allowed for Stage 3
-      (credit-impaired/defaulted) accounts that may still have outstanding debt.
-      For Stage 1 or Stage 2, treat this as an exception requiring review.
-      Keep the NULL/unconvertible MATURITY_DATE validation above.
+      MATURITY_DATE may be earlier than PROCESS_DATE for accounts with
+      outstanding debt, including Stage 1/2 accounts with DPD > 0.
+      Do not block snapshot loading on maturity date alone. Keep the
+      NULL/unconvertible MATURITY_DATE validation above.
     */
-    IF EXISTS
-    (
-        SELECT 1
-        FROM #SnapshotCandidate
-        WHERE MATURITY_DATE < PROCESS_DATE
-          AND STAGE <> 3
-    )
-        THROW 51310, 'At least one non-Stage-3 contract MATURITY_DATE is earlier than PROCESS_DATE. Review maturity/status data before loading.', 1;
 
     IF EXISTS
     (
