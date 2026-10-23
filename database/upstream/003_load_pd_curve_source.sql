@@ -57,11 +57,12 @@ BEGIN
         )
             THROW 51803, 'No active AccountSnapshot rows exist for this run.', 1;
 
-        SELECT @PD_SOURCE_PROCESS_DATE = MAX(PROCESS_DATE)
-        FROM dbo.RETAIL_MARGINAL_PIT_PD;
-
-        IF @PD_SOURCE_PROCESS_DATE IS NULL
-            THROW 51804, 'dbo.RETAIL_MARGINAL_PIT_PD is empty or has no PROCESS_DATE.', 1;
+        /*
+          RETAIL_MARGINAL_PIT_PD.PROCESS_DATE belongs to the source curve's
+          PERIOD/PROCESS_DATE timeline and is not a snapshot selector for this
+          loader. Do not filter source rows by it. Forecast period is derived
+          from PERIOD relative to the ECL run PROCESS_DATE below.
+        */
 
         /* Require the canonical scenario mapping expected by the ECL engine. */
         IF NOT EXISTS
@@ -160,7 +161,7 @@ BEGIN
           ON pn.POOL_NAME = a.POOL_NAME
          AND pn.IS_ACTIVE = 1
         JOIN dbo.RETAIL_MARGINAL_PIT_PD AS pd
-          ON pd.PROCESS_DATE = @PD_SOURCE_PROCESS_DATE
+          ON 1 = 1
          AND pd.SEGMENT_LV2 = pn.SEGMENT
          AND pd.BUCKET = fr.BUCKET
          AND pd.RATING = fr.RATING
@@ -224,9 +225,7 @@ BEGIN
         (
             @RUN_ID, @PROCESS_DATE, 'PD_SOURCE_ETL', 'SUCCEEDED',
             CONCAT(
-                N'Loaded source PD snapshot PROCESS_DATE=',
-                CONVERT(nvarchar(10), @PD_SOURCE_PROCESS_DATE, 23),
-                N' into ecl_stg.PDCurve.'
+                N'Loaded source PD rows using PERIOD relative to ECL run PROCESS_DATE into ecl_stg.PDCurve.'
             ),
             @ROW_COUNT, SUSER_SNAME()
         );
@@ -236,7 +235,6 @@ BEGIN
         SELECT
             @RUN_ID AS RUN_ID,
             @PROCESS_DATE AS RUN_PROCESS_DATE,
-            @PD_SOURCE_PROCESS_DATE AS PD_SOURCE_PROCESS_DATE,
             @ROW_COUNT AS PD_ROW_COUNT,
             'STAGED' AS LOAD_STATUS;
     END TRY
