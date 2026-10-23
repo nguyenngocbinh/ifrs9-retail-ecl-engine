@@ -183,15 +183,13 @@ Chạy các lệnh trong cùng một session/batch để biến `@RUN_ID` còn h
 
 #### Nạp PD từ nguồn
 
-Triển khai thêm script `database/upstream/003_load_pd_curve_source.sql` sau các script tạo schema và `database/007_pd_curve_loader.sql`, trên database engine có quyền đọc các bảng nguồn. Procedure `ecl_core.usp_StageSourcePDCurve` nhận schema nguồn (mặc định `dbo`) và database nguồn tùy chọn. Trước khi chạy, xác nhận đúng database/schema thực tế và mã `SCENARIO` được chủ sở hữu mô hình phê duyệt; **không mặc định 1/2/3 tương ứng Downturn/Base/Upturn**.
+Chạy script `database/upstream/003_load_pd_curve_source.sql` sau khi đã triển khai schema và `database/007_pd_curve_loader.sql`. Bản đơn giản giả định hai bảng nguồn nằm trong cùng database với engine, schema `dbo`. Trước khi chạy, xác nhận mã `SCENARIO` được chủ sở hữu mô hình phê duyệt; **không mặc định 1/2/3 tương ứng Downturn/Base/Upturn**.
 
 ```sql
 -- Chạy trong database IFRS9 ECL Engine; thay các giá trị placeholder.
 EXEC ecl_core.usp_StageSourcePDCurve
   @RUN_ID = @RUN_ID,
   @VERSION_ID = 1, -- thay bằng VERSION_ID đầu vào đã thống nhất
-  @SOURCE_DATABASE = N'<source_database>', -- dùng NULL nếu nguồn cùng database
-  @SOURCE_SCHEMA = N'<source_schema>',
   @SOURCE_SCENARIO_DOWNTURN = N'<approved_source_code_for_downturn>',
   @SOURCE_SCENARIO_BASE = N'<approved_source_code_for_base>',
   @SOURCE_SCENARIO_UPTURN = N'<approved_source_code_for_upturn>';
