@@ -82,7 +82,10 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 - Every PD row must match the run `PROCESS_DATE` and an active account snapshot. Values must be within [0,1].
 - Every active account must have active rows for `DOWNTURN`, `BASE`, and `UPTURN` for each annual forecast period through maturity (maximum 120 periods).
 - The approved source `RETAIL_MARGINAL_PIT_PD` stores `FINAL_MARGINAL_PIT_PD` by `SEGMENT_LV1`, `SEGMENT_LV2`, `BUCKET`, `RATING`, and `SCENARIO`. Source-to-canonical scenario mapping and all join-key semantics must be explicit in source ETL; the shared loader does not guess whether source scenario codes 1/2/3 mean Downturn/Base/Upturn.
-- This migration completes shared contract validation. The source-specific transformation from `TBL_MAN_FACILITY_RATING` and `RETAIL_MARGINAL_PIT_PD` into `PDCurve` remains a separate upstream implementation.
+- The source ETL procedure is `ecl_core.usp_StageSourcePDCurve`, defined in `database/upstream/003_load_pd_curve_source.sql`. It joins facility rating to the active run snapshot by `ACCOUNT_ID` and `REPORTING_DATE`, then joins PD by `BUCKET`, `RATING`, and `ecl_cfg.PoolName.SEGMENT = SEGMENT_LV2`. It uses `PERIOD` as `FORECAST_PERIOD` and `FINAL_MARGINAL_PIT_PD` as `MARGINAL_PD`.
+- Deploy the upstream script after the core schema and shared PD validator exist, and only after confirming the actual source database/schema and column definitions. The procedure defaults to source schema `dbo`; pass `@SOURCE_DATABASE` and `@SOURCE_SCHEMA` when needed.
+- The source scenario codes must be supplied explicitly through `@SOURCE_SCENARIO_DOWNTURN`, `@SOURCE_SCENARIO_BASE`, and `@SOURCE_SCENARIO_UPTURN`; these parameters intentionally have no defaults. The source `PROCESS_DATE` is not filtered (it is currently fixed by year), but the observed dates are returned and written to the run audit message. Confirm those dates are approved for the requested run date.
+- The procedure replaces PD rows for the supplied `RUN_ID` transactionally, rejects duplicate account/scenario/period keys and invalid PD/period values, and does not call `usp_LoadPDCurve`; call that validator only after the ETL succeeds.
 
 
 ## 10. Shared LGD loading
