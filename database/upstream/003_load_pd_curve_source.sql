@@ -3,7 +3,7 @@ IFRS 9 Retail ECL Engine — source PD loader
 Purpose:
 - Load source marginal PIT PD into the canonical ecl_stg.PDCurve contract.
 - Match facility ratings to the ECL run date and account pool.
-- Select one source PD snapshot (latest PROCESS_DATE) and record its date in audit.
+- Treat source PROCESS_DATE as part of the source curve timeline, not as a snapshot filter.
 - Map source scenario codes through the existing ecl_cfg.Scenario configuration.
 
 Assumption: RETAIL_MARGINAL_PIT_PD.PERIOD is a DATE representing annual period-end
@@ -26,7 +26,6 @@ BEGIN
     DECLARE
         @PROCESS_DATE date,
         @RUN_STATUS varchar(20),
-        @PD_SOURCE_PROCESS_DATE date,
         @ROW_COUNT bigint;
 
     BEGIN TRY
@@ -57,12 +56,7 @@ BEGIN
         )
             THROW 51803, 'No active AccountSnapshot rows exist for this run.', 1;
 
-        /*
-          RETAIL_MARGINAL_PIT_PD.PROCESS_DATE belongs to the source curve's
-          PERIOD/PROCESS_DATE timeline and is not a snapshot selector for this
-          loader. Do not filter source rows by it. Forecast period is derived
-          from PERIOD relative to the ECL run PROCESS_DATE below.
-        */
+        /* Source PROCESS_DATE is not used as a snapshot filter in this loader. */
 
         /* Require the canonical scenario mapping expected by the ECL engine. */
         IF NOT EXISTS
@@ -105,7 +99,7 @@ BEGIN
         )
             THROW 51807, 'One or more active accounts have no facility rating for the run date and pool.', 1;
 
-        /* Validate every required account rating has a PD curve in the selected source snapshot. */
+        /* Validate every required account rating has a future PD curve relative to the ECL run date. */
         IF EXISTS
         (
             SELECT 1
@@ -130,7 +124,7 @@ BEGIN
                     AND pd.PERIOD > @PROCESS_DATE
               )
         )
-            THROW 51808, 'No future PD period exists for at least one account segment/bucket/rating in the selected source snapshot.', 1;
+            THROW 51808, 'No future PD period exists for at least one account segment/bucket/rating relative to the ECL run date.', 1;
 
         /* Build and validate the full load set before replacing any existing run data. */
         DROP TABLE IF EXISTS #MappedRows;
