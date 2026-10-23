@@ -25,6 +25,32 @@ BEGIN
     IF @PROCESS_DATE IS NULL
         THROW 51800, 'RUN_ID không tồn tại hoặc run không ở trạng thái CREATED/VALIDATING.', 1;
 
+    /* Fail fast rather than silently dropping source rows with unmapped scenario codes. */
+    IF EXISTS
+    (
+        SELECT 1
+        FROM dbo.TBL_MAN_FACILITY_RATING AS fr
+        INNER JOIN ecl_stg.AccountSnapshot AS a
+            ON a.RUN_ID = @RUN_ID
+           AND a.PROCESS_DATE = @PROCESS_DATE
+           AND a.ACCOUNT_ID = CONVERT(varchar(100), fr.ACCOUNT_ID)
+           AND a.IS_ACTIVE = 1
+        INNER JOIN ecl_cfg.PoolName AS pn
+            ON pn.POOL_NAME = a.POOL_NAME
+           AND pn.IS_ACTIVE = 1
+        INNER JOIN dbo.RETAIL_MARGINAL_PIT_PD AS pd
+            ON pd.BUCKET = fr.BUCKET
+           AND pd.RATING = fr.RATING
+           AND pd.SEGMENT_LV2 = pn.SEGMENT
+        LEFT JOIN ecl_cfg.SourceScenarioMapping AS sm
+            ON sm.SOURCE_SYSTEM = 'RETAIL_MARGINAL_PIT_PD'
+           AND sm.SOURCE_SCENARIO_CODE = TRY_CONVERT(int, pd.SCENARIO)
+           AND sm.IS_ACTIVE = 1
+        WHERE fr.REPORTING_DATE = @PROCESS_DATE
+          AND sm.SOURCE_SCENARIO_CODE IS NULL
+    )
+        THROW 51801, 'Có mã SCENARIO nguồn chưa được cấu hình trong ecl_cfg.SourceScenarioMapping.', 1;
+
     BEGIN TRY
         BEGIN TRANSACTION;
 
@@ -40,11 +66,7 @@ BEGIN
             @RUN_ID,
             @PROCESS_DATE,
             CONVERT(varchar(100), fr.ACCOUNT_ID),
-            CASE pd.SCENARIO
-                WHEN 1 THEN 'BASE'
-                WHEN 2 THEN 'UPTURN'
-                WHEN 3 THEN 'DOWNTURN'
-            END,
+            sm.SCENARIO_CODE,
             TRY_CONVERT(smallint, pd.PERIOD),
             TRY_CONVERT(decimal(19,12), pd.FINAL_MARGINAL_PIT_PD),
             @VERSION_ID,
@@ -62,7 +84,10 @@ BEGIN
             ON pd.BUCKET = fr.BUCKET
            AND pd.RATING = fr.RATING
            AND pd.SEGMENT_LV2 = pn.SEGMENT
-           AND pd.SCENARIO IN (1, 2, 3)
+        INNER JOIN ecl_cfg.SourceScenarioMapping AS sm
+            ON sm.SOURCE_SYSTEM = 'RETAIL_MARGINAL_PIT_PD'
+           AND sm.SOURCE_SCENARIO_CODE = TRY_CONVERT(int, pd.SCENARIO)
+           AND sm.IS_ACTIVE = 1
         WHERE fr.REPORTING_DATE = @PROCESS_DATE;
 
         SET @ROW_COUNT = @@ROWCOUNT;
