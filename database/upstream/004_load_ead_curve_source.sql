@@ -181,6 +181,7 @@ BEGIN
             WHERE s.PROCESS_DATE = p.PROCESS_DATE
               AND CONVERT(varchar(100), s.ACCOUNT_NUMBER) = p.ACCOUNT_ID
               AND s.SCHEDULE_DUE_DATE <= p.PERIOD_END_DATE
+              AND TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT) IS NOT NULL
             ORDER BY
                 s.SCHEDULE_DUE_DATE DESC,
                 s.SCHEDULE_NO DESC
