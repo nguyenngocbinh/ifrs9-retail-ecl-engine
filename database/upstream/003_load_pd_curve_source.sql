@@ -174,6 +174,14 @@ BEGIN
           ON CONVERT(varchar(100), fr.ACCOUNT_ID) = a.ACCOUNT_ID
          AND fr.REPORTING_DATE = @PROCESS_DATE
          AND fr.POOL_NAME = a.POOL_NAME
+        CROSS APPLY
+        (
+            SELECT RATING_FIX =
+                CASE
+                    WHEN fr.BUCKET = 'B1: MOB <6 & DPD 0-9' THEN 'D0'
+                    ELSE fr.RATING
+                END
+        ) AS rf
         JOIN ecl_cfg.PoolName AS pn
           ON pn.POOL_NAME = a.POOL_NAME
          AND pn.IS_ACTIVE = 1
