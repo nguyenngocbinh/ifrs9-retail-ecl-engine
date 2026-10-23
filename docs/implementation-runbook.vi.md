@@ -181,7 +181,30 @@ Chạy các lệnh trong cùng một session/batch để biến `@RUN_ID` còn h
 
 ### PD, LGD, EAD và EIR
 
-ETL theo từng nguồn/sản phẩm cần chuyển dữ liệu về grain ở bảng trên. Sau khi nạp PD/LGD/EAD, gọi các procedure kiểm tra:
+#### Nạp PD từ nguồn
+
+Triển khai thêm script `database/upstream/003_load_pd_curve_source.sql` sau các script tạo schema và `database/007_pd_curve_loader.sql`, trên database engine có quyền đọc các bảng nguồn. Procedure `ecl_core.usp_StageSourcePDCurve` nhận schema nguồn (mặc định `dbo`) và database nguồn tùy chọn. Trước khi chạy, xác nhận đúng database/schema thực tế và mã `SCENARIO` được chủ sở hữu mô hình phê duyệt; **không mặc định 1/2/3 tương ứng Downturn/Base/Upturn**.
+
+```sql
+-- Chạy trong database IFRS9 ECL Engine; thay các giá trị placeholder.
+EXEC ecl_core.usp_StageSourcePDCurve
+  @RUN_ID = @RUN_ID,
+  @VERSION_ID = 1, -- thay bằng VERSION_ID đầu vào đã thống nhất
+  @SOURCE_DATABASE = N'<source_database>', -- dùng NULL nếu nguồn cùng database
+  @SOURCE_SCHEMA = N'<source_schema>',
+  @SOURCE_SCENARIO_DOWNTURN = N'<approved_source_code_for_downturn>',
+  @SOURCE_SCENARIO_BASE = N'<approved_source_code_for_base>',
+  @SOURCE_SCENARIO_UPTURN = N'<approved_source_code_for_upturn>';
+
+-- Chỉ gọi sau khi procedure ETL thành công:
+EXEC ecl_core.usp_LoadPDCurve @RUN_ID = @RUN_ID;
+```
+
+Procedure ghép `TBL_MAN_FACILITY_RATING` với snapshot đang active theo `ACCOUNT_ID` và `REPORTING_DATE = RunControl.PROCESS_DATE`; ghép PD theo `BUCKET`, `RATING` và `ecl_cfg.PoolName.SEGMENT = RETAIL_MARGINAL_PIT_PD.SEGMENT_LV2`. `PERIOD` thành `FORECAST_PERIOD`; `FINAL_MARGINAL_PIT_PD` thành `MARGINAL_PD`. `RETAIL_MARGINAL_PIT_PD.PROCESS_DATE` không được lọc vì nguồn hiện cố định theo năm; kết quả ETL trả về các ngày nguồn đã quan sát và ghi vào audit để người chạy xác nhận.
+
+Procedure từ chối khóa trùng và giá trị PD/kỳ không hợp lệ, đồng thời thay dữ liệu PD hiện có của chính `RUN_ID` trong một transaction. Nếu chạy lại sau lỗi, cần kiểm tra trạng thái/audit trước khi quyết định; theo quy trình chung, ưu tiên tạo `RUN_ID` mới.
+
+Sau khi nạp PD/LGD/EAD, gọi các procedure kiểm tra:
 
 ```sql
 EXEC ecl_core.usp_LoadPDCurve  @RUN_ID = @RUN_ID;
@@ -191,8 +214,7 @@ EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
 
 Các curve phải phủ **mọi kỳ năm cần thiết đến maturity**; PD phải đủ cả ba scenario. Với kỳ cuối không tròn năm, theo quy ước v1 chỉ thời gian chiết khấu được điều chỉnh; không tự prorate PD hoặc EAD. EIR phải được nạp trực tiếp vào `ecl_stg.EIRCurve`; không có loader EIR riêng trong migration hiện tại.
 
-Nguồn PD hiện có rating/segment/scenario cần được ETL/mapping sang `PDCurve`; loader dùng chung **không** tự ánh xạ `SOURCE_SCENARIO` hoặc tự tính PD. LGD nguồn chỉ có một reporting date cần được ETL thành đường cong năm theo phương pháp LGD được phê duyệt trước khi đưa vào `LGDCurve`; loader dùng chung không tự kéo dài LGD một thời điểm thành curve.
-
+Nguồn PD dùng `FINAL_MARGINAL_PIT_PD`; loader dùng chung **không** tự ánh xạ mã scenario hoặc tự tính PD. LGD nguồn chỉ có một reporting date cần được ETL thành đường cong năm theo phương pháp LGD được phê duyệt trước khi đưa vào `LGDCurve`; loader dùng chung không tự kéo dài LGD một thời điểm thành curve.
 ## 5. Quy trình một RUN_ID
 
 Gọi `usp_CreateRun` với `PROCESS_DATE`, `RUN_TYPE='FULL'`, version trọng số kịch bản hiệu lực và `CALCULATION_VERSION`; lấy `@RUN_ID OUTPUT`. Sau đó chuyển trạng thái sang VALIDATING:
