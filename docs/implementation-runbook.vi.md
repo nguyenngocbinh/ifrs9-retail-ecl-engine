@@ -183,7 +183,7 @@ Chạy các lệnh trong cùng một session/batch để biến `@RUN_ID` còn h
 
 #### Nạp PD từ nguồn
 
-Chạy script `database/upstream/003_load_pd_curve_source.sql` sau khi đã triển khai schema, `database/007_pd_curve_loader.sql` và schema/configuration in `database/001_create_logical_schema.sql`. Procedure giả định hai bảng nguồn nằm trong cùng database với engine, schema `dbo`. Mapping scenario được lưu trong `ecl_cfg.Scenario` và được seed bởi `database/009_source_scenario_mapping.sql`: `RETAIL_MARGINAL_PIT_PD` có mapping `1 = BASE`, `2 = UPTURN`, `3 = DOWNTURN`. Procedure đọc mapping từ bảng cấu hình, không hard-code mã số.
+Chạy script `database/upstream/003_load_pd_curve_source.sql` sau khi đã triển khai schema, `database/007_pd_curve_loader.sql` và schema và cấu hình trong `database/001_create_logical_schema.sql`. Procedure giả định hai bảng nguồn nằm trong cùng database với engine, schema `dbo`. Mapping scenario được lưu trong `ecl_cfg.Scenario` và được seed bởi `database/001_create_logical_schema.sql`: `RETAIL_MARGINAL_PIT_PD` có mapping `1 = BASE`, `2 = UPTURN`, `3 = DOWNTURN`. Procedure đọc mapping từ bảng cấu hình, không hard-code mã số.
 
 ```sql
 -- Chạy trong database IFRS9 ECL Engine; thay VERSION_ID theo cấu hình thực tế.
