@@ -210,29 +210,227 @@ EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
 Curve phải phủ **mọi kỳ năm cần thiết đến maturity cho Stage 1/2**; PD phải đủ cả ba scenario ở mỗi kỳ đó. Riêng Stage 3 chỉ cần `FORECAST_PERIOD = 1` cho PD của cả ba scenario, LGD, EAD và EIR, vì engine đặt PD = 100% và chỉ tính một kỳ với số mũ chiết khấu bằng 1. Quy ước này áp dụng cả khi `MATURITY_DATE` còn ở tương lai. Tài khoản đã đáo hạn (`MATURITY_DATE <= PROCESS_DATE`) cũng chỉ dùng kỳ 1, bất kể Stage. Với Stage 1/2 có kỳ cuối không tròn năm, theo quy ước v1 chỉ thời gian chiết khấu được điều chỉnh; không tự prorate PD hoặc EAD. EIR phải được nạp trực tiếp vào `ecl_stg.EIRCurve`; không có loader EIR riêng trong migration hiện tại.
 
 Nguồn PD dùng `FINAL_MARGINAL_PIT_PD`; loader dùng chung **không** tự ánh xạ mã scenario hoặc tự tính PD. LGD nguồn chỉ có một reporting date cần được ETL thành đường cong năm theo phương pháp LGD được phê duyệt trước khi đưa vào `LGDCurve`; loader dùng chung không tự kéo dài LGD một thời điểm thành curve.
-## 5. Quy trình một RUN_ID
+## 5. Quy trình thực thi một RUN_ID
 
-Gọi `usp_CreateRun` với `PROCESS_DATE`, `RUN_TYPE='FULL'`, version trọng số kịch bản hiệu lực và `CALCULATION_VERSION`; lấy `@RUN_ID OUTPUT`. Sau đó chuyển trạng thái sang VALIDATING:
+Mục này mô tả vòng đời của một lần chạy ECL: tạo run, nạp dữ liệu, đăng ký Manifest, kiểm tra đầu vào, đối soát, tính toán và xuất bản kết quả.
+
+### 5.1. Nguyên tắc
+
+- Mỗi lần chạy chỉ gọi `ecl_core.usp_CreateRun` **một lần**. Procedure này tạo cả `RunControl` và header `RunInputManifest`.
+- Tất cả đầu vào của run phải cùng `RUN_ID` và `PROCESS_DATE`.
+- Run `SELECTIVE` chỉ được chứa tài khoản thuộc `REQUESTED_POOL_NAME` hoặc `REQUESTED_POOL_ID` đã yêu cầu.
+- Chỉ khai báo `IS_COMPLETE = 1` khi dữ liệu thực sự đầy đủ, đã được kiểm tra theo hợp đồng dữ liệu.
+- `SNAPSHOT_ROW_COUNT` phải bằng số dòng mà reconciliation đếm được. Procedure hiện đếm tất cả dòng theo `RUN_ID`, gồm cả dòng inactive; không thay bằng số dòng active.
+- Sau khi Manifest được seal, không sửa các mục Manifest. Khi cần chạy lại, tạo `RUN_ID` mới và giữ audit của run cũ.
+
+### 5.2. Bước 1 — Tạo hoặc tiếp tục RUN_ID
+
+Trước khi tạo run, xác nhận version trọng số kịch bản có hiệu lực tại `PROCESS_DATE`; với run selective, pool phải tồn tại và active.
+
+Ví dụ tạo run Auto mới:
 
 ```sql
 DECLARE @RUN_ID bigint;
 
 EXEC ecl_core.usp_CreateRun
-  @PROCESS_DATE = '2026-10-15',
-  @RUN_TYPE = 'FULL',
-  @SCENARIO_WEIGHT_VERSION_ID = 1, -- thay bằng VERSION_ID hợp lệ thực tế
-  @CALCULATION_VERSION = 'ECL-V1',
-  @RUN_ID = @RUN_ID OUTPUT;
+    @PROCESS_DATE = '2026-09-30',
+    @RUN_TYPE = 'SELECTIVE',
+    @SCENARIO_WEIGHT_VERSION_ID = 1,
+    @CALCULATION_VERSION = 'ECL-AUTO-V1',
+    @REQUESTED_POOL_NAME = 'RETAIL_LN_AUTO',
+    @REQUESTED_POOL_ID = NULL,
+    @RUN_NOTE = N'Run riêng danh mục Auto',
+    @RUN_ID = @RUN_ID OUTPUT;
 
 SELECT @RUN_ID AS RUN_ID;
-
-EXEC ecl_core.usp_TransitionRunStatus
-  @RUN_ID = @RUN_ID,
-  @NEW_STATUS = 'VALIDATING',
-  @EVENT_MESSAGE = N'Load and validate approved input snapshots';
 ```
 
-Tiếp theo, nạp sáu nhóm dữ liệu của run đó. Ghi nhận mỗi nhóm bằng `usp_RegisterRunInput` với `INPUT_FAMILY` tương ứng `ACCOUNT`, `PD`, `LGD`, `EAD`, `EIR`, `SCENARIO_WEIGHT`; khai báo đúng source/version, số dòng snapshot và `IS_COMPLETE=1` chỉ khi dữ liệu thực sự đầy đủ. Sau đó:
+Lưu lại ID được trả về; không tự đặt số. Nếu run đã tồn tại, dùng lại ID đó và **không gọi lại** `usp_CreateRun`.
+
+Kiểm tra trạng thái và Manifest:
+
+```sql
+DECLARE @RUN_ID bigint = 20; -- Thay bằng RUN_ID thực tế
+
+SELECT RUN_ID, PROCESS_DATE, RUN_TYPE, RUN_STATUS,
+       REQUESTED_POOL_NAME, REQUESTED_POOL_ID,
+       SCENARIO_WEIGHT_VERSION_ID, CALCULATION_VERSION
+FROM ecl_core.RunControl
+WHERE RUN_ID = @RUN_ID;
+
+SELECT RUN_ID, IS_SEALED, CREATED_AT, SEALED_AT
+FROM ecl_core.RunInputManifest
+WHERE RUN_ID = @RUN_ID;
+```
+
+Nếu trạng thái là `CREATED`, chuyển sang `VALIDATING`. Nếu đã là `VALIDATING`, bỏ qua lệnh chuyển trạng thái:
+
+```sql
+EXEC ecl_core.usp_TransitionRunStatus
+    @RUN_ID = @RUN_ID,
+    @NEW_STATUS = 'VALIDATING',
+    @EVENT_MESSAGE = N'Load and validate input snapshots';
+```
+
+### 5.3. Bước 2 — Nạp dữ liệu và kiểm tra phạm vi
+
+Nạp Stage/Pool và `AccountSnapshot`, sau đó ETL PD, LGD, EAD, EIR vào các bảng chuẩn theo đúng hợp đồng dữ liệu. Các procedure `usp_LoadPDCurve`, `usp_LoadLGDCurve`, `usp_LoadEADCurve` kiểm tra dữ liệu đã nạp; chúng không tự ETL dữ liệu nguồn. EIR được nạp trực tiếp vào `ecl_stg.EIRCurve`.
+
+Với run Auto, kiểm tra phạm vi trước khi nạp curve:
+
+```sql
+SELECT POOL_NAME, POOL_ID, STAGE, COUNT_BIG(*) AS ACCOUNT_COUNT
+FROM ecl_stg.AccountSnapshot
+WHERE RUN_ID = @RUN_ID AND IS_ACTIVE = 1
+GROUP BY POOL_NAME, POOL_ID, STAGE;
+
+IF EXISTS (
+    SELECT 1
+    FROM ecl_stg.AccountSnapshot
+    WHERE RUN_ID = @RUN_ID
+      AND IS_ACTIVE = 1
+      AND POOL_NAME <> 'RETAIL_LN_AUTO'
+)
+    THROW 52001, 'AccountSnapshot contains non-Auto accounts.', 1;
+```
+
+Sau khi ETL thành công, gọi các loader kiểm tra:
+
+```sql
+EXEC ecl_core.usp_LoadPDCurve  @RUN_ID = @RUN_ID;
+EXEC ecl_core.usp_LoadLGDCurve @RUN_ID = @RUN_ID;
+EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
+```
+
+Đảm bảo curve đủ kỳ theo maturity và Stage; PD phải có đủ ba scenario cho các kỳ cần tính. Kiểm tra ngày dữ liệu, POCI, tài khoản và phạm vi selective trước khi xác nhận đầu vào hoàn tất.
+
+### 5.4. Bước 3 — Đếm số dòng dùng cho Manifest
+
+Reconciliation hiện so sánh số dòng Manifest với số dòng staging theo `RUN_ID`; riêng `SCENARIO_WEIGHT`, nó đếm các dòng cấu hình thuộc version được chọn trong `RunControl`.
+
+```sql
+SELECT 'ACCOUNT' AS INPUT_FAMILY, COUNT_BIG(*) AS ROW_COUNT
+FROM ecl_stg.AccountSnapshot WHERE RUN_ID = @RUN_ID
+UNION ALL
+SELECT 'PD', COUNT_BIG(*) FROM ecl_stg.PDCurve WHERE RUN_ID = @RUN_ID
+UNION ALL
+SELECT 'LGD', COUNT_BIG(*) FROM ecl_stg.LGDCurve WHERE RUN_ID = @RUN_ID
+UNION ALL
+SELECT 'EAD', COUNT_BIG(*) FROM ecl_stg.EADCurve WHERE RUN_ID = @RUN_ID
+UNION ALL
+SELECT 'EIR', COUNT_BIG(*) FROM ecl_stg.EIRCurve WHERE RUN_ID = @RUN_ID
+UNION ALL
+SELECT 'SCENARIO_WEIGHT', COUNT_BIG(*)
+FROM ecl_cfg.ScenarioWeight w
+JOIN ecl_core.RunControl r
+  ON r.RUN_ID = @RUN_ID
+ AND r.SCENARIO_WEIGHT_VERSION_ID = w.VERSION_ID;
+```
+
+Kiểm tra cấu hình có đủ `DOWNTURN`, `BASE`, `UPTURN`, các dòng active hợp lệ và tổng trọng số bằng 1. Số dòng khớp không thay thế kiểm tra tính đầy đủ và tính đúng nghiệp vụ.
+
+### 5.5. Bước 4 — Đăng ký sáu nhóm đầu vào
+
+Mỗi run cần đúng sáu nhóm: `ACCOUNT`, `PD`, `LGD`, `EAD`, `EIR`, `SCENARIO_WEIGHT`. Đoạn dưới chỉ dùng khi **chưa có mục nào** trong Manifest. Nó lấy row count từ các bảng được reconciliation kiểm tra.
+
+```sql
+DECLARE @WEIGHT_VERSION_ID int;
+SELECT @WEIGHT_VERSION_ID = SCENARIO_WEIGHT_VERSION_ID
+FROM ecl_core.RunControl
+WHERE RUN_ID = @RUN_ID AND RUN_STATUS = 'VALIDATING';
+
+IF @WEIGHT_VERSION_ID IS NULL
+    THROW 52010, 'Run does not exist or is not VALIDATING.', 1;
+
+IF NOT EXISTS (
+    SELECT 1 FROM ecl_core.RunInputManifest
+    WHERE RUN_ID = @RUN_ID AND IS_SEALED = 0
+)
+    THROW 52011, 'Manifest is missing or already sealed.', 1;
+
+IF EXISTS (
+    SELECT 1 FROM ecl_core.RunInputManifestItem
+    WHERE RUN_ID = @RUN_ID
+)
+    THROW 52012, 'Manifest items already exist; inspect them before registering.', 1;
+
+DECLARE
+    @ACCOUNT_ROWS bigint, @PD_ROWS bigint, @LGD_ROWS bigint,
+    @EAD_ROWS bigint, @EIR_ROWS bigint, @WEIGHT_ROWS bigint;
+
+SELECT @ACCOUNT_ROWS = COUNT_BIG(*) FROM ecl_stg.AccountSnapshot WHERE RUN_ID = @RUN_ID;
+SELECT @PD_ROWS = COUNT_BIG(*) FROM ecl_stg.PDCurve WHERE RUN_ID = @RUN_ID;
+SELECT @LGD_ROWS = COUNT_BIG(*) FROM ecl_stg.LGDCurve WHERE RUN_ID = @RUN_ID;
+SELECT @EAD_ROWS = COUNT_BIG(*) FROM ecl_stg.EADCurve WHERE RUN_ID = @RUN_ID;
+SELECT @EIR_ROWS = COUNT_BIG(*) FROM ecl_stg.EIRCurve WHERE RUN_ID = @RUN_ID;
+SELECT @WEIGHT_ROWS = COUNT_BIG(*)
+FROM ecl_cfg.ScenarioWeight WHERE VERSION_ID = @WEIGHT_VERSION_ID;
+
+-- Chỉ đặt IS_COMPLETE = 1 khi dữ liệu đã được xác nhận đầy đủ.
+EXEC ecl_core.usp_RegisterRunInput
+    @RUN_ID=@RUN_ID, @INPUT_FAMILY='ACCOUNT',
+    @SOURCE_SYSTEM='SQL_SERVER', @SOURCE_OBJECT='ecl_stg.AccountSnapshot',
+    @SOURCE_VERSION='RUN_ID snapshot',
+    @SNAPSHOT_ROW_COUNT=@ACCOUNT_ROWS, @IS_COMPLETE=1;
+
+EXEC ecl_core.usp_RegisterRunInput
+    @RUN_ID=@RUN_ID, @INPUT_FAMILY='PD',
+    @SOURCE_SYSTEM='SQL_SERVER', @SOURCE_OBJECT='ecl_stg.PDCurve',
+    @SOURCE_VERSION='RUN_ID snapshot',
+    @SNAPSHOT_ROW_COUNT=@PD_ROWS, @IS_COMPLETE=1;
+
+EXEC ecl_core.usp_RegisterRunInput
+    @RUN_ID=@RUN_ID, @INPUT_FAMILY='LGD',
+    @SOURCE_SYSTEM='SQL_SERVER', @SOURCE_OBJECT='ecl_stg.LGDCurve',
+    @SOURCE_VERSION='RUN_ID snapshot',
+    @SNAPSHOT_ROW_COUNT=@LGD_ROWS, @IS_COMPLETE=1;
+
+EXEC ecl_core.usp_RegisterRunInput
+    @RUN_ID=@RUN_ID, @INPUT_FAMILY='EAD',
+    @SOURCE_SYSTEM='SQL_SERVER', @SOURCE_OBJECT='ecl_stg.EADCurve',
+    @SOURCE_VERSION='RUN_ID snapshot',
+    @SNAPSHOT_ROW_COUNT=@EAD_ROWS, @IS_COMPLETE=1;
+
+EXEC ecl_core.usp_RegisterRunInput
+    @RUN_ID=@RUN_ID, @INPUT_FAMILY='EIR',
+    @SOURCE_SYSTEM='SQL_SERVER', @SOURCE_OBJECT='ecl_stg.EIRCurve',
+    @SOURCE_VERSION='RUN_ID snapshot',
+    @SNAPSHOT_ROW_COUNT=@EIR_ROWS, @IS_COMPLETE=1;
+
+EXEC ecl_core.usp_RegisterRunInput
+    @RUN_ID=@RUN_ID, @INPUT_FAMILY='SCENARIO_WEIGHT',
+    @SOURCE_SYSTEM='SQL_SERVER', @SOURCE_OBJECT='ecl_cfg.ScenarioWeight',
+    @SOURCE_VERSION=CONCAT('VERSION_ID=', @WEIGHT_VERSION_ID),
+    @SNAPSHOT_ROW_COUNT=@WEIGHT_ROWS, @IS_COMPLETE=1;
+```
+
+Thay `SOURCE_VERSION` bằng mã version/snapshot có ý nghĩa thực tế trong ETL. Giá trị `RUN_ID snapshot` chỉ là nhãn minh họa.
+
+Nếu Manifest đã có một hoặc nhiều mục, **không chạy lại** đoạn đăng ký toàn bộ: procedure thực hiện INSERT và khóa chính không cho phép trùng `RUN_ID + INPUT_FAMILY`. Kiểm tra các mục đã có; nếu thông tin đăng ký sai, cân nhắc tạo run mới thay vì sửa/xóa audit.
+
+### 5.6. Bước 5 — Kiểm tra, seal và validate Manifest
+
+Kiểm tra đủ sáu nhóm:
+
+```sql
+SELECT INPUT_FAMILY, SOURCE_SYSTEM, SOURCE_OBJECT, SOURCE_VERSION,
+       SNAPSHOT_ROW_COUNT, IS_COMPLETE, REGISTERED_AT
+FROM ecl_core.RunInputManifestItem
+WHERE RUN_ID = @RUN_ID
+ORDER BY INPUT_FAMILY;
+
+WITH RequiredInputFamily AS (
+    SELECT INPUT_FAMILY
+    FROM (VALUES ('ACCOUNT'), ('PD'), ('LGD'), ('EAD'), ('EIR'), ('SCENARIO_WEIGHT')) v(INPUT_FAMILY)
+)
+SELECT r.INPUT_FAMILY
+FROM RequiredInputFamily r
+LEFT JOIN ecl_core.RunInputManifestItem m
+  ON m.RUN_ID = @RUN_ID AND m.INPUT_FAMILY = r.INPUT_FAMILY
+WHERE m.INPUT_FAMILY IS NULL OR m.IS_COMPLETE <> 1;
+```
+
+Truy vấn thứ hai phải trả về **0 dòng**. Xác nhận Manifest chưa seal rồi thực hiện lần lượt:
 
 ```sql
 EXEC ecl_core.usp_SealRunInputs @RUN_ID = @RUN_ID;
@@ -240,18 +438,77 @@ EXEC ecl_core.usp_ValidateRunInputs @RUN_ID = @RUN_ID;
 EXEC ecl_core.usp_ReconcileInputSnapshots @RUN_ID = @RUN_ID;
 ```
 
-Không tính nếu có finding severity ERROR/FATAL hoặc reconciliation chưa SUCCEEDED. Sau khi kiểm tra audit và xác nhận đầu vào hợp lệ:
+Đọc findings và sự kiện:
+
+```sql
+SELECT VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID,
+       SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE
+FROM ecl_audit.ValidationError
+WHERE RUN_ID = @RUN_ID
+ORDER BY SEVERITY, VALIDATION_CODE;
+
+SELECT EVENT_ID, EVENT_TYPE, EVENT_STATUS, EVENT_MESSAGE, ROW_COUNT, EVENT_AT
+FROM ecl_audit.RunEvent
+WHERE RUN_ID = @RUN_ID
+  AND EVENT_TYPE IN ('INPUT_VALIDATION', 'INPUT_RECONCILIATION')
+ORDER BY EVENT_ID;
+```
+
+Chỉ tiếp tục khi Manifest đã seal, validation không có finding `ERROR`/`FATAL` cần xử lý, sự kiện validation gần nhất là `SUCCEEDED`, và reconciliation gần nhất là `SUCCEEDED`. Nếu lỗi, dừng để xử lý nguyên nhân; không tính ECL. Lưu ý validation ghi finding vào bảng audit, vì vậy cần kiểm tra cả findings đã tồn tại từ lần chạy trước, không chỉ kết quả trả về của lần gọi mới nhất.
+
+### 5.7. Bước 6 — Tính ECL và xuất bản
+
+Chỉ thực hiện khi các điều kiện validation và reconciliation đã đạt:
 
 ```sql
 EXEC ecl_core.usp_TransitionRunStatus
-  @RUN_ID = @RUN_ID, @NEW_STATUS = 'CALCULATING';
+    @RUN_ID = @RUN_ID,
+    @NEW_STATUS = 'CALCULATING',
+    @EVENT_MESSAGE = N'Inputs validated and reconciled';
 
 EXEC ecl_core.usp_CalculateECL @RUN_ID = @RUN_ID;
 EXEC ecl_core.usp_PublishECL @RUN_ID = @RUN_ID;
 ```
 
-Đây là mẫu lệnh điều phối: chỉ chạy calculate khi đã thật sự nạp đủ dữ liệu và đăng ký đúng row count của cả sáu nhóm. Không dùng `VERSION_ID=1` hay `SCENARIO_WEIGHT_VERSION_ID=1` nếu chưa xác nhận version thực tế.
+Nếu `usp_CalculateECL` thất bại, không gọi `usp_PublishECL`. Kiểm tra lỗi SQL, `ecl_audit.ValidationError`, `ecl_audit.RunEvent` và trạng thái run trước khi quyết định bước tiếp theo.
 
+### 5.8. Bước 7 — Xác nhận kết quả
+
+```sql
+SELECT * FROM ecl_core.RunControl WHERE RUN_ID = @RUN_ID;
+
+SELECT EVENT_ID, EVENT_TYPE, EVENT_STATUS, EVENT_MESSAGE, ROW_COUNT, EVENT_AT
+FROM ecl_audit.RunEvent
+WHERE RUN_ID = @RUN_ID
+ORDER BY EVENT_ID;
+
+SELECT COUNT_BIG(*) AS DETAIL_ROWS
+FROM ecl_result.ECLDetail WHERE RUN_ID = @RUN_ID;
+
+SELECT COUNT_BIG(*) AS ACCOUNT_ROWS,
+       SUM(ECL_12_MONTH) AS ECL_12_MONTH,
+       SUM(ECL_LIFETIME) AS ECL_LIFETIME,
+       SUM(ECL_DEFAULT) AS ECL_DEFAULT,
+       SUM(ECL_TOTAL) AS ECL_TOTAL
+FROM ecl_result.ECLAccount WHERE RUN_ID = @RUN_ID;
+
+SELECT POOL_NAME, STAGE, ACCOUNT_COUNT,
+       ECL_12_MONTH, ECL_LIFETIME, ECL_DEFAULT, ECL_TOTAL
+FROM ecl_result.ECLPortfolioSummary
+WHERE RUN_ID = @RUN_ID;
+```
+
+Run chỉ hoàn tất xuất bản khi `RUN_STATUS = 'PUBLISHED'`, audit ghi nhận các bước cần thiết thành công và kết quả đã được đối chiếu theo quy tắc báo cáo được phê duyệt.
+
+### 5.9. Xử lý lỗi và chạy lại
+
+- Lỗi trước khi seal: kiểm tra dữ liệu và Manifest; không đăng ký trùng `INPUT_FAMILY`.
+- Validation/reconciliation thất bại: xử lý nguyên nhân gốc, không tiếp tục tính ECL.
+- Lỗi sau khi seal: không sửa Manifest đã seal, không xóa audit hoặc kết quả để ép chạy lại.
+- Khi cần chạy lại, tạo `RUN_ID` mới và giữ nguyên run cũ để bảo toàn lịch sử kiểm soát.
+- Lưu `RUN_ID`, `PROCESS_DATE`, version trọng số, version tính toán, số dòng từng nhóm, kết quả validation/reconciliation và kết quả cuối cùng.
+
+**Lưu ý:** số dòng khớp Manifest chỉ chứng minh số lượng đã đăng ký khớp với số lượng reconciliation đếm được. Nó không chứng minh dữ liệu đúng nghiệp vụ, đủ kỳ dự báo hoặc đủ tài khoản; các điều kiện đó phải được kiểm tra riêng.
 ## 6. Kiểm tra kết quả và lỗi
 
 ```sql
