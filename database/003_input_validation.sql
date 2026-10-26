@@ -286,7 +286,7 @@ BEGIN
                END AS HORIZON
         FROM ecl_stg.AccountSnapshot a
         WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
-          AND a.IS_ACTIVE = 1 AND ISNULL(a.IS_POCI, 0) = 0
+          AND a.IS_ACTIVE = 1
           
     ),
     Numbers AS
@@ -311,7 +311,7 @@ BEGIN
                    END AS HORIZON
             FROM ecl_stg.AccountSnapshot a
             WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
-              AND a.IS_ACTIVE = 1 AND ISNULL(a.IS_POCI, 0) = 0
+              AND a.IS_ACTIVE = 1
               
         ),
         Numbers AS
@@ -363,7 +363,7 @@ BEGIN
                    END AS HORIZON
             FROM ecl_stg.AccountSnapshot a
             WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
-              AND a.IS_ACTIVE = 1 AND ISNULL(a.IS_POCI, 0) = 0
+              AND a.IS_ACTIVE = 1
               
         ),
         Numbers AS
