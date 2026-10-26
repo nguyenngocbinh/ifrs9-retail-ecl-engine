@@ -63,7 +63,9 @@ BEGIN
           Build annual periods only for accounts that:
           1) are active in this run;
           2) have not already been loaded into EADCurve by another product-specific ETL;
-          3) have a matching source schedule for this PROCESS_DATE.
+          3) have a matching source schedule for this PROCESS_DATE. The DB2
+             source procedure emits a synthetic PROCESS_DATE row when no future
+             principal schedule exists but the reporting-date account balance does.
 
           This allows product-specific ETLs (for example Auto) to populate their
           own accounts without this Non-Revolving ETL deleting or overwriting them.
