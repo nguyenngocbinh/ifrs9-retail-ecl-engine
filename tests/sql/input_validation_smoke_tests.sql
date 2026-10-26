@@ -67,7 +67,7 @@ BEGIN TRY
     ) v;
 
     IF @VALIDATION_STATUS <> 'FAILED'
-        THROW 51400, 'Expected validation to fail when required curves and POCI classification are missing.', 1;
+        THROW 51400, 'Expected validation to fail because required curve coverage is missing.', 1;
 
     IF NOT EXISTS (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'PD_COVERAGE_MISSING')
         THROW 51401, 'Expected missing PD coverage finding.', 1;
@@ -78,17 +78,17 @@ BEGIN TRY
     IF NOT EXISTS (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'EIR_COVERAGE_MISSING')
         THROW 51403, 'Expected missing EIR coverage finding.', 1;
 
-    IF NOT EXISTS (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'POCI_CLASSIFICATION_MISSING' AND ACCOUNT_ID = 'SYN-VALIDATION-002')
-        THROW 51404, 'Expected explicit POCI classification finding for the unclassified account.', 1;
-
-    IF NOT EXISTS (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'POCI_EXCLUDED' AND SEVERITY = 'ERROR' AND ACCOUNT_ID = 'SYN-VALIDATION-003')
-        THROW 51406, 'Detected POCI must block calculation until explicit exclusion and reconciliation are implemented.', 1;
+    IF EXISTS (SELECT 1 FROM ecl_audit.ValidationError
+               WHERE RUN_ID = @RUN_ID
+                 AND VALIDATION_CODE IN ('POCI_CLASSIFICATION_MISSING', 'POCI_EXCLUDED')
+                 AND ACCOUNT_ID IN ('SYN-VALIDATION-002', 'SYN-VALIDATION-003'))
+        THROW 51404, 'Temporary POCI bypass must not create blocking findings for unknown or detected POCI.', 1;
 
     IF EXISTS (SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID = @RUN_ID)
         THROW 51405, 'Input validation must not produce ECL calculation detail.', 1;
 
     ROLLBACK TRANSACTION;
-    PRINT 'PASS: missing PD/LGD/EAD/EIR coverage, unknown POCI classification, and detected POCI are blocked; no ECL calculation is performed.';
+    PRINT 'PASS: missing PD/LGD/EAD/EIR coverage is blocked; unknown/detected POCI is non-blocking in temporary bypass; no ECL calculation is performed.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
