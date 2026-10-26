@@ -35,7 +35,8 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 
 - Stage 1 output category: `ECL_12_MONTH`.
 - Stage 2 output category: `ECL_LIFETIME`.
-- Stage 3 output category: `ECL_DEFAULT`; follow the same calculation logic as Stage 2 with the only change being PD = 1. Use the same annual EAD/LGD curves, shared EIR, discount-time convention, discounting, and aggregation.
+- Stage 3 output category: `ECL_DEFAULT`; for accounts whose contractual maturity is after `PROCESS_DATE`, use the lifetime annual periods and set PD = 1 in each period, with the same EAD/LGD curves and shared EIR discount convention as Stage 2.
+- For an active unpaid account with `MATURITY_DATE <= PROCESS_DATE`, use exactly `FORECAST_PERIOD = 1` as the post-maturity processing period, regardless of Stage. Calculate ECL using the period-1 PD/LGD/EAD and shared EIR inputs; use a one-year discount exponent for this designated period. Do not generate or sum periods 2+ for the post-maturity case. This is a v1 processing convention, not an assumption that all loans become Stage 3 solely because maturity has passed.
 - Stage 1, Stage 2 and Stage 3 use the same shared EIR curve and the same discount formula `DF(t)=1/(1+EIR(t))^t`. Stage 3 does not have a separate EIR curve or discount-rate rule.
 - LGD inputs are defined as undiscounted in the canonical contract. No additional unresolved Stage 3 source-mapping or source-survey gate is imposed in this phase.
 
