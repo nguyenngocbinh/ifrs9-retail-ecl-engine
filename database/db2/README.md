@@ -34,6 +34,7 @@ ORDER BY ACCOUNT_NUMBER, SCHEDULE_DUE_DATE, SCHEDULE_NO;
 
 - `FCC_RPTB_CL020.OUTSTANDINGVND` supplies `EAD_0` for the exact `P_PROCESS_DATE` snapshot.
 - `FCC_LOAN_SCHEDULE.AMOUNT_DUE` is used as scheduled principal repayment for due dates after `P_PROCESS_DATE`.
+- If an account exists in the CL020 reporting-date snapshot but has no future principal schedule rows, the procedure emits one synthetic schedule row at `P_PROCESS_DATE` with zero principal repayment and `EAD_AFTER_REPAYMENT = EAD_0`. This preserves the account and carries the current balance forward when the SQL Server annual curve ETL maps the synthetic row to each required year-end period. Treat this as an explicit fallback assumption: it does not infer future principal amortization where no schedule exists.
 - Schedule rows are sourced from the currently available schedule snapshot. Confirm it is appropriate for the reporting date before production use.
 - This first pass does not apply `AMOUNT_SETTLED`, readjustments, waivers, write-offs, product-scope filtering, or additional data-quality rules.
 - `EAD_AFTER_REPAYMENT` is the balance after cumulative scheduled principal at each due date; it is not yet an annual EAD curve.
