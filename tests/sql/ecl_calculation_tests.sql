@@ -58,7 +58,11 @@ BEGIN TRY
  EXEC ecl_core.usp_ValidateRunInputs @R;
 
  IF EXISTS(SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID=@R AND SEVERITY IN('ERROR','FATAL'))
+ BEGIN
+   SELECT VALIDATION_CODE, ACCOUNT_ID, SCENARIO_CODE, FORECAST_PERIOD, ERROR_MESSAGE
+   FROM ecl_audit.ValidationError WHERE RUN_ID=@R AND SEVERITY IN('ERROR','FATAL');
    THROW 52500,'Synthetic calculation fixture failed input validation.',1;
+ END;
 
  EXEC ecl_core.usp_ReconcileInputSnapshots @R;
  IF ISNULL((SELECT TOP(1) EVENT_STATUS FROM ecl_audit.RunEvent
