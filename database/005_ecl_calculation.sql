@@ -82,8 +82,8 @@ BEGIN
 
         /*
           Fail closed on missing, inactive, or incomplete curves even if validation was bypassed.
-          Accounts with MATURITY_DATE <= PROCESS_DATE use exactly FORECAST_PERIOD=1 as
-          the post-maturity processing period, with period-1 PD/LGD/EAD/EIR coverage.
+          Stage 3 accounts always use exactly FORECAST_PERIOD=1 because PD is fixed at 100%;
+          accounts with MATURITY_DATE <= PROCESS_DATE also use period 1 regardless of Stage.
         */
         IF EXISTS (
             SELECT 1
@@ -106,7 +106,8 @@ BEGIN
         ) THROW 51518, 'Active in-scope accounts have missing required curve coverage.', 1;
 
         DECLARE @MAX_HORIZON int =
-            (SELECT ISNULL(MAX(CASE WHEN MATURITY_DATE<=@PROCESS_DATE THEN 1
+            (SELECT ISNULL(MAX(CASE WHEN STAGE=3 THEN 1
+                                    WHEN MATURITY_DATE<=@PROCESS_DATE THEN 1
                                     WHEN CEILING(DATEDIFF(month,@PROCESS_DATE,MATURITY_DATE)/12.0)<1 THEN 1
                                     ELSE CEILING(DATEDIFF(month,@PROCESS_DATE,MATURITY_DATE)/12.0) END),0)
              FROM ecl_stg.AccountSnapshot a
@@ -120,7 +121,8 @@ BEGIN
         IF EXISTS (
             SELECT 1
             FROM ecl_stg.AccountSnapshot a
-            CROSS APPLY (SELECT CASE WHEN a.MATURITY_DATE<=@PROCESS_DATE THEN 1
+            CROSS APPLY (SELECT CASE WHEN a.STAGE=3 THEN 1
+                                     WHEN a.MATURITY_DATE<=@PROCESS_DATE THEN 1
                                      WHEN CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0)<1 THEN 1
                                      ELSE CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0) END AS HORIZON) h
             JOIN (SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
@@ -166,7 +168,8 @@ BEGIN
 
         ;WITH InScope AS (
             SELECT a.RUN_ID,a.PROCESS_DATE,a.ACCOUNT_ID,a.CUSTOMER_ID,a.POOL_NAME,a.STAGE,a.POOL_ID,a.MATURITY_DATE,
-                   CONVERT(int,CASE WHEN a.MATURITY_DATE<=@PROCESS_DATE THEN 1
+                   CONVERT(int,CASE WHEN a.STAGE=3 THEN 1
+                                    WHEN a.MATURITY_DATE<=@PROCESS_DATE THEN 1
                                     WHEN CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0)<1 THEN 1
                                     ELSE CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0) END) AS HORIZON,
                    DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0 AS MATURITY_T
@@ -179,6 +182,7 @@ BEGIN
         Periods AS (
             SELECT a.*, n.N AS FORECAST_PERIOD,
                    CASE
+                       WHEN a.STAGE=3 THEN CONVERT(decimal(19,8),1.0)
                        WHEN a.MATURITY_DATE<=@PROCESS_DATE THEN CONVERT(decimal(19,8),1.0)
                        WHEN n.N=a.HORIZON AND a.MATURITY_T>0 THEN a.MATURITY_T
                        WHEN n.N=a.HORIZON THEN CONVERT(decimal(19,8),DATEDIFF(day,@PROCESS_DATE,a.MATURITY_DATE)/365.25)
