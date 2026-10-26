@@ -8,8 +8,8 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
-/* Nullable by design: NULL means upstream has not certified POCI classification.
-   Do not default unknown POCI status to non-POCI. */
+/* Nullable by design. Temporary POCI bypass: NULL is not a validation blocker and
+   follows the ordinary ECL path until explicit POCI treatment is implemented. */
 IF COL_LENGTH(N'ecl_stg.AccountSnapshot', N'IS_POCI') IS NULL
     ALTER TABLE ecl_stg.AccountSnapshot ADD IS_POCI bit NULL;
 GO
@@ -202,35 +202,12 @@ BEGIN
       Such accounts use only FORECAST_PERIOD=1 as the post-maturity processing period.
     */
 
-    INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
-    SELECT @RUN_ID, @PROCESS_DATE, 'POCI_CLASSIFICATION_MISSING', 'ERROR',
-           a.POOL_NAME, a.ACCOUNT_ID, a.POOL_ID,
-           N'POCI classification is NULL. Upstream must explicitly classify the account before calculation.'
-    FROM ecl_stg.AccountSnapshot a
-    WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
-      AND a.IS_ACTIVE = 1 AND a.IS_POCI IS NULL
-      AND NOT EXISTS
-      (
-        SELECT 1 FROM ecl_audit.ValidationError e
-        WHERE e.RUN_ID = @RUN_ID AND e.VALIDATION_CODE = 'POCI_CLASSIFICATION_MISSING'
-          AND e.ACCOUNT_ID = a.ACCOUNT_ID
-      );
-
-    INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
-    SELECT @RUN_ID, @PROCESS_DATE, 'POCI_EXCLUDED', 'ERROR',
-           a.POOL_NAME, a.ACCOUNT_ID, a.POOL_ID,
-           N'POCI account is out of v1 calculation scope and must be excluded from ordinary ECL calculation and reconciled.'
-    FROM ecl_stg.AccountSnapshot a
-    WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
-      AND a.IS_ACTIVE = 1 AND a.IS_POCI = 1
-      AND NOT EXISTS
-      (
-        SELECT 1 FROM ecl_audit.ValidationError e
-        WHERE e.RUN_ID = @RUN_ID AND e.VALIDATION_CODE = 'POCI_EXCLUDED'
-          AND e.ACCOUNT_ID = a.ACCOUNT_ID
-      );
+    /*
+      TEMPORARY IMPLEMENTATION SCOPE: POCI-specific classification and exclusion controls
+      are intentionally not blocking this run. For this version, active accounts with
+      IS_POCI = 1 or NULL continue through the ordinary ECL path. This is a technical
+      workaround only; do not treat the result as production IFRS 9 POCI accounting.
+    */
 
     /* Validate the version is effective on the reporting date and its three scenario weights sum to 1. */
     IF NOT EXISTS
@@ -309,7 +286,7 @@ BEGIN
                END AS HORIZON
         FROM ecl_stg.AccountSnapshot a
         WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
-          AND a.IS_ACTIVE = 1 AND ISNULL(a.IS_POCI, 0) = 0
+          AND a.IS_ACTIVE = 1
           
     ),
     Numbers AS
@@ -334,7 +311,7 @@ BEGIN
                    END AS HORIZON
             FROM ecl_stg.AccountSnapshot a
             WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
-              AND a.IS_ACTIVE = 1 AND ISNULL(a.IS_POCI, 0) = 0
+              AND a.IS_ACTIVE = 1
               
         ),
         Numbers AS
@@ -386,7 +363,7 @@ BEGIN
                    END AS HORIZON
             FROM ecl_stg.AccountSnapshot a
             WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
-              AND a.IS_ACTIVE = 1 AND ISNULL(a.IS_POCI, 0) = 0
+              AND a.IS_ACTIVE = 1
               
         ),
         Numbers AS

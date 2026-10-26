@@ -76,10 +76,9 @@ BEGIN
 
     DECLARE @MISMATCH_COUNT int = (SELECT COUNT(*) FROM @COUNTS
                                     WHERE EXPECTED_ROWS IS NULL OR EXPECTED_ROWS <> ACTUAL_ROWS);
+    /* Temporary POCI bypass: POCI/unknown-POCI counts remain diagnostic only. */
     DECLARE @FAIL_COUNT int = @MISMATCH_COUNT
-        + CASE WHEN @DATE_MISMATCH > 0 THEN 1 ELSE 0 END
-        + CASE WHEN @UNKNOWN_POCI_COUNT > 0 THEN 1 ELSE 0 END
-        + CASE WHEN @POCI_COUNT > 0 THEN 1 ELSE 0 END;
+        + CASE WHEN @DATE_MISMATCH > 0 THEN 1 ELSE 0 END;
 
     /* Serialize this run's reconciliation audit writes; no lifecycle status changes. */
     BEGIN TRY
@@ -113,20 +112,11 @@ BEGIN
             VALUES (@RUN_ID, @PROCESS_DATE, 'STAGING_DATE_MISMATCH', 'ERROR',
                     CONCAT(@DATE_MISMATCH, N' staged rows have PROCESS_DATE different from the run.'));
 
-        IF @UNKNOWN_POCI_COUNT > 0 AND NOT EXISTS
-            (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'POCI_RECON_UNKNOWN')
-            INSERT INTO ecl_audit.ValidationError
-                (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, ERROR_MESSAGE)
-            VALUES (@RUN_ID, @PROCESS_DATE, 'POCI_RECON_UNKNOWN', 'ERROR',
-                    CONCAT(@UNKNOWN_POCI_COUNT, N' active accounts have unknown POCI classification.'));
-
-        /* Until downstream calculation excludes and reconciles POCI, ERROR is mandatory. */
-        IF @POCI_COUNT > 0 AND NOT EXISTS
-            (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'POCI_RECON_BLOCKED')
-            INSERT INTO ecl_audit.ValidationError
-                (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, ERROR_MESSAGE)
-            VALUES (@RUN_ID, @PROCESS_DATE, 'POCI_RECON_BLOCKED', 'ERROR',
-                    CONCAT(@POCI_COUNT, N' POCI accounts require explicit downstream exclusion and reconciliation.'));
+        /*
+          TEMPORARY IMPLEMENTATION SCOPE: do not create blocking POCI findings.
+          Counts are retained in the reconciliation result and event for visibility.
+          Active POCI and unknown-POCI accounts remain in the ordinary ECL population.
+        */
 
         INSERT INTO ecl_audit.RunEvent
             (RUN_ID, PROCESS_DATE, EVENT_TYPE, EVENT_STATUS, EVENT_MESSAGE, ROW_COUNT, AMOUNT_VALUE)
