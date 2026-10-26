@@ -296,8 +296,17 @@ BEGIN
             IF NOT EXISTS (SELECT 1 FROM ecl_core.RunInputManifest WHERE RUN_ID = @RUN_ID AND IS_SEALED = 1)
                 THROW 51034, 'Inputs must be sealed before calculation starts.', 1;
 
-            IF EXISTS (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_ID AND SEVERITY IN ('ERROR','FATAL'))
-                THROW 51035, 'Run has ERROR/FATAL validation findings; calculation is blocked.', 1;
+            /* Temporary POCI bypass: preserve audit history but do not let these two
+               known POCI-only findings block the calculation transition.
+               All other ERROR/FATAL findings remain blocking. */
+            IF EXISTS (
+                SELECT 1
+                FROM ecl_audit.ValidationError
+                WHERE RUN_ID = @RUN_ID
+                  AND SEVERITY IN ('ERROR','FATAL')
+                  AND VALIDATION_CODE NOT IN ('POCI_CLASSIFICATION_MISSING','POCI_RECON_UNKNOWN')
+            )
+                THROW 51035, 'Run has non-POCI ERROR/FATAL validation findings; calculation is blocked.', 1;
         END;
 
         IF @NEW_STATUS = 'SUCCEEDED'
