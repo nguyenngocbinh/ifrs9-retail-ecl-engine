@@ -46,7 +46,6 @@ BEGIN TRY
         (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-PL-001', NULL, 'RETAIL_LN_CONS_UNSEC', 2,
          'POOL-PL', '20281015', 1, 1);
 
-    /* Product-specific ETL inserts its calculated annual curve into the canonical table. */
     INSERT INTO ecl_stg.EADCurve
         (RUN_ID, PROCESS_DATE, ACCOUNT_ID, FORECAST_PERIOD, EAD, CURRENCY_CODE, VERSION_ID, IS_ACTIVE)
     VALUES
@@ -77,7 +76,6 @@ BEGIN TRY
     )
         THROW 51692, 'Non-Revolving Personal Loan period-2 EAD row should remain in canonical EADCurve.', 1;
 
-    /* Revalidation must not duplicate or rewrite canonical EAD rows. */
     EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
     SELECT @ROWS = COUNT_BIG(*) FROM ecl_stg.EADCurve WHERE RUN_ID = @RUN_ID;
     IF @ROWS <> 3
@@ -86,8 +84,30 @@ BEGIN TRY
     IF (SELECT COUNT_BIG(*) FROM ecl_audit.RunEvent WHERE RUN_ID = @RUN_ID AND EVENT_TYPE = 'EAD_LOAD' AND EVENT_STATUS = 'SUCCEEDED') <> 2
         THROW 51694, 'Each successful EAD validation call should be recorded in the run audit.', 1;
 
+    /*
+      Regression: Stage 3 may have horizon below one and need no annual EAD
+      curve periods through contractual maturity. Loader must not fail solely
+      because maturity is on/before PROCESS_DATE.
+    */
+    DECLARE @STAGE3_ACCOUNT varchar(100) = 'SYN-EAD-STAGE3-001';
+    INSERT INTO ecl_stg.AccountSnapshot
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE,
+         POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE)
+    VALUES
+        (@RUN_ID, @PROCESS_DATE, @STAGE3_ACCOUNT, NULL, 'RETAIL_LN_CONS_UNSEC', 3,
+         'POOL-PL', '20261001', 1, 1);
+
+    EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM ecl_audit.RunEvent
+        WHERE RUN_ID = @RUN_ID AND EVENT_TYPE = 'EAD_LOAD' AND EVENT_STATUS = 'SUCCEEDED'
+    )
+        THROW 51695, 'Stage 3 account with horizon below one should be accepted by EAD loader.', 1;
+
     ROLLBACK TRANSACTION;
-    PRINT 'PASS: shared EAD loader validates direct canonical EAD rows for Auto and Non-Revolving Personal Loan.';
+    PRINT 'PASS: EAD loader validates active curves and allows Stage 3 horizon below one.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
