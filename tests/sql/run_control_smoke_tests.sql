@@ -65,8 +65,16 @@ BEGIN TRY
     IF XACT_STATE() <> 1
         THROW 51104, 'Rejected manifest mutation left the caller transaction uncommittable.', 1;
 
+    /* Temporary POCI bypass regression: a POCI-only audit finding must not block calculation. */
+    INSERT INTO ecl_audit.ValidationError
+        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, ERROR_MESSAGE)
+    VALUES
+        (@RUN_ID, @PROCESS_DATE, 'POCI_CLASSIFICATION_MISSING', 'ERROR',
+         N'Synthetic POCI finding; should not block during temporary bypass.');
+
     EXEC ecl_core.usp_TransitionRunStatus
-        @RUN_ID = @RUN_ID, @NEW_STATUS = 'CALCULATING', @EVENT_MESSAGE = N'Smoke test';
+        @RUN_ID = @RUN_ID, @NEW_STATUS = 'CALCULATING',
+        @EVENT_MESSAGE = N'Smoke test; POCI-only finding should be ignored temporarily';
 
     EXEC ecl_core.usp_RecordRunMilestone
         @RUN_ID = @RUN_ID, @MILESTONE = 'RECONCILIATION', @MILESTONE_STATUS = 'SUCCEEDED',
