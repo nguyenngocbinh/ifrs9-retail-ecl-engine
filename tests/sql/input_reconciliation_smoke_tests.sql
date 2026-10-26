@@ -50,10 +50,10 @@ BEGIN TRY
         WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'MANIFEST_COUNT_MISMATCH' AND SEVERITY = 'ERROR')
         THROW 51601, 'Expected manifest/account count mismatch.', 1;
 
-    IF NOT EXISTS
+    IF EXISTS
        (SELECT 1 FROM ecl_audit.ValidationError
-        WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'POCI_RECON_BLOCKED' AND SEVERITY = 'ERROR')
-        THROW 51602, 'Expected detected POCI to block calculation.', 1;
+        WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE IN ('POCI_RECON_BLOCKED', 'POCI_RECON_UNKNOWN'))
+        THROW 51602, 'Temporary POCI bypass must not create blocking POCI reconciliation findings.', 1;
 
     IF NOT EXISTS
        (SELECT 1 FROM ecl_audit.RunEvent
@@ -80,7 +80,7 @@ BEGIN TRY
         THROW 51606, 'Repeated input reconciliation duplicated count-mismatch findings.', 1;
 
     ROLLBACK TRANSACTION;
-    PRINT 'PASS: manifest mismatch, POCI blocking, no publication gate bypass, and repeat finding idempotence.';
+    PRINT 'PASS: manifest mismatch blocks reconciliation; POCI is diagnostic only; no publication gate bypass; repeat finding idempotence.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
