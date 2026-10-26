@@ -294,6 +294,7 @@ BEGIN
     (
         SELECT a.ACCOUNT_ID, a.POOL_NAME, a.POOL_ID,
                CASE
+                 WHEN a.STAGE = 3 THEN 1
                  WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                  ELSE
                    CASE WHEN
@@ -324,6 +325,7 @@ BEGIN
         (
             SELECT a.ACCOUNT_ID, a.POOL_NAME, a.POOL_ID,
                    CASE
+                     WHEN a.STAGE = 3 THEN 1
                      WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                      ELSE CEILING(CONVERT(decimal(10,2),
                        DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE)
