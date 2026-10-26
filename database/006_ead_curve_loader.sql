@@ -70,10 +70,9 @@ BEGIN
             THROW 51605, 'EAD loader: every EAD row must match an account snapshot with the same process date.', 1;
 
         /*
-          Accounts with MATURITY_DATE <= PROCESS_DATE use exactly FORECAST_PERIOD=1
-          as the post-maturity processing period, regardless of Stage. Accounts with
-          future maturity require coverage through their annual horizon. Maximum
-          supported horizon remains 120 periods.
+          Stage 3 accounts always require only FORECAST_PERIOD=1 because PD is fixed at 100%.
+          Accounts with MATURITY_DATE <= PROCESS_DATE also use period 1 regardless of Stage;
+          other accounts require coverage through their annual horizon (maximum 120 periods).
         */
         IF EXISTS
         (
@@ -82,6 +81,7 @@ BEGIN
             CROSS APPLY
             (
                 SELECT CONVERT(int, CASE
+                    WHEN a.STAGE = 3 THEN 1
                     WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                     WHEN CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0) < 1 THEN 1
                     ELSE CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0)
@@ -120,7 +120,7 @@ BEGIN
                   )
               )
         )
-            THROW 51606, 'EAD loader: active accounts need active VND EAD rows for every required period; matured accounts use FORECAST_PERIOD=1. Maximum supported horizon is 120 periods.', 1;
+            THROW 51606, 'EAD loader: active accounts need active VND EAD rows for every required period; Stage 3 and matured accounts use period 1. Maximum supported horizon is 120 periods.', 1;
 
         SELECT @ROW_COUNT = COUNT_BIG(*)
         FROM ecl_stg.EADCurve
