@@ -78,11 +78,17 @@ BEGIN TRY
     IF NOT EXISTS (SELECT 1 FROM ecl_audit.ValidationError WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'EIR_COVERAGE_MISSING')
         THROW 51403, 'Expected missing EIR coverage finding.', 1;
 
-    IF EXISTS (SELECT 1 FROM ecl_audit.ValidationError
-               WHERE RUN_ID = @RUN_ID
-                 AND VALIDATION_CODE IN ('POCI_CLASSIFICATION_MISSING', 'POCI_EXCLUDED')
-                 AND ACCOUNT_ID IN ('SYN-VALIDATION-002', 'SYN-VALIDATION-003'))
-        THROW 51404, 'Temporary POCI bypass must not create blocking findings for unknown or detected POCI.', 1;
+    /* POCI is temporarily bypassed: only blocking POCI findings violate this contract.
+       Non-POCI ERROR/FATAL findings (curve coverage below) must continue to block validation. */
+    IF EXISTS (
+        SELECT 1
+        FROM ecl_audit.ValidationError
+        WHERE RUN_ID = @RUN_ID
+          AND SEVERITY IN ('ERROR', 'FATAL')
+          AND VALIDATION_CODE IN ('POCI_CLASSIFICATION_MISSING', 'POCI_EXCLUDED', 'POCI_RECON_UNKNOWN', 'POCI_RECON_BLOCKED')
+          AND ACCOUNT_ID IN ('SYN-VALIDATION-002', 'SYN-VALIDATION-003')
+    )
+        THROW 51404, 'Temporary POCI bypass must not create blocking POCI ERROR/FATAL findings.', 1;
 
     IF EXISTS (SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID = @RUN_ID)
         THROW 51405, 'Input validation must not produce ECL calculation detail.', 1;
