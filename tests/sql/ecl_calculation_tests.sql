@@ -103,7 +103,7 @@ BEGIN TRY
    THROW 52519,'Future-maturity Stage 3 must produce one period per scenario.',1;
  IF EXISTS(SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID=@R AND ACCOUNT_ID='SYN-CALC-S3-FUTURE' AND FORECAST_PERIOD<>1)
    THROW 52520,'Future-maturity Stage 3 must not produce periods 2+.',1;
- IF EXISTS(SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID=@R AND ACCOUNT_ID='SYN-CALC-S3-FUTURE' AND (PD_USED<>1 OR ABS(CONVERT(float,DISCOUNT_FACTOR)-1.0/1.05)>0.0000000001))
+ IF EXISTS(SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID=@R AND ACCOUNT_ID='SYN-CALC-S3-FUTURE' AND (PD_USED<>1 OR ABS(CONVERT(float,DISCOUNT_FACTOR)-(1.0/CONVERT(float,1.05)))>0.0000000001))
    THROW 52521,'Future-maturity Stage 3 must use PD=1 and one-year discounting.',1;
 
  /* Same RUN_ID must not be calculated twice; rejected retry leaves output unchanged. */
