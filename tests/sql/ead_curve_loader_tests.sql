@@ -46,7 +46,6 @@ BEGIN TRY
         (@RUN_ID, @PROCESS_DATE, 'SYN-EAD-PL-001', NULL, 'RETAIL_LN_CONS_UNSEC', 2,
          'POOL-PL', '20281015', 1, 1);
 
-    /* Product-specific ETL inserts its calculated annual curve into the canonical table. */
     INSERT INTO ecl_stg.EADCurve
         (RUN_ID, PROCESS_DATE, ACCOUNT_ID, FORECAST_PERIOD, EAD, CURRENCY_CODE, VERSION_ID, IS_ACTIVE)
     VALUES
@@ -77,7 +76,6 @@ BEGIN TRY
     )
         THROW 51692, 'Non-Revolving Personal Loan period-2 EAD row should remain in canonical EADCurve.', 1;
 
-    /* Revalidation must not duplicate or rewrite canonical EAD rows. */
     EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
     SELECT @ROWS = COUNT_BIG(*) FROM ecl_stg.EADCurve WHERE RUN_ID = @RUN_ID;
     IF @ROWS <> 3
@@ -86,8 +84,58 @@ BEGIN TRY
     IF (SELECT COUNT_BIG(*) FROM ecl_audit.RunEvent WHERE RUN_ID = @RUN_ID AND EVENT_TYPE = 'EAD_LOAD' AND EVENT_STATUS = 'SUCCEEDED') <> 2
         THROW 51694, 'Each successful EAD validation call should be recorded in the run audit.', 1;
 
+    /*
+      Regression: an account matured before PROCESS_DATE must provide exactly
+      the designated period-1 EAD for post-maturity processing.
+    */
+    DECLARE @STAGE3_ACCOUNT varchar(100) = 'SYN-EAD-STAGE3-001';
+    INSERT INTO ecl_stg.AccountSnapshot
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE,
+         POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE)
+    VALUES
+        (@RUN_ID, @PROCESS_DATE, @STAGE3_ACCOUNT, NULL, 'RETAIL_LN_CONS_UNSEC', 3,
+         'POOL-PL', '20261001', 1, 1);
+
+    INSERT INTO ecl_stg.EADCurve
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, FORECAST_PERIOD, EAD, CURRENCY_CODE, VERSION_ID, IS_ACTIVE)
+    VALUES (@RUN_ID, @PROCESS_DATE, @STAGE3_ACCOUNT, 1, 40000000, 'VND', 1, 1);
+
+    EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM ecl_audit.RunEvent
+        WHERE RUN_ID = @RUN_ID AND EVENT_TYPE = 'EAD_LOAD' AND EVENT_STATUS = 'SUCCEEDED'
+    )
+        THROW 51695, 'Matured Stage 3 account with period-1 EAD should be accepted by EAD loader.', 1;
+
+    /*
+      Regression: Stage 1 with maturity later in the same calendar month must
+      still require and accept period-1 EAD coverage.
+    */
+    DECLARE @STAGE12_ACCOUNT varchar(100) = 'SYN-EAD-STAGE12-SUBYEAR-001';
+    INSERT INTO ecl_stg.AccountSnapshot
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE,
+         POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE)
+    VALUES
+        (@RUN_ID, @PROCESS_DATE, @STAGE12_ACCOUNT, NULL, 'RETAIL_LN_CONS_UNSEC', 1,
+         'POOL-PL', '20261020', 1, 1);
+
+    INSERT INTO ecl_stg.EADCurve
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, FORECAST_PERIOD, EAD, CURRENCY_CODE, VERSION_ID, IS_ACTIVE)
+    VALUES (@RUN_ID, @PROCESS_DATE, @STAGE12_ACCOUNT, 1, 30000000, 'VND', 1, 1);
+
+    EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM ecl_audit.RunEvent
+        WHERE RUN_ID = @RUN_ID AND EVENT_TYPE = 'EAD_LOAD' AND EVENT_STATUS = 'SUCCEEDED'
+    )
+        THROW 51696, 'Stage 1 account with future maturity and period-1 EAD should be accepted.', 1;
+
     ROLLBACK TRANSACTION;
-    PRINT 'PASS: shared EAD loader validates direct canonical EAD rows for Auto and Non-Revolving Personal Loan.';
+    PRINT 'PASS: EAD loader accepts horizon below one for Stage 1 and Stage 3.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;

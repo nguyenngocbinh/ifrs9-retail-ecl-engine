@@ -80,7 +80,11 @@ BEGIN
                      AND SCENARIO_CODE IN ('DOWNTURN','BASE','UPTURN'))-1.0) > 0.00000001
             THROW 51517, 'Selected scenario weights must contain Downturn/Base/Upturn and sum to one.', 1;
 
-        /* Fail closed on missing, inactive, or incomplete curves even if validation was bypassed. */
+        /*
+          Fail closed on missing, inactive, or incomplete curves even if validation was bypassed.
+          Stage 3 accounts always use exactly FORECAST_PERIOD=1 because PD is fixed at 100%;
+          accounts with MATURITY_DATE <= PROCESS_DATE also use period 1 regardless of Stage.
+        */
         IF EXISTS (
             SELECT 1
             FROM ecl_stg.AccountSnapshot a
@@ -89,8 +93,7 @@ BEGIN
                    (@REQUESTED_POOL_NAME IS NULL OR a.POOL_NAME=@REQUESTED_POOL_NAME)
                    AND (@REQUESTED_POOL_ID IS NULL OR a.POOL_ID=@REQUESTED_POOL_ID))
               AND (
-                a.MATURITY_DATE<=@PROCESS_DATE
-                OR NOT EXISTS (SELECT 1 FROM ecl_stg.PDCurve p
+                NOT EXISTS (SELECT 1 FROM ecl_stg.PDCurve p
                     WHERE p.RUN_ID=a.RUN_ID AND p.ACCOUNT_ID=a.ACCOUNT_ID AND p.IS_ACTIVE=1
                       AND p.PROCESS_DATE=@PROCESS_DATE AND p.SCENARIO_CODE='BASE')
                 OR NOT EXISTS (SELECT 1 FROM ecl_stg.LGDCurve l
@@ -100,10 +103,13 @@ BEGIN
                     WHERE e.RUN_ID=a.RUN_ID AND e.ACCOUNT_ID=a.ACCOUNT_ID AND e.IS_ACTIVE=1
                       AND e.PROCESS_DATE=@PROCESS_DATE)
               )
-        ) THROW 51518, 'Active in-scope accounts have invalid maturity or missing annual curve coverage.', 1;
+        ) THROW 51518, 'Active in-scope accounts have missing required curve coverage.', 1;
 
         DECLARE @MAX_HORIZON int =
-            (SELECT ISNULL(MAX(CEILING(DATEDIFF(month,@PROCESS_DATE,MATURITY_DATE)/12.0)),0)
+            (SELECT ISNULL(MAX(CASE WHEN STAGE=3 THEN 1
+                                    WHEN MATURITY_DATE<=@PROCESS_DATE THEN 1
+                                    WHEN CEILING(DATEDIFF(month,@PROCESS_DATE,MATURITY_DATE)/12.0)<1 THEN 1
+                                    ELSE CEILING(DATEDIFF(month,@PROCESS_DATE,MATURITY_DATE)/12.0) END),0)
              FROM ecl_stg.AccountSnapshot a
              WHERE a.RUN_ID=@RUN_ID AND a.PROCESS_DATE=@PROCESS_DATE AND a.IS_ACTIVE=1
                AND (@RUN_TYPE='FULL' OR
@@ -115,7 +121,10 @@ BEGIN
         IF EXISTS (
             SELECT 1
             FROM ecl_stg.AccountSnapshot a
-            CROSS APPLY (SELECT CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0) AS HORIZON) h
+            CROSS APPLY (SELECT CASE WHEN a.STAGE=3 THEN 1
+                                     WHEN a.MATURITY_DATE<=@PROCESS_DATE THEN 1
+                                     WHEN CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0)<1 THEN 1
+                                     ELSE CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0) END AS HORIZON) h
             JOIN (SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
                   FROM sys.all_objects x CROSS JOIN sys.all_objects y) n ON n.N<=h.HORIZON
             WHERE a.RUN_ID=@RUN_ID AND a.PROCESS_DATE=@PROCESS_DATE AND a.IS_ACTIVE=1
@@ -159,7 +168,10 @@ BEGIN
 
         ;WITH InScope AS (
             SELECT a.RUN_ID,a.PROCESS_DATE,a.ACCOUNT_ID,a.CUSTOMER_ID,a.POOL_NAME,a.STAGE,a.POOL_ID,a.MATURITY_DATE,
-                   CONVERT(int,CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0)) AS HORIZON,
+                   CONVERT(int,CASE WHEN a.STAGE=3 THEN 1
+                                    WHEN a.MATURITY_DATE<=@PROCESS_DATE THEN 1
+                                    WHEN CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0)<1 THEN 1
+                                    ELSE CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0) END) AS HORIZON,
                    DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0 AS MATURITY_T
             FROM ecl_stg.AccountSnapshot a
             WHERE a.RUN_ID=@RUN_ID AND a.PROCESS_DATE=@PROCESS_DATE AND a.IS_ACTIVE=1
@@ -169,7 +181,13 @@ BEGIN
         ),
         Periods AS (
             SELECT a.*, n.N AS FORECAST_PERIOD,
-                   CASE WHEN n.N=a.HORIZON THEN a.MATURITY_T ELSE CONVERT(decimal(19,8),n.N) END AS DISCOUNT_T
+                   CASE
+                       WHEN a.STAGE=3 THEN CONVERT(decimal(19,8),1.0)
+                       WHEN a.MATURITY_DATE<=@PROCESS_DATE THEN CONVERT(decimal(19,8),1.0)
+                       WHEN n.N=a.HORIZON AND a.MATURITY_T>0 THEN a.MATURITY_T
+                       WHEN n.N=a.HORIZON THEN CONVERT(decimal(19,8),DATEDIFF(day,@PROCESS_DATE,a.MATURITY_DATE)/365.25)
+                       ELSE CONVERT(decimal(19,8),n.N)
+                   END AS DISCOUNT_T
             FROM InScope a
             JOIN (SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
                   FROM sys.all_objects x CROSS JOIN sys.all_objects y) n ON n.N<=a.HORIZON

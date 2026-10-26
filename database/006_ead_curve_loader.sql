@@ -69,46 +69,58 @@ BEGIN
         )
             THROW 51605, 'EAD loader: every EAD row must match an account snapshot with the same process date.', 1;
 
+        /*
+          Stage 3 accounts always require only FORECAST_PERIOD=1 because PD is fixed at 100%.
+          Accounts with MATURITY_DATE <= PROCESS_DATE also use period 1 regardless of Stage;
+          other accounts require coverage through their annual horizon (maximum 120 periods).
+        */
         IF EXISTS
         (
             SELECT 1
             FROM ecl_stg.AccountSnapshot a
             CROSS APPLY
             (
-                SELECT CONVERT(int, CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0)) AS HORIZON
+                SELECT CONVERT(int, CASE
+                    WHEN a.STAGE = 3 THEN 1
+                    WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
+                    WHEN CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0) < 1 THEN 1
+                    ELSE CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0)
+                END) AS HORIZON
             ) h
             WHERE a.RUN_ID = @RUN_ID
               AND a.PROCESS_DATE = @PROCESS_DATE
               AND a.IS_ACTIVE = 1
               AND
               (
-                  a.MATURITY_DATE <= @PROCESS_DATE
-                  OR h.HORIZON < 1
-                  OR h.HORIZON > 120
-                  OR EXISTS
+                  h.HORIZON > 120
+                  OR
                   (
-                      SELECT 1
-                      FROM
+                      h.HORIZON >= 1
+                      AND EXISTS
                       (
-                          SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
-                          FROM sys.all_objects x CROSS JOIN sys.all_objects y
-                      ) n
-                      WHERE n.N <= h.HORIZON
-                        AND NOT EXISTS
-                        (
-                            SELECT 1
-                            FROM ecl_stg.EADCurve e
-                            WHERE e.RUN_ID = a.RUN_ID
-                              AND e.ACCOUNT_ID = a.ACCOUNT_ID
-                              AND e.PROCESS_DATE = @PROCESS_DATE
-                              AND e.FORECAST_PERIOD = n.N
-                              AND e.IS_ACTIVE = 1
-                              AND e.CURRENCY_CODE = 'VND'
-                        )
+                          SELECT 1
+                          FROM
+                          (
+                              SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+                              FROM sys.all_objects x CROSS JOIN sys.all_objects y
+                          ) n
+                          WHERE n.N <= h.HORIZON
+                            AND NOT EXISTS
+                            (
+                                SELECT 1
+                                FROM ecl_stg.EADCurve e
+                                WHERE e.RUN_ID = a.RUN_ID
+                                  AND e.ACCOUNT_ID = a.ACCOUNT_ID
+                                  AND e.PROCESS_DATE = @PROCESS_DATE
+                                  AND e.FORECAST_PERIOD = n.N
+                                  AND e.IS_ACTIVE = 1
+                                  AND e.CURRENCY_CODE = 'VND'
+                            )
+                      )
                   )
               )
         )
-            THROW 51606, 'EAD loader: active accounts need active VND EAD rows for every annual period through maturity (maximum 120 periods).', 1;
+            THROW 51606, 'EAD loader: active accounts need active VND EAD rows for every required period; Stage 3 and matured accounts use period 1. Maximum supported horizon is 120 periods.', 1;
 
         SELECT @ROW_COUNT = COUNT_BIG(*)
         FROM ecl_stg.EADCurve

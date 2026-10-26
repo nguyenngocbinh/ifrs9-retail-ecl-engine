@@ -32,7 +32,7 @@ The engine must validate that selected active weights are present, non-negative,
 |---|---|---|
 | Stage 1 | 12-month ECL (first 12-month horizon) | `ECL_12_MONTH` |
 | Stage 2 | Lifetime ECL | `ECL_LIFETIME` |
-| Stage 3 | Default/lifetime calculation with PD=1 | `ECL_DEFAULT` |
+| Stage 3 | One-period defaulted-exposure calculation (`FORECAST_PERIOD = 1`, PD=1) | `ECL_DEFAULT` |
 
 - Exactly one Stage is expected per account and reporting date.
 - Stage output categories are mutually exclusive for aggregation.
@@ -58,7 +58,7 @@ ECL_contribution(t, s) = PD_contribution(t, s)
 
 `PD_contribution(t,s)` is intended to represent the appropriate marginal default probability for annual period `t`, conditional on the original cohort being the denominator. The precise source definition must be checked to ensure the supplied marginal PD is not converted or multiplied into a cumulative PD incorrectly.
 
-For Stage 1, contributions are restricted to the approved 12-month horizon. For Stage 2, contributions cover the approved remaining lifetime horizon. Stage 3 uses PD=1 per the currently selected rule, subject to validation of curve semantics and the approved method for allocating default exposure across periods.
+For Stage 1, contributions are restricted to the approved 12-month horizon. For Stage 2, contributions cover the approved remaining lifetime horizon. For the selected v1 Stage 3 implementation convention, calculate only `FORECAST_PERIOD = 1` with PD=1, period-1 EAD/LGD/EIR, and a one-year discount exponent. Do not sum period-2+ contributions for Stage 3. This avoids repeatedly applying PD=1 to future balances of the same defaulted account; period-1 EAD semantics still require source/methodology confirmation.
 
 Scenario-weighted ECL is conceptually:
 
@@ -82,7 +82,7 @@ where EIR(t) is the existing source's rate for forecast period t, and t is the a
 
 ## 6. Stage 3
 
-Current selected rule: always use PD=1 for Stage 3 and validate LGD/EAD input curves. The implementation must not mechanically apply a full series of PD=1 contributions across all future periods without confirming whether it duplicates the same default exposure. The actual Stage 3 calculation contract depends on OQ-001 and OQ-008 in `docs/open-questions.md`.
+Selected v1 implementation convention: Stage 3 always uses PD=1 but calculates ECL only for `FORECAST_PERIOD = 1`, regardless of whether contractual maturity has passed. Use period-1 EAD/LGD/EIR and discount with exponent 1.0; create one row for each scenario and do not calculate periods 2+. This is an implementation choice to avoid repeated PD=1 contributions across future periods, not by itself formal approval of the bank's accounting methodology. Confirm that period-1 EAD represents the exposure basis intended for defaulted accounts.
 
 ## 7. Input validation policy
 

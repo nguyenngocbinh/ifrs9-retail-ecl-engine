@@ -207,7 +207,7 @@ EXEC ecl_core.usp_LoadLGDCurve @RUN_ID = @RUN_ID;
 EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
 ```
 
-Các curve phải phủ **mọi kỳ năm cần thiết đến maturity**; PD phải đủ cả ba scenario. Với kỳ cuối không tròn năm, theo quy ước v1 chỉ thời gian chiết khấu được điều chỉnh; không tự prorate PD hoặc EAD. EIR phải được nạp trực tiếp vào `ecl_stg.EIRCurve`; không có loader EIR riêng trong migration hiện tại.
+Curve phải phủ **mọi kỳ năm cần thiết đến maturity cho Stage 1/2**; PD phải đủ cả ba scenario ở mỗi kỳ đó. Riêng Stage 3 chỉ cần `FORECAST_PERIOD = 1` cho PD của cả ba scenario, LGD, EAD và EIR, vì engine đặt PD = 100% và chỉ tính một kỳ với số mũ chiết khấu bằng 1. Quy ước này áp dụng cả khi `MATURITY_DATE` còn ở tương lai. Tài khoản đã đáo hạn (`MATURITY_DATE <= PROCESS_DATE`) cũng chỉ dùng kỳ 1, bất kể Stage. Với Stage 1/2 có kỳ cuối không tròn năm, theo quy ước v1 chỉ thời gian chiết khấu được điều chỉnh; không tự prorate PD hoặc EAD. EIR phải được nạp trực tiếp vào `ecl_stg.EIRCurve`; không có loader EIR riêng trong migration hiện tại.
 
 Nguồn PD dùng `FINAL_MARGINAL_PIT_PD`; loader dùng chung **không** tự ánh xạ mã scenario hoặc tự tính PD. LGD nguồn chỉ có một reporting date cần được ETL thành đường cong năm theo phương pháp LGD được phê duyệt trước khi đưa vào `LGDCurve`; loader dùng chung không tự kéo dài LGD một thời điểm thành curve.
 ## 5. Quy trình một RUN_ID

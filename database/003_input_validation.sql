@@ -197,20 +197,10 @@ BEGIN
           AND e.ACCOUNT_ID = a.ACCOUNT_ID
       );
 
-    INSERT INTO ecl_audit.ValidationError
-        (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
-    SELECT @RUN_ID, @PROCESS_DATE, 'MATURITY_DATE_INVALID', 'ERROR',
-           a.POOL_NAME, a.ACCOUNT_ID, a.POOL_ID,
-           N'Active account maturity date is earlier than the process date.'
-    FROM ecl_stg.AccountSnapshot a
-    WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
-      AND a.IS_ACTIVE = 1 AND a.MATURITY_DATE < @PROCESS_DATE
-      AND NOT EXISTS
-      (
-        SELECT 1 FROM ecl_audit.ValidationError e
-        WHERE e.RUN_ID = @RUN_ID AND e.VALIDATION_CODE = 'MATURITY_DATE_INVALID'
-          AND e.ACCOUNT_ID = a.ACCOUNT_ID
-      );
+    /*
+      Maturity on/before PROCESS_DATE is valid for an active unpaid account.
+      Such accounts use only FORECAST_PERIOD=1 as the post-maturity processing period.
+    */
 
     INSERT INTO ecl_audit.ValidationError
         (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, POOL_NAME, ACCOUNT_ID, POOL_ID, ERROR_MESSAGE)
@@ -304,6 +294,7 @@ BEGIN
     (
         SELECT a.ACCOUNT_ID, a.POOL_NAME, a.POOL_ID,
                CASE
+                 WHEN a.STAGE = 3 THEN 1
                  WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                  ELSE
                    CASE WHEN
@@ -319,7 +310,7 @@ BEGIN
         FROM ecl_stg.AccountSnapshot a
         WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
           AND a.IS_ACTIVE = 1 AND ISNULL(a.IS_POCI, 0) = 0
-          AND a.MATURITY_DATE >= @PROCESS_DATE
+          
     ),
     Numbers AS
     (
@@ -334,6 +325,7 @@ BEGIN
         (
             SELECT a.ACCOUNT_ID, a.POOL_NAME, a.POOL_ID,
                    CASE
+                     WHEN a.STAGE = 3 THEN 1
                      WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                      ELSE CEILING(CONVERT(decimal(10,2),
                        DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE)
@@ -343,7 +335,7 @@ BEGIN
             FROM ecl_stg.AccountSnapshot a
             WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
               AND a.IS_ACTIVE = 1 AND ISNULL(a.IS_POCI, 0) = 0
-              AND a.MATURITY_DATE >= @PROCESS_DATE
+              
         ),
         Numbers AS
         (
@@ -385,6 +377,7 @@ BEGIN
         (
             SELECT a.ACCOUNT_ID, a.POOL_NAME, a.POOL_ID,
                    CASE
+                     WHEN a.STAGE = 3 THEN 1
                      WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                      ELSE CEILING(CONVERT(decimal(10,2),
                        DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE)
@@ -394,7 +387,7 @@ BEGIN
             FROM ecl_stg.AccountSnapshot a
             WHERE a.RUN_ID = @RUN_ID AND a.PROCESS_DATE = @PROCESS_DATE
               AND a.IS_ACTIVE = 1 AND ISNULL(a.IS_POCI, 0) = 0
-              AND a.MATURITY_DATE >= @PROCESS_DATE
+              
         ),
         Numbers AS
         (
