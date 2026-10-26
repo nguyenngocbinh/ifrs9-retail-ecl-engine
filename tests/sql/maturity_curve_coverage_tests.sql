@@ -36,10 +36,10 @@ BEGIN TRY
         @RUN_ID = @RUN_ID, @NEW_STATUS = 'VALIDATING',
         @EVENT_MESSAGE = N'Synthetic boundary test: exact 12 months versus 12 months plus one day';
 
-    EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'ACCOUNT', 'TEST', 'synthetic.account', 'v1', 2, 1, NULL;
-    EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'PD', 'TEST', 'synthetic.pd', 'v1', 6, 1, NULL;
-    EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'LGD', 'TEST', 'synthetic.lgd', 'v1', 2, 1, NULL;
-    EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'EAD', 'TEST', 'synthetic.ead', 'v1', 2, 1, NULL;
+    EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'ACCOUNT', 'TEST', 'synthetic.account', 'v1', 3, 1, NULL;
+    EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'PD', 'TEST', 'synthetic.pd', 'v1', 9, 1, NULL;
+    EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'LGD', 'TEST', 'synthetic.lgd', 'v1', 3, 1, NULL;
+    EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'EAD', 'TEST', 'synthetic.ead', 'v1', 3, 1, NULL;
     EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'EIR', 'TEST', 'synthetic.eir', 'v1', 1, 1, NULL;
     EXEC ecl_core.usp_RegisterRunInput @RUN_ID, 'SCENARIO_WEIGHT', 'TEST', 'synthetic.weights', 'v1', 3, 1, NULL;
     EXEC ecl_core.usp_SealRunInputs @RUN_ID;
@@ -47,7 +47,8 @@ BEGIN TRY
     /*
       Account A matures exactly 12 months after PROCESS_DATE => horizon 1.
       Account B matures 12 months + 1 day after PROCESS_DATE => horizon 2.
-      Only period 1 is supplied for both; period 2 must be required only for B.
+      Account C is Stage 3 with future maturity => horizon 1 by Stage 3 convention.
+      Only period 1 is supplied; period 2 must be required only for B.
     */
     INSERT INTO ecl_stg.AccountSnapshot
         (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE, POOL_ID,
@@ -56,7 +57,9 @@ BEGIN TRY
         (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M', NULL, 'RETAIL_LN_MORTGAGE', 1, 'POOL-MAT',
          '20271015', 1, 1, 0),
         (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M-1D', NULL, 'RETAIL_LN_AUTO', 2, 'POOL-MAT',
-         '20271016', 1, 1, 0);
+         '20271016', 1, 1, 0),
+        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-STAGE3-FUTURE', NULL, 'RETAIL_CARD', 3, 'POOL-MAT',
+         '20301015', 1, 1, 0);
 
     INSERT INTO ecl_stg.PDCurve
         (RUN_ID, PROCESS_DATE, ACCOUNT_ID, SCENARIO_CODE, FORECAST_PERIOD, MARGINAL_PD, VERSION_ID, IS_ACTIVE)
@@ -66,19 +69,24 @@ BEGIN TRY
         (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M', 'UPTURN',   1, 0.005000000000, 1, 1),
         (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M-1D', 'DOWNTURN', 1, 0.020000000000, 1, 1),
         (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M-1D', 'BASE',     1, 0.010000000000, 1, 1),
-        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M-1D', 'UPTURN',   1, 0.005000000000, 1, 1);
+        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M-1D', 'UPTURN',   1, 0.005000000000, 1, 1),
+        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-STAGE3-FUTURE', 'DOWNTURN', 1, 0.020000000000, 1, 1),
+        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-STAGE3-FUTURE', 'BASE',     1, 0.010000000000, 1, 1),
+        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-STAGE3-FUTURE', 'UPTURN',   1, 0.005000000000, 1, 1);
 
     INSERT INTO ecl_stg.LGDCurve
         (RUN_ID, PROCESS_DATE, ACCOUNT_ID, FORECAST_PERIOD, LGD, VERSION_ID, IS_ACTIVE)
     VALUES
         (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M', 1, 0.400000000000, 1, 1),
-        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M-1D', 1, 0.400000000000, 1, 1);
+        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M-1D', 1, 0.400000000000, 1, 1),
+        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-STAGE3-FUTURE', 1, 0.400000000000, 1, 1);
 
     INSERT INTO ecl_stg.EADCurve
         (RUN_ID, PROCESS_DATE, ACCOUNT_ID, FORECAST_PERIOD, EAD, CURRENCY_CODE, VERSION_ID, IS_ACTIVE)
     VALUES
         (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M', 1, 100000.0000, 'VND', 1, 1),
-        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M-1D', 1, 200000.0000, 'VND', 1, 1);
+        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-12M-1D', 1, 200000.0000, 'VND', 1, 1),
+        (@RUN_ID, @PROCESS_DATE, 'SYN-MATURITY-STAGE3-FUTURE', 1, 300000.0000, 'VND', 1, 1);
 
     INSERT INTO ecl_stg.EIRCurve
         (RUN_ID, PROCESS_DATE, FORECAST_PERIOD, EIR, RATE_BASIS, VERSION_ID, IS_ACTIVE)
@@ -90,7 +98,7 @@ BEGIN TRY
     IF EXISTS
     (
         SELECT 1 FROM ecl_audit.ValidationError
-        WHERE RUN_ID = @RUN_ID AND ACCOUNT_ID = 'SYN-MATURITY-12M'
+        WHERE RUN_ID = @RUN_ID AND ACCOUNT_ID IN ('SYN-MATURITY-12M','SYN-MATURITY-STAGE3-FUTURE')
           AND FORECAST_PERIOD = 2
           AND VALIDATION_CODE IN ('PD_COVERAGE_MISSING', 'CURVE_COVERAGE_MISSING')
     )
@@ -131,11 +139,20 @@ BEGIN TRY
     )
         THROW 51905, 'A two-period horizon must require shared EIR period 2.', 1;
 
+    IF EXISTS
+    (
+        SELECT 1 FROM ecl_audit.ValidationError
+        WHERE RUN_ID = @RUN_ID AND ACCOUNT_ID = 'SYN-MATURITY-STAGE3-FUTURE'
+          AND FORECAST_PERIOD = 2
+          AND VALIDATION_CODE IN ('PD_COVERAGE_MISSING', 'CURVE_COVERAGE_MISSING')
+    )
+        THROW 51907, 'Future-maturity Stage 3 must require only period-1 curve coverage.', 1;
+
     IF EXISTS (SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID = @RUN_ID)
         THROW 51906, 'Input validation must not produce ECL detail rows.', 1;
 
     ROLLBACK TRANSACTION;
-    PRINT 'PASS: maturity boundary at 12 months/12 months+1 day and PD/LGD/EAD/EIR period-2 coverage.';
+    PRINT 'PASS: maturity boundary at 12 months/12 months+1 day, Stage 3 period-one coverage, and PD/LGD/EAD/EIR period-2 coverage.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
