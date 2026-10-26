@@ -302,7 +302,7 @@ EXEC ecl_core.usp_LoadLGDCurve @RUN_ID = @RUN_ID;
 EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
 ```
 
-Đảm bảo curve đủ kỳ theo maturity và Stage; PD phải có đủ ba scenario cho các kỳ cần tính. Kiểm tra ngày dữ liệu, tài khoản và phạm vi selective trước khi xác nhận đầu vào hoàn tất. Lưu ý: phiên bản hiện tại tạm bỏ qua kiểm soát POCI; tài khoản có IS_POCI = 1 hoặc NULL vẫn đi theo luồng ECL thông thường. Đây chỉ là workaround kiểm thử kỹ thuật, chưa đáp ứng xử lý kế toán POCI cho production.
+Đảm bảo curve đủ kỳ theo maturity và Stage; PD phải có đủ ba scenario cho các kỳ cần tính. Kiểm tra ngày dữ liệu, tài khoản và phạm vi selective trước khi xác nhận đầu vào hoàn tất. Lưu ý: phiên bản hiện tại tạm bỏ qua kiểm soát POCI; tài khoản có IS_POCI = 1 hoặc NULL vẫn đi theo luồng ECL thông thường. Gate chuyển sang CALCULATING cũng tạm không chặn hai mã audit `POCI_CLASSIFICATION_MISSING` và `POCI_RECON_UNKNOWN`; mọi lỗi ERROR/FATAL khác vẫn chặn. Các finding POCI cũ được giữ nguyên trong audit, không xóa. Đây chỉ là workaround kiểm thử kỹ thuật, chưa đáp ứng xử lý kế toán POCI cho production.
 
 ### 5.4. Bước 3 — Đếm số dòng dùng cho Manifest
 
