@@ -106,8 +106,30 @@ BEGIN TRY
     )
         THROW 51695, 'Stage 3 account with horizon below one should be accepted by EAD loader.', 1;
 
+    /*
+      Regression: Stage 1 with maturity later in the same calendar month can
+      have HORIZON = 0 because DATEDIFF(MONTH) returns zero. This is allowed
+      when maturity remains after PROCESS_DATE.
+    */
+    DECLARE @STAGE12_ACCOUNT varchar(100) = 'SYN-EAD-STAGE12-SUBYEAR-001';
+    INSERT INTO ecl_stg.AccountSnapshot
+        (RUN_ID, PROCESS_DATE, ACCOUNT_ID, CUSTOMER_ID, POOL_NAME, STAGE,
+         POOL_ID, MATURITY_DATE, VERSION_ID, IS_ACTIVE)
+    VALUES
+        (@RUN_ID, @PROCESS_DATE, @STAGE12_ACCOUNT, NULL, 'RETAIL_LN_CONS_UNSEC', 1,
+         'POOL-PL', '20261020', 1, 1);
+
+    EXEC ecl_core.usp_LoadEADCurve @RUN_ID = @RUN_ID;
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM ecl_audit.RunEvent
+        WHERE RUN_ID = @RUN_ID AND EVENT_TYPE = 'EAD_LOAD' AND EVENT_STATUS = 'SUCCEEDED'
+    )
+        THROW 51696, 'Stage 1 account with horizon below one and future maturity should be accepted.', 1;
+
     ROLLBACK TRANSACTION;
-    PRINT 'PASS: EAD loader validates active curves and allows Stage 3 horizon below one.';
+    PRINT 'PASS: EAD loader accepts horizon below one for Stage 1 and Stage 3.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
