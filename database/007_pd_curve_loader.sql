@@ -80,9 +80,9 @@ BEGIN
             THROW 51706, 'PD loader: MARGINAL_PD must be in [0,1] and FORECAST_PERIOD must be positive.', 1;
 
         /*
-          Require each active, non-POCI account to have all three canonical
-          scenarios for every annual forecast period through maturity.
-          A final partial year still requires the full annual PD input;
+          Require all three canonical scenarios through maturity for Stage 1/2.
+          Stage 3 requires only FORECAST_PERIOD=1 because PD is fixed at 100%.
+          A final partial year for Stage 1/2 still requires the full annual PD input;
           only the discount-time exponent is partial.
         */
         IF EXISTS
@@ -92,6 +92,7 @@ BEGIN
             CROSS APPLY
             (
                 SELECT CASE
+                    WHEN a.STAGE = 3 THEN 1
                     WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                     ELSE CONVERT(int, CEILING(
                         CONVERT(decimal(10,2),
@@ -136,7 +137,7 @@ BEGIN
                   )
               )
         )
-            THROW 51707, 'PD loader: each active non-POCI account needs active PD rows for DOWNTURN, BASE, and UPTURN for every annual period through maturity (maximum 120 periods).', 1;
+            THROW 51707, 'PD loader: each active Stage 1/2 account needs PD rows for all scenarios through maturity; Stage 3 needs only period 1 (maximum 120 periods).', 1;
 
         SELECT @ROW_COUNT = COUNT_BIG(*)
         FROM ecl_stg.PDCurve
