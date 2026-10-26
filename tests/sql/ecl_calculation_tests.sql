@@ -24,7 +24,7 @@ BEGIN TRY
   (RUN_ID,PROCESS_DATE,ACCOUNT_ID,CUSTOMER_ID,POOL_NAME,STAGE,POOL_ID,MATURITY_DATE,VERSION_ID,IS_ACTIVE,IS_POCI)
  VALUES(@R,@D,'SYN-CALC-S1','SYN-CUST-S1','RETAIL_LN_MORTGAGE',1,'POOL-CALC','20271016',1,1,0),
        (@R,@D,'SYN-CALC-S2','SYN-CUST-S2','RETAIL_LN_AUTO',2,'POOL-CALC','20280416',1,1,0),
-       (@R,@D,'SYN-CALC-S3','SYN-CUST-S3','RETAIL_CARD',3,'POOL-CALC','20280416',1,1,0);
+       (@R,@D,'SYN-CALC-S3','SYN-CUST-S3','RETAIL_CARD',3,'POOL-CALC','20261015',1,1,0);
 
  INSERT INTO ecl_stg.PDCurve(RUN_ID,PROCESS_DATE,ACCOUNT_ID,SCENARIO_CODE,FORECAST_PERIOD,MARGINAL_PD,VERSION_ID,IS_ACTIVE)
  SELECT @R,@D,a.ACCOUNT_ID,s.SCENARIO_CODE,p.N,
@@ -73,7 +73,8 @@ BEGIN TRY
  /* Weighted PD is exactly 2%; annual PD/EAD are not prorated for the 18-month maturity. */
  SET @EXPECTED1=100000000.0*0.4*0.02/1.05;
  SET @EXPECTED2=@EXPECTED1+(80000000.0*0.4*0.02/POWER(CONVERT(float,1.05),1.5));
- SET @EXPECTED3=(100000000.0*0.4/1.05)+(80000000.0*0.4/POWER(CONVERT(float,1.05),1.5));
+ /* Matured Stage 3 uses only the designated post-maturity period 1. */
+ SET @EXPECTED3=100000000.0*0.4/1.05;
 
  SELECT @ST1=ECL_12_MONTH FROM ecl_result.ECLAccount WHERE RUN_ID=@R AND ACCOUNT_ID='SYN-CALC-S1';
  SELECT @ST2=ECL_LIFETIME FROM ecl_result.ECLAccount WHERE RUN_ID=@R AND ACCOUNT_ID='SYN-CALC-S2';
@@ -81,7 +82,11 @@ BEGIN TRY
  IF ABS(CONVERT(float,@ST1)-@EXPECTED1)>2 THROW 52503,'Stage 1 weighted 12-month ECL formula mismatch.',1;
  IF ABS(CONVERT(float,@ST2)-@EXPECTED2)>2
    THROW 52504,'Stage 2 lifetime ECL or fractional final discount time mismatch.',1;
- IF ABS(CONVERT(float,@ST3)-@EXPECTED3)>2 THROW 52505,'Stage 3 must use PD=1 and Stage 2 EAD/LGD/EIR discount logic.',1;
+ IF ABS(CONVERT(float,@ST3)-@EXPECTED3)>2 THROW 52505,'Matured Stage 3 must use only FORECAST_PERIOD=1 with PD=1.',1;
+ IF (SELECT COUNT(*) FROM ecl_result.ECLDetail WHERE RUN_ID=@R AND ACCOUNT_ID='SYN-CALC-S3')<>3
+   THROW 52516,'Matured Stage 3 must produce one period per scenario.',1;
+ IF EXISTS(SELECT 1 FROM ecl_result.ECLDetail WHERE RUN_ID=@R AND ACCOUNT_ID='SYN-CALC-S3' AND FORECAST_PERIOD<>1)
+   THROW 52517,'Matured Stage 3 must not produce post-maturity periods beyond period 1.',1;
 
  SELECT @DF=DISCOUNT_FACTOR FROM ecl_result.ECLDetail
  WHERE RUN_ID=@R AND ACCOUNT_ID='SYN-CALC-S2' AND SCENARIO_CODE='BASE' AND FORECAST_PERIOD=2;
@@ -95,7 +100,7 @@ BEGIN TRY
  EXEC @ERR=ecl_core.usp_CalculateECL @R;
  IF @ERR<>51515 THROW 52508,'Calculation retry on completed RUN_ID should return rejection status 51515.',1;
  IF XACT_STATE()<>1 THROW 52509,'Rejected calculation retry must leave the caller transaction committable.',1;
- IF (SELECT COUNT(*) FROM ecl_result.ECLDetail WHERE RUN_ID=@R)<>15
+ IF (SELECT COUNT(*) FROM ecl_result.ECLDetail WHERE RUN_ID=@R)<>12
    THROW 52513,'Rejected calculation retry changed detail output.',1;
 
  EXEC ecl_core.usp_PublishECL @R;
