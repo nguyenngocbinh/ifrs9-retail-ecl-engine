@@ -81,7 +81,11 @@ BEGIN
             FROM ecl_stg.AccountSnapshot a
             CROSS APPLY
             (
-                SELECT CONVERT(int, CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0)) AS HORIZON
+                SELECT CONVERT(int, CASE
+                    WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
+                    WHEN CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0) < 1 THEN 1
+                    ELSE CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0)
+                END) AS HORIZON
             ) h
             WHERE a.RUN_ID = @RUN_ID
               AND a.PROCESS_DATE = @PROCESS_DATE
