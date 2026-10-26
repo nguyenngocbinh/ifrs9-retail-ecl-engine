@@ -1,4 +1,4 @@
-/* 
+/*
 Migration 006: shared EAD curve validation for all retail products.
 
 Product-specific ETL calculates annual EAD and loads it directly into the canonical
@@ -70,11 +70,12 @@ BEGIN
             THROW 51605, 'EAD loader: every EAD row must match an account snapshot with the same process date.', 1;
 
         /*
-          Stage 3 is already in default and does not require a positive remaining
-          contractual horizon. It must still have valid maturity data? No: for Stage 3,
-          maturity <= PROCESS_DATE or horizon < 1 must not block EAD validation.
-          Stage 1/2 continue to require positive horizon and complete annual coverage.
-          The 120-period upper bound still applies to every active account.
+          A horizon below one is valid for every stage when the account has less
+          than one full annual period remaining. Stage 1/2 still require maturity
+          to be after PROCESS_DATE. Stage 3 may also have maturity on/before
+          PROCESS_DATE because it is already in default. For horizon >= 1, every
+          active account must have active VND EAD rows for each annual period.
+          Maximum supported horizon remains 120 periods.
         */
         IF EXISTS
         (
@@ -89,45 +90,15 @@ BEGIN
               AND a.IS_ACTIVE = 1
               AND
               (
-                  -- All stages must stay within the supported maximum.
                   h.HORIZON > 120
                   OR
                   (
-                      -- Stage 1 and Stage 2 require remaining maturity.
                       a.STAGE IN (1, 2)
-                      AND
-                      (
-                          a.MATURITY_DATE <= @PROCESS_DATE
-                          OR h.HORIZON < 1
-                          OR EXISTS
-                          (
-                              SELECT 1
-                              FROM
-                              (
-                                  SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
-                                  FROM sys.all_objects x CROSS JOIN sys.all_objects y
-                              ) n
-                              WHERE n.N <= h.HORIZON
-                                AND NOT EXISTS
-                                (
-                                    SELECT 1
-                                    FROM ecl_stg.EADCurve e
-                                    WHERE e.RUN_ID = a.RUN_ID
-                                      AND e.ACCOUNT_ID = a.ACCOUNT_ID
-                                      AND e.PROCESS_DATE = @PROCESS_DATE
-                                      AND e.FORECAST_PERIOD = n.N
-                                      AND e.IS_ACTIVE = 1
-                                      AND e.CURRENCY_CODE = 'VND'
-                                )
-                          )
-                      )
+                      AND a.MATURITY_DATE <= @PROCESS_DATE
                   )
                   OR
                   (
-                      -- Stage 3 still needs EAD for its actual calculation periods.
-                      -- When horizon is below 1, no annual-period coverage is required.
-                      a.STAGE = 3
-                      AND h.HORIZON >= 1
+                      h.HORIZON >= 1
                       AND EXISTS
                       (
                           SELECT 1
@@ -152,7 +123,7 @@ BEGIN
                   )
               )
         )
-            THROW 51606, 'EAD loader: Stage 1/2 accounts need active VND EAD rows for every annual period through maturity; Stage 3 may have horizon below 1. Maximum supported horizon is 120 periods.', 1;
+            THROW 51606, 'EAD loader: active accounts with horizon >= 1 need active VND EAD rows for every annual period; Stage 1/2 maturity must be after PROCESS_DATE. Maximum supported horizon is 120 periods.', 1;
 
         SELECT @ROW_COUNT = COUNT_BIG(*)
         FROM ecl_stg.EADCurve
@@ -162,7 +133,7 @@ BEGIN
             (RUN_ID, PROCESS_DATE, EVENT_TYPE, EVENT_STATUS, EVENT_MESSAGE, ROW_COUNT, ACTOR)
         VALUES
             (@RUN_ID, @PROCESS_DATE, 'EAD_LOAD', 'SUCCEEDED',
-             N'Validated annual EAD rows loaded directly into canonical EADCurve.', 
+             N'Validated annual EAD rows loaded directly into canonical EADCurve.',
              @ROW_COUNT, SUSER_SNAME());
 
         COMMIT TRANSACTION;
