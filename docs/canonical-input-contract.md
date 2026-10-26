@@ -19,7 +19,7 @@ Input reconciliation currently compares manifest counts with physical staging co
 | EIR | `RUN_ID + FORECAST_PERIOD` | One shared FTP selling-funds rate for 12 months for each forecast period; same rate curve is applied across accounts/pools and all stages. The numeric value is dimensionless and consumed as supplied, without percentage/decimal conversion. |
 | SCENARIO_WEIGHT | `VERSION_ID + SCENARIO_CODE` | Downturn 0.1568, Base 0.6864, Upturn 0.1568 for the selected configuration version; sum is 1. Version and effective-date history are retained. |
 
-All curve rows must be compatible with the run's reporting date and input version. Forecast periods start at 1. Curves must cover the full annual periods needed through each account's contractual maturity.
+All curve rows must be compatible with the run's reporting date and input version. Forecast periods start at 1. For accounts that have not matured, curves must cover the full annual periods needed through contractual maturity. For unpaid accounts whose `PROCESS_DATE >= MATURITY_DATE`, apply the post-maturity convention in Section 8.1.
 
 ## 3. FTP 12-month EIR and discount-time convention
 
@@ -50,7 +50,7 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 
 1. All six manifest families are complete and reconcile to physical staged row counts.
 2. Staging rows match the run's `PROCESS_DATE`; account keys and curve grains are unique.
-3. Active accounts have required curve coverage through maturity.
+3. Active accounts have required curve coverage through contractual maturity, or the post-maturity `FORECAST_PERIOD = 1` convention in Section 8.1 when the account is still unpaid.
 4. PD values are in [0,1]; LGD values are in [0,1]; EAD is non-negative and denominated in VND.
 5. One shared EIR value exists per required full forecast period and its supplied value is greater than -1 under the selected discount formula. Do not transform the value.
 6. The selected scenario-weight version is effective on `PROCESS_DATE`, contains all three scenarios and sums to 1 within the configured tolerance.
@@ -70,8 +70,16 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 - Product-specific ETL calculates one annual EAD value per account and forecast period, then writes it directly into canonical `ecl_stg.EADCurve`. No separate `EADCurveInput` table is used.
 - The common procedure `ecl_core.usp_LoadEADCurve @RUN_ID` validates the rows already loaded into `ecl_stg.EADCurve` and records the successful validation in `ecl_audit.RunEvent`; it does not copy, transform, or calculate EAD.
 - The run's `PROCESS_DATE` must match the run control and account snapshot; currency must be VND; EAD must be non-negative.
-- Every active account must have active EAD rows for all annual forecast periods through maturity, with a maximum supported horizon of 120 periods.
+- For accounts that have not matured, every active account must have active EAD rows for all annual forecast periods through contractual maturity, with a maximum supported horizon of 120 periods.
 - Auto and Non-Revolving source ETL are responsible for source-specific schedule/balance transformations before inserting into the canonical table. The shared procedure does not infer settlement, write-off, waiver, or amortization semantics.
+
+### 8.1. Unpaid accounts at or after contractual maturity
+
+- If an account remains unpaid and `PROCESS_DATE >= MATURITY_DATE`, use `FORECAST_PERIOD = 1` as the post-maturity processing period. Do not derive a zero/negative forecast period from the elapsed contractual maturity date, and do not omit the account from ECL solely because contractual maturity has passed.
+- The period-1 EAD must represent the exposure determined under the applicable source/product rules for that account as of the reporting date. The `FORECAST_PERIOD = 1` rule defines the processing-period convention; it does not itself determine the EAD amount, recovery cash flows, or LGD.
+- Apply the existing stage-specific ECL rules to the account. Maturity date alone does not determine Stage 3; stage classification remains governed by the bank's default/SICR policy. For Stage 3, the existing contract continues to apply PD = 1 and the shared EAD/LGD/EIR calculation conventions.
+- This is a single-period post-maturity convention for v1, not a claim that the contractual loan has another year to maturity. Do not create additional post-maturity forecast periods unless a separate workout/recovery-horizon methodology is approved.
+- The source-specific ETL must supply the required period-1 curve inputs consistently with the canonical input contract. The common EAD loader remains a validator/auditor and must not invent the post-maturity balance or recovery profile.
 - `ecl_core.usp_CalculateECL` continues to consume `ecl_stg.EADCurve` unchanged.
 
 
