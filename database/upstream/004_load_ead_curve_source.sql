@@ -75,6 +75,7 @@ BEGIN
             a.PROCESS_DATE,
             a.ACCOUNT_ID,
             a.MATURITY_DATE,
+            a.STAGE,
             a.VERSION_ID AS SNAPSHOT_VERSION_ID,
             MAX(TRY_CONVERT(decimal(19,4), s.EAD_0)) AS EAD_0
         INTO #SourceAccounts
@@ -93,7 +94,7 @@ BEGIN
                 AND e.ACCOUNT_ID = a.ACCOUNT_ID
           )
         GROUP BY
-            a.RUN_ID, a.PROCESS_DATE, a.ACCOUNT_ID, a.MATURITY_DATE, a.VERSION_ID;
+            a.RUN_ID, a.PROCESS_DATE, a.ACCOUNT_ID, a.MATURITY_DATE, a.STAGE, a.VERSION_ID;
 
         IF NOT EXISTS (SELECT 1 FROM #SourceAccounts)
             THROW 51905, 'EAD source ETL: no unloaded active accounts matched the Non-Revolving source schedule for this run.', 1;
@@ -102,12 +103,11 @@ BEGIN
         (
             SELECT 1
             FROM #SourceAccounts
-            WHERE MATURITY_DATE IS NULL
-               OR MATURITY_DATE <= @PROCESS_DATE
+            WHERE (MATURITY_DATE IS NULL AND STAGE <> 3)
                OR EAD_0 IS NULL
                OR EAD_0 < 0
         )
-            THROW 51906, 'EAD source ETL: matched accounts require a future maturity date and a non-negative EAD_0.', 1;
+            THROW 51906, 'EAD source ETL: maturity date is required except for Stage 3; EAD_0 must be non-negative.', 1;
 
         IF EXISTS
         (
@@ -130,9 +130,15 @@ BEGIN
                 a.PROCESS_DATE,
                 a.ACCOUNT_ID,
                 a.MATURITY_DATE,
+                a.STAGE,
                 a.SNAPSHOT_VERSION_ID,
                 a.EAD_0,
-                CONVERT(int, CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0)) AS HORIZON
+                CONVERT(int, CASE
+                    WHEN a.STAGE = 3 THEN 1
+                    WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
+                    WHEN CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0) < 1 THEN 1
+                    ELSE CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0)
+                END) AS HORIZON
             FROM #SourceAccounts AS a
         ),
         AnnualPeriods AS
@@ -142,6 +148,7 @@ BEGIN
                 h.PROCESS_DATE,
                 h.ACCOUNT_ID,
                 h.MATURITY_DATE,
+                h.STAGE,
                 h.SNAPSHOT_VERSION_ID,
                 h.EAD_0,
                 h.HORIZON,
