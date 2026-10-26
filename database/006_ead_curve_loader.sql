@@ -70,12 +70,10 @@ BEGIN
             THROW 51605, 'EAD loader: every EAD row must match an account snapshot with the same process date.', 1;
 
         /*
-          A horizon below one is valid for every stage when the account has less
-          than one full annual period remaining. Stage 1/2 still require maturity
-          to be after PROCESS_DATE. Stage 3 may also have maturity on/before
-          PROCESS_DATE because it is already in default. For horizon >= 1, every
-          active account must have active VND EAD rows for each annual period.
-          Maximum supported horizon remains 120 periods.
+          Accounts with MATURITY_DATE <= PROCESS_DATE use exactly FORECAST_PERIOD=1
+          as the post-maturity processing period, regardless of Stage. Accounts with
+          future maturity require coverage through their annual horizon. Maximum
+          supported horizon remains 120 periods.
         */
         IF EXISTS
         (
@@ -91,11 +89,6 @@ BEGIN
               AND
               (
                   h.HORIZON > 120
-                  OR
-                  (
-                      a.STAGE IN (1, 2)
-                      AND a.MATURITY_DATE <= @PROCESS_DATE
-                  )
                   OR
                   (
                       h.HORIZON >= 1
@@ -123,7 +116,7 @@ BEGIN
                   )
               )
         )
-            THROW 51606, 'EAD loader: active accounts with horizon >= 1 need active VND EAD rows for every annual period; Stage 1/2 maturity must be after PROCESS_DATE. Maximum supported horizon is 120 periods.', 1;
+            THROW 51606, 'EAD loader: active accounts need active VND EAD rows for every required period; matured accounts use FORECAST_PERIOD=1. Maximum supported horizon is 120 periods.', 1;
 
         SELECT @ROW_COUNT = COUNT_BIG(*)
         FROM ecl_stg.EADCurve
