@@ -71,6 +71,7 @@ BEGIN
             CROSS APPLY
             (
                 SELECT CASE
+                    WHEN a.STAGE = 3 THEN 1
                     WHEN a.MATURITY_DATE <= @PROCESS_DATE THEN 1
                     ELSE CONVERT(int, CEILING(
                         (DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE)
@@ -105,7 +106,7 @@ BEGIN
                   )
               )
         )
-            THROW 51806, 'LGD loader: each active account needs active LGD rows for every annual period through maturity (maximum 120 periods).', 1;
+            THROW 51806, 'LGD loader: each active Stage 1/2 account needs LGD rows through maturity; Stage 3 needs only period 1 (maximum 120 periods).', 1;
 
         SELECT @ROW_COUNT = COUNT_BIG(*)
         FROM ecl_stg.LGDCurve
