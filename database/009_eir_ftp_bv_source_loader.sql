@@ -107,7 +107,7 @@ BEGIN
             WHERE RUN_ID = @RUN_ID
               AND PROCESS_DATE = @PROCESS_DATE
               AND IS_ACTIVE = 1
-        ) h;
+        ) AS h;
 
         IF @HORIZON < 1
             THROW 52504, 'EIR source ETL: no positive forecast horizon could be derived.', 1;
