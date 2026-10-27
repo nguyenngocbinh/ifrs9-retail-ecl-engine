@@ -249,7 +249,7 @@ BEGIN
                         s.SCHEDULE_DUE_DATE DESC,
                         s.SCHEDULE_NO DESC
                 ) AS checkpoint_row
-                WHERE checkpoint.CHECKPOINT_DATE <= p.MATURITY_DATE
+                WHERE cp.CHECKPOINT_DATE <= p.MATURITY_DATE
             ) AS q
         ) AS quarterly_ead;
 
