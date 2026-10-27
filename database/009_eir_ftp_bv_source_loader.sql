@@ -134,15 +134,38 @@ BEGIN
             THROW 52507, @MissingDatabaseMessage, 1;
         END;
 
-        SET @SQL = N'
-IF OBJECT_ID(@QualifiedObject, N''U'') IS NULL AND OBJECT_ID(@QualifiedObject, N''V'') IS NULL
-    THROW 52508, ''EIR source ETL: configured source object does not exist or is not visible.'', 1;
+        DECLARE @MetadataSQL nvarchar(max);
+        DECLARE @SourceMetadata TABLE
+        (
+            OBJECT_ID int NULL,
+            COLUMN_NAME sysname NULL
+        );
 
-IF COL_LENGTH(@QualifiedObject, N''process_date'') IS NULL
-   OR COL_LENGTH(@QualifiedObject, N''ftp_bv'') IS NULL
-   OR COL_LENGTH(@QualifiedObject, N''ccy'') IS NULL
-    THROW 52509, ''EIR source ETL: required columns process_date, ftp_bv, ccy are missing.'', 1;';
-        EXEC sys.sp_executesql @SQL, N'@QualifiedObject nvarchar(776)', @QualifiedObject=@SOURCE_OBJECT;
+        SET @MetadataSQL = N'
+SELECT o.object_id, c.name
+FROM ' + QUOTENAME(@SOURCE_DATABASE) + N'.sys.objects AS o
+INNER JOIN ' + QUOTENAME(@SOURCE_DATABASE) + N'.sys.schemas AS s
+  ON s.schema_id = o.schema_id
+LEFT JOIN ' + QUOTENAME(@SOURCE_DATABASE) + N'.sys.columns AS c
+  ON c.object_id = o.object_id
+WHERE s.name = @SchemaName
+  AND o.name = @TableName
+  AND o.type IN (''U'',''V'');';
+
+        INSERT INTO @SourceMetadata (OBJECT_ID, COLUMN_NAME)
+        EXEC sys.sp_executesql
+            @MetadataSQL,
+            N'@SchemaName sysname, @TableName sysname',
+            @SchemaName = @SOURCE_SCHEMA,
+            @TableName = @SOURCE_TABLE;
+
+        IF NOT EXISTS (SELECT 1 FROM @SourceMetadata WHERE OBJECT_ID IS NOT NULL)
+            THROW 52508, 'EIR source ETL: configured source object does not exist or is not visible.', 1;
+
+        IF NOT EXISTS (SELECT 1 FROM @SourceMetadata WHERE COLUMN_NAME = N'process_date')
+           OR NOT EXISTS (SELECT 1 FROM @SourceMetadata WHERE COLUMN_NAME = N'ftp_bv')
+           OR NOT EXISTS (SELECT 1 FROM @SourceMetadata WHERE COLUMN_NAME = N'ccy')
+            THROW 52509, 'EIR source ETL: required columns process_date, ftp_bv, ccy are missing.', 1;
 
         /* Fail on duplicate date/currency keys and bad source values relevant to the run horizon. */
         SET @SQL = N'
