@@ -116,7 +116,7 @@ BEGIN
                     (@REQUESTED_POOL_NAME IS NULL OR a.POOL_NAME=@REQUESTED_POOL_NAME)
                     AND (@REQUESTED_POOL_ID IS NULL OR a.POOL_ID=@REQUESTED_POOL_ID)));
 
-        IF @MAX_HORIZON > 120 THROW 51519, 'Forecast horizon exceeds the supported 120 annual periods.', 1;
+        IF @MAX_HORIZON > 30 THROW 51519, 'Forecast horizon exceeds the supported 30 annual periods.', 1;
 
         IF EXISTS (
             SELECT 1
@@ -125,7 +125,7 @@ BEGIN
                                      WHEN a.MATURITY_DATE<=@PROCESS_DATE THEN 1
                                      WHEN CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0)<1 THEN 1
                                      ELSE CEILING(DATEDIFF(month,@PROCESS_DATE,a.MATURITY_DATE)/12.0) END AS HORIZON) h
-            JOIN (SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+            JOIN (SELECT TOP (30) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
                   FROM sys.all_objects x CROSS JOIN sys.all_objects y) n ON n.N<=h.HORIZON
             WHERE a.RUN_ID=@RUN_ID AND a.PROCESS_DATE=@PROCESS_DATE AND a.IS_ACTIVE=1
               AND (@RUN_TYPE='FULL' OR
@@ -189,7 +189,7 @@ BEGIN
                        ELSE CONVERT(decimal(19,8),n.N)
                    END AS DISCOUNT_T
             FROM InScope a
-            JOIN (SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+            JOIN (SELECT TOP (30) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
                   FROM sys.all_objects x CROSS JOIN sys.all_objects y) n ON n.N<=a.HORIZON
             WHERE a.STAGE IN (2,3) OR n.N=1
         ),
