@@ -7,6 +7,7 @@ SET XACT_ABORT ON;
 
 DECLARE @RUN_ID bigint;
 DECLARE @PROCESS_DATE date = '20260930';
+DECLARE @SOURCE_DATABASE sysname = DB_NAME();
 DECLARE @WEIGHT_VERSION int = 2147482995;
 DECLARE @SOURCE_ROWS int;
 DECLARE @RATE decimal(19,12);
@@ -62,7 +63,7 @@ BEGIN TRY
          'POOL-EIR', '20280930', 1, 1, 0);
 
     EXEC ecl_core.usp_StageSourceEIRCurve
-        @RUN_ID = @RUN_ID, @SOURCE_DATABASE = DB_NAME(),
+        @RUN_ID = @RUN_ID, @SOURCE_DATABASE = @SOURCE_DATABASE,
         @SOURCE_SCHEMA = N'eir_source_test', @SOURCE_TABLE = N'rb_ftp_bv_12m';
 
     EXEC ecl_core.usp_LoadEIRCurve @RUN_ID = @RUN_ID;
