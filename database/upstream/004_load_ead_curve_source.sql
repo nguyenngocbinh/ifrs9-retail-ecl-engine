@@ -123,6 +123,16 @@ BEGIN
         )
             THROW 51907, 'EAD source ETL: EAD_AFTER_REPAYMENT cannot be negative.', 1;
 
+        IF EXISTS
+        (
+            SELECT 1
+            FROM #SourceAccounts AS a
+            WHERE a.STAGE <> 3
+              AND a.MATURITY_DATE > @PROCESS_DATE
+              AND CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0) > 30
+        )
+            THROW 51910, 'EAD source ETL: maturity horizon exceeds the maximum supported 30 annual periods.', 1;
+
         DROP TABLE IF EXISTS #MappedRows;
 
         ;WITH AccountHorizon AS
