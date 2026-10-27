@@ -90,7 +90,7 @@ BEGIN TRY
     ROLLBACK TRANSACTION;
 
     IF OBJECT_ID(@FIXTURE_QUALIFIED, N'U') IS NOT NULL
-        EXEC(N'DROP TABLE eir_source_test.' + QUOTENAME(@FIXTURE_TABLE) + N';');
+        EXEC sys.sp_executesql N'DROP TABLE eir_source_test.' + QUOTENAME(@FIXTURE_TABLE) + N';';
 
     PRINT 'PASS: EIR annual horizon, FTP_12M basis, source-rate preservation, and load audit.';
 END TRY
