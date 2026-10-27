@@ -149,7 +149,7 @@ BEGIN
         BEGIN
             DECLARE @MissingSourceMessage nvarchar(2048) =
                 CONCAT(N'EIR source ETL: source object ', @SOURCE_OBJECT,
-                       N' was not found on this SQL Server instance or is not visible to the caller.');
+                       N' is missing one or more required columns: process_date, ftp_bv, ccy.');
             THROW 52508, @MissingSourceMessage, 1;
         END;
 
