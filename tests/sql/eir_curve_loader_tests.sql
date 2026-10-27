@@ -101,10 +101,10 @@ BEGIN CATCH
     IF DB_ID(N'CORE_EIR_TEST') IS NOT NULL
     BEGIN
         BEGIN TRY
-            EXEC(N'USE master; ALTER DATABASE [CORE_EIR_TEST] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [CORE_EIR_TEST];'
+            EXEC(N'USE master; ALTER DATABASE [CORE_EIR_TEST] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [CORE_EIR_TEST];');
         END TRY
         BEGIN CATCH
-            PRINT 'WARNING: test cleanup could not drop the synthetic CORE database.';
+            PRINT 'WARNING: test cleanup could not drop the synthetic CORE_EIR_TEST database.';
         END CATCH
     END;
     THROW;
