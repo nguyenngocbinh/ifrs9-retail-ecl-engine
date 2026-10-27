@@ -1,7 +1,7 @@
 /*
 SQL Server 2022 regression tests for the FTP 12-month EIR source loader and validator.
-Prerequisites: migrations 001-009 deployed. Tests use a disposable synthetic source
-table named CORE.dbo.rb_ftp_bv_12m and roll back all test data.
+Prerequisites: migrations 001-009 deployed. The test creates and removes a disposable
+CORE_EIR_TEST source database; do not run on a server where that database already exists.
 */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
@@ -33,7 +33,7 @@ BEGIN TRY
         THROW 52700, 'EIR source-loader test requires CORE_EIR_TEST not to exist; remove stale synthetic test database before rerunning.', 1;
 
     EXEC(N'CREATE DATABASE [CORE_EIR_TEST];');
-    EXEC(N'USE [CORE_EIR_TEST]; CREATE TABLE dbo.rb_ftp_bv_12m
+    EXEC(N'CREATE TABLE CORE_EIR_TEST.dbo.rb_ftp_bv_12m
     (
         process_date date NOT NULL,
         ftp_bv decimal(19,10) NULL,
