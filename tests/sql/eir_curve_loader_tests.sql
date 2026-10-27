@@ -28,7 +28,7 @@ BEGIN TRY
         (@WEIGHT_VERSION, 'BASE',     0.68640000, 1),
         (@WEIGHT_VERSION, 'UPTURN',   0.15680000, 1);
 
-    /* Use a test-only source database name so the test never mutates a real CORE database. */
+    /* Test with a same-instance disposable source database; never touch the actual CORE database. */
     IF DB_ID(N'CORE_EIR_TEST') IS NOT NULL
         THROW 52700, 'EIR source-loader test requires CORE_EIR_TEST not to exist; remove stale synthetic test database before rerunning.', 1;
 
