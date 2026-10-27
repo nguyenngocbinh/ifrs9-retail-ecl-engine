@@ -28,21 +28,22 @@ BEGIN TRY
         (@WEIGHT_VERSION, 'BASE',     0.68640000, 1),
         (@WEIGHT_VERSION, 'UPTURN',   0.15680000, 1);
 
-    /* Create a synthetic source table in the existing CI database, in a dedicated schema. */
+    /* Use a unique fixture table name so the regression can run repeatedly or concurrently. */
+    DECLARE @FIXTURE_TABLE sysname = CONCAT(N'rb_ftp_bv_12m_', @@SPID, N'_', RIGHT(CONVERT(varchar(36), NEWID()), 8));
+    DECLARE @FIXTURE_QUALIFIED nvarchar(300) = QUOTENAME(N'eir_source_test') + N'.' + QUOTENAME(@FIXTURE_TABLE);
     IF SCHEMA_ID(N'eir_source_test') IS NULL EXEC(N'CREATE SCHEMA eir_source_test AUTHORIZATION dbo;');
-    IF OBJECT_ID(N'eir_source_test.rb_ftp_bv_12m', N'U') IS NOT NULL
-        DROP TABLE eir_source_test.rb_ftp_bv_12m;
-    CREATE TABLE eir_source_test.rb_ftp_bv_12m
+    DECLARE @FixtureSql nvarchar(max) = N'CREATE TABLE eir_source_test.' + QUOTENAME(@FIXTURE_TABLE) + N'
     (
         process_date date NOT NULL,
         ftp_bv decimal(19,10) NULL,
         ccy char(3) NOT NULL
     );
-    INSERT INTO eir_source_test.rb_ftp_bv_12m(process_date,ftp_bv,ccy)
-    VALUES ('2026-09-30',9.2000000000,'VND'),
-           ('2026-08-31',9.2000000000,'VND'),
-           ('2026-05-31',8.8000000000,'VND'),
-           ('2026-09-30',4.0000000000,'USD');
+    INSERT INTO eir_source_test.' + QUOTENAME(@FIXTURE_TABLE) + N'(process_date,ftp_bv,ccy)
+    VALUES (''2026-09-30'',9.2000000000,''VND''),
+           (''2026-08-31'',9.2000000000,''VND''),
+           (''2026-05-31'',8.8000000000,''VND''),
+           (''2026-09-30'',4.0000000000,''USD'');';
+    EXEC sys.sp_executesql @FixtureSql;
 
     EXEC ecl_core.usp_CreateRun
         @PROCESS_DATE = @PROCESS_DATE,
@@ -64,7 +65,7 @@ BEGIN TRY
 
     EXEC ecl_core.usp_StageSourceEIRCurve
         @RUN_ID = @RUN_ID, @SOURCE_DATABASE = @SOURCE_DATABASE,
-        @SOURCE_SCHEMA = N'eir_source_test', @SOURCE_TABLE = N'rb_ftp_bv_12m';
+        @SOURCE_SCHEMA = N'eir_source_test', @SOURCE_TABLE = @FIXTURE_TABLE;
 
     EXEC ecl_core.usp_LoadEIRCurve @RUN_ID = @RUN_ID;
 
@@ -88,13 +89,13 @@ BEGIN TRY
 
     ROLLBACK TRANSACTION;
 
-    DROP TABLE IF EXISTS eir_source_test.rb_ftp_bv_12m;
+    EXEC(N'DROP TABLE IF EXISTS eir_source_test.' + QUOTENAME(@FIXTURE_TABLE) + N';');
 
     PRINT 'PASS: EIR annual horizon, FTP_12M basis, source-rate preservation, and load audit.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    IF OBJECT_ID(N'eir_source_test.rb_ftp_bv_12m', N'U') IS NOT NULL
-        DROP TABLE eir_source_test.rb_ftp_bv_12m;
+    IF OBJECT_ID(@FIXTURE_QUALIFIED, N'U') IS NOT NULL
+        EXEC(N'DROP TABLE eir_source_test.' + QUOTENAME(@FIXTURE_TABLE) + N';');
     THROW;
 END CATCH;
