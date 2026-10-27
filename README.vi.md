@@ -101,6 +101,7 @@ Mỗi lần chạy lại phải sử dụng **RUN_ID mới**; không ghi đè đ
 | `ecl_core.usp_LoadPDCurve` | Kiểm tra PD curve năm đã nạp đủ theo scenario và maturity. |
 | `ecl_core.usp_LoadLGDCurve` | Kiểm tra LGD curve năm đã nạp đủ theo maturity. |
 | `ecl_core.usp_LoadEADCurve` | Kiểm tra EAD curve năm đã nạp đủ, đúng VND và khớp tài khoản. |
+| `ecl_core.usp_StageSourceEIRCurve` / `usp_LoadEIRCurve` | ETL `CORE.dbo.rb_ftp_bv_12m` thành EIR curve dùng chung và kiểm tra coverage theo horizon. |
 | `ecl_core.usp_ValidateRunInputs` / `usp_ReconcileInputSnapshots` | Kiểm tra chất lượng và đối soát manifest với dữ liệu thực tế. |
 | `ecl_core.usp_CalculateECL` | Tính ECL theo tài khoản/kịch bản/kỳ và ghi kết quả. |
 | `ecl_core.usp_PublishECL` | Publish run thành công và làm tròn số tiền theo VND. |
