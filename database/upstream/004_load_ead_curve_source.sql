@@ -228,14 +228,15 @@ BEGIN
             (
                 SELECT
                     COALESCE(
-                        TRY_CONVERT(decimal(19,4), checkpoint_row.EAD_AFTER_REPAYMENT),
+                        TRY_CONVERT(decimal(19,4), quarter_row.EAD_AFTER_REPAYMENT),
                         p.EAD_0
                     ) AS EAD_AT_CHECKPOINT
-                FROM (VALUES (3), (6), (9)) AS month_values(MONTH_OFFSET)
-                CROSS APPLY
+                FROM
                 (
-                    SELECT DATEADD(month, month_values.MONTH_OFFSET, p.PROCESS_DATE) AS CHECKPOINT_DATE
-                ) AS cp
+                    SELECT 3 AS MONTH_OFFSET
+                    UNION ALL SELECT 6
+                    UNION ALL SELECT 9
+                ) AS mo
                 OUTER APPLY
                 (
                     SELECT TOP (1)
@@ -243,13 +244,18 @@ BEGIN
                     FROM STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE AS s
                     WHERE s.PROCESS_DATE = p.PROCESS_DATE
                       AND s.ACCOUNT_NUMBER = p.ACCOUNT_ID
-                      AND s.SCHEDULE_DUE_DATE < DATEADD(day, 1, cp.CHECKPOINT_DATE)
+                      AND s.SCHEDULE_DUE_DATE < DATEADD
+                          (
+                              day,
+                              1,
+                              DATEADD(month, mo.MONTH_OFFSET, p.PROCESS_DATE)
+                          )
                       AND TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT) IS NOT NULL
                     ORDER BY
                         s.SCHEDULE_DUE_DATE DESC,
                         s.SCHEDULE_NO DESC
-                ) AS checkpoint_row
-                WHERE cp.CHECKPOINT_DATE <= p.MATURITY_DATE
+                ) AS quarter_row
+                WHERE DATEADD(month, mo.MONTH_OFFSET, p.PROCESS_DATE) <= p.MATURITY_DATE
             ) AS q
         ) AS quarterly_ead;
 
