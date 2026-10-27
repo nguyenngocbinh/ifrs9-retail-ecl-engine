@@ -185,6 +185,16 @@ IF EXISTS
     SELECT 1
     FROM ' + @SOURCE_OBJECT + N' AS s
     WHERE s.ccy = @Currency
+      AND s.process_date IS NULL
+      AND s.ftp_bv IS NOT NULL
+)
+    THROW 52517, ''EIR source ETL: source process_date cannot be NULL for VND observations.'', 1;
+
+IF EXISTS
+(
+    SELECT 1
+    FROM ' + @SOURCE_OBJECT + N' AS s
+    WHERE s.ccy = @Currency
       AND s.process_date <= DATEADD(month, @Horizon * 12, @ProcessDate)
       AND (s.ftp_bv IS NULL OR TRY_CONVERT(decimal(19,12), s.ftp_bv) IS NULL
            OR TRY_CONVERT(decimal(19,12), s.ftp_bv) <= -1)
