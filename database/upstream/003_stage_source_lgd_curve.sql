@@ -11,7 +11,7 @@ Purpose:
 Optimization notes:
 - Materialize one LGD observation per active account before annual expansion.
 - Validate source cardinality and maturity horizons before expansion.
-- Generate forecast periods from a bounded 1..120 numbers set.
+- Generate forecast periods from a bounded 1..30 numbers set.
 - Index #MappedLGD on the canonical key before validation/insertion.
 - Preserve the canonical grain, annual horizon semantics, transactional replace,
   audit event, and existing source validation errors.
