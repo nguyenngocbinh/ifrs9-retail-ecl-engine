@@ -12,7 +12,6 @@ BEGIN
     PRINT 'SKIP: EIR source integration test requires [CORE].[dbo].[rb_ftp_bv_12m] on this SQL Server instance.';
     RETURN;
 END;
-GO
 
 DECLARE @RUN_ID bigint;
 DECLARE @PROCESS_DATE date = '20260930';
@@ -30,7 +29,6 @@ ORDER BY process_date DESC;
 
 IF @EXPECTED_RATE IS NULL OR @EXPECTED_RATE <= -1
     THROW 52700, 'EIR source integration test requires a valid VND FTP rate on or before 2026-09-30.', 1;
-GO
 
 BEGIN TRY
     BEGIN TRANSACTION;
