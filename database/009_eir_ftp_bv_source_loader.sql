@@ -167,6 +167,20 @@ WHERE s.name = @SchemaName
            OR NOT EXISTS (SELECT 1 FROM @SourceMetadata WHERE COLUMN_NAME = N'ccy')
             THROW 52509, 'EIR source ETL: required columns process_date, ftp_bv, ccy are missing.', 1;
 
+        CREATE TABLE #MappedEIR
+        (
+            RUN_ID bigint NOT NULL,
+            PROCESS_DATE date NOT NULL,
+            FORECAST_PERIOD smallint NOT NULL,
+            EIR decimal(19,12) NULL,
+            RATE_BASIS varchar(20) NOT NULL,
+            VERSION_ID int NOT NULL,
+            IS_ACTIVE bit NOT NULL,
+            SOURCE_PROCESS_DATE date NULL,
+            CURRENCY_CODE char(3) NULL,
+            TARGET_DATE date NOT NULL
+        );
+
         /* Fail on duplicate date/currency keys and bad source values relevant to the run horizon. */
         SET @SQL = N'
 IF EXISTS
@@ -235,6 +249,11 @@ TargetPeriods AS
     FROM Numbers
     WHERE n <= @Horizon
 )
+INSERT INTO #MappedEIR
+(
+    RUN_ID, PROCESS_DATE, FORECAST_PERIOD, EIR, RATE_BASIS,
+    VERSION_ID, IS_ACTIVE, SOURCE_PROCESS_DATE, CURRENCY_CODE, TARGET_DATE
+)
 SELECT
     @RunId AS RUN_ID,
     @ProcessDate AS PROCESS_DATE,
@@ -246,7 +265,6 @@ SELECT
     CONVERT(date,s.process_date) AS SOURCE_PROCESS_DATE,
     CONVERT(char(3),s.ccy) AS CURRENCY_CODE,
     DATEADD(month, CONVERT(int,t.FORECAST_PERIOD) * 12, @ProcessDate) AS TARGET_DATE
-INTO #MappedEIR
 FROM TargetPeriods t
 OUTER APPLY
 (
@@ -277,15 +295,6 @@ IF EXISTS
 )
     THROW 52516, ''EIR source ETL: invalid forecast target date.'', 1;
 
-DELETE FROM ecl_stg.EIRCurve
-WHERE RUN_ID = @RunId;
-
-INSERT INTO ecl_stg.EIRCurve
-(
-    RUN_ID, PROCESS_DATE, FORECAST_PERIOD, EIR, RATE_BASIS, VERSION_ID, IS_ACTIVE
-)
-SELECT RUN_ID, PROCESS_DATE, FORECAST_PERIOD, EIR, RATE_BASIS, VERSION_ID, IS_ACTIVE
-FROM #MappedEIR;
 ';
 
         EXEC sys.sp_executesql
@@ -295,6 +304,17 @@ FROM #MappedEIR;
             @ProcessDate = @PROCESS_DATE,
             @Horizon = @HORIZON,
             @Currency = @CURRENCY_CODE;
+
+        DELETE FROM ecl_stg.EIRCurve
+        WHERE RUN_ID = @RUN_ID;
+
+        INSERT INTO ecl_stg.EIRCurve
+        (
+            RUN_ID, PROCESS_DATE, FORECAST_PERIOD, EIR, RATE_BASIS, VERSION_ID, IS_ACTIVE
+        )
+        SELECT
+            RUN_ID, PROCESS_DATE, FORECAST_PERIOD, EIR, RATE_BASIS, VERSION_ID, IS_ACTIVE
+        FROM #MappedEIR;
 
         SELECT @ROW_COUNT = COUNT_BIG(*)
         FROM ecl_stg.EIRCurve
