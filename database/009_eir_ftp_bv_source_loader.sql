@@ -244,7 +244,8 @@ SELECT
     CONVERT(int,1) AS VERSION_ID,
     CONVERT(bit,1) AS IS_ACTIVE,
     CONVERT(date,s.process_date) AS SOURCE_PROCESS_DATE,
-    CONVERT(char(3),s.ccy) AS CURRENCY_CODE
+    CONVERT(char(3),s.ccy) AS CURRENCY_CODE,
+    DATEADD(month, CONVERT(int,t.FORECAST_PERIOD) * 12, @ProcessDate) AS TARGET_DATE
 INTO #MappedEIR
 FROM TargetPeriods t
 OUTER APPLY
