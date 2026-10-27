@@ -46,6 +46,7 @@ Each implementation PR has its own log at `docs/implementation-log/PR-NNN.md`.
 - [x] Stage 3 follows Stage 2 logic with only PD=1 changed; same annual EAD/LGD curves and shared EIR discount convention.
 - [x] Stage 1/2/3 use shared EIR and `DF(t)=1/(1+EIR(t))^t`.
 - [x] EIR is the supplied FTP 12-month value, consumed as-is without percentage/decimal conversion.
+- [x] PR branch adds `database/009_eir_ftp_bv_source_loader.sql` with source ETL from `CORE.dbo.rb_ftp_bv_12m`, shared EIR validation, and SQL Server 2022 regression test; source rate semantics still require data-owner confirmation before operational use.
 - [x] Partial final-year fraction changes only discount-time exponent; annual PD and EAD are not prorated.
 - [x] VND output; final published ECL rounded to whole VND.
 - [x] No mandatory approval metadata for scenario weights.
@@ -101,3 +102,14 @@ Do not infer production deployment success from CI. Do not merge future PRs with
 - [x] Reuse upstream `POOL_NAME` and validate it against the canonical `ecl_cfg.PoolName` list; no separate product mapping layer is needed.
 - [ ] Confirm the canonical pool-name list against approved source mapping; test both loaders against verified source DDL and synthetic/disposable SQL Server data.
 - [ ] Add SQL regression tests for successful load, missing mapping, invalid maturity, duplicate source contract, and guarded reload.
+
+
+## EIR FTP 12-month source loader
+
+- [x] Add source ETL from `CORE.dbo.rb_ftp_bv_12m` to the canonical shared `ecl_stg.EIRCurve`.
+- [x] Add `FTP_12M` to the allowed canonical `RATE_BASIS` values.
+- [x] Add shared `ecl_core.usp_LoadEIRCurve` coverage/value validator and audit event.
+- [x] Add synthetic regression test and include it in SQL Server 2022 CI.
+- [x] Document source mapping and invocation in Vietnamese runbook/canonical contract/README.
+- [ ] Confirm with the source data owner whether `ftp_bv=9.2` is intentionally used as numeric value 9.2 in `DF(t)=1/(1+EIR)^t`; the loader intentionally performs no percentage/decimal conversion because current contract forbids implicit transformation.
+- [ ] Execute the new end-to-end SQL Server 2022 regression test and review CI results before merging.
