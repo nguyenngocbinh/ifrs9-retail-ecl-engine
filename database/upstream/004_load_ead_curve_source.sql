@@ -166,16 +166,36 @@ BEGIN
             ) AS n
             WHERE n.N <= h.HORIZON
         )
+        /*
+          EAD convention:
+          - Stage 2 with at least one year remaining: point-in-time balance at
+            each annual checkpoint (reporting date + FORECAST_PERIOD years).
+          - Stage 2 with less than one year remaining: arithmetic mean of the
+            available 3-, 6-, and 9-month checkpoint balances that fall on or
+            before maturity. If no quarterly checkpoint occurs before maturity,
+            fall back to EAD_0.
+          - All other stages keep the annual point-in-time convention.
+          - At a checkpoint, use the latest EAD_AFTER_REPAYMENT whose schedule
+            due date is on or before the checkpoint; same-day repayment is
+            therefore reflected in the checkpoint balance.
+          - EAD is not discounted here; the ECL calculation applies EIR discounting.
+        */
         SELECT
             p.RUN_ID,
             p.PROCESS_DATE,
             p.ACCOUNT_ID,
             p.FORECAST_PERIOD,
             CONVERT(decimal(19,4),
-                COALESCE(
-                    TRY_CONVERT(decimal(19,4), schedule_row.EAD_AFTER_REPAYMENT),
-                    p.EAD_0
-                )
+                CASE
+                    WHEN p.STAGE = 2
+                     AND p.MATURITY_DATE > p.PROCESS_DATE
+                     AND p.MATURITY_DATE < DATEADD(year, 1, p.PROCESS_DATE)
+                    THEN COALESCE(quarterly_ead.EAD_AVG, p.EAD_0)
+                    ELSE COALESCE(
+                        TRY_CONVERT(decimal(19,4), annual_ead.EAD_AFTER_REPAYMENT),
+                        p.EAD_0
+                    )
+                END
             ) AS EAD,
             CONVERT(varchar(3), 'VND') AS CURRENCY_CODE,
             @VERSION_ID AS VERSION_ID,
@@ -194,7 +214,39 @@ BEGIN
             ORDER BY
                 s.SCHEDULE_DUE_DATE DESC,
                 s.SCHEDULE_NO DESC
-        ) AS schedule_row;
+        ) AS annual_ead
+        OUTER APPLY
+        (
+            SELECT
+                CONVERT(decimal(19,4), AVG(CONVERT(decimal(19,4), q.EAD_AT_CHECKPOINT))) AS EAD_AVG
+            FROM
+            (
+                SELECT
+                    COALESCE(
+                        TRY_CONVERT(decimal(19,4), checkpoint_row.EAD_AFTER_REPAYMENT),
+                        p.EAD_0
+                    ) AS EAD_AT_CHECKPOINT
+                FROM (VALUES (3), (6), (9)) AS offsets(MONTH_OFFSET)
+                CROSS APPLY
+                (
+                    SELECT DATEADD(month, offsets.MONTH_OFFSET, p.PROCESS_DATE) AS CHECKPOINT_DATE
+                ) AS checkpoint
+                OUTER APPLY
+                (
+                    SELECT TOP (1)
+                        s.EAD_AFTER_REPAYMENT
+                    FROM STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE AS s
+                    WHERE s.PROCESS_DATE = p.PROCESS_DATE
+                      AND s.ACCOUNT_NUMBER = p.ACCOUNT_ID
+                      AND s.SCHEDULE_DUE_DATE < DATEADD(day, 1, checkpoint.CHECKPOINT_DATE)
+                      AND TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT) IS NOT NULL
+                    ORDER BY
+                        s.SCHEDULE_DUE_DATE DESC,
+                        s.SCHEDULE_NO DESC
+                ) AS checkpoint_row
+                WHERE checkpoint.CHECKPOINT_DATE <= p.MATURITY_DATE
+            ) AS q
+        ) AS quarterly_ead;
 
         IF EXISTS
         (
