@@ -14,7 +14,7 @@
 | Pool assignment | Existing upstream process | Source contract unconfirmed |
 | Annual PD, scenario-specific | Existing upstream process | Unconditional marginal PD on original cohort |
 | LGD | Existing upstream process | Flat across scenarios by current assumption |
-| EAD | Existing upstream process | Annual, year-end convention, EAD at default; exact semantics to verify |
+| EAD | Existing upstream process | Stage 2: annual point-in-time balance at each 1-year checkpoint when remaining maturity is at least 1 year; if remaining maturity is under 1 year, average available 3-, 6-, and 9-month checkpoint balances. EAD remains undiscounted upstream. |
 | Scenario weights | Existing approved table | Need physical table/version |
 | EIR | Existing source | One common rate curve across pools; one EIR value per forecast period |
 | Standard error | Not used in calculation | Optional audit/control only |
@@ -44,6 +44,12 @@ The engine must validate that selected active weights are present, non-negative,
 Scenario PDs are already calculated upstream for Downturn, Base, and Upturn. The engine combines scenario results using the approved scenario weights. It must not recalculate PD from `PD FWL ± 1 SE`.
 
 LGD and EAD are assumed equal across the three scenarios for this first specification. This does not mean that EAD/LGD input records should be copied blindly: their curve grains, period alignment, and meanings must be validated.
+
+## 3.1 EAD checkpoint convention (implementation proposal)
+
+For Stage 2, annual forecast periods use the latest source balance effective at the annual checkpoint (reporting date plus the forecast period in years). The annual checkpoint is capped at maturity for a final partial period. If the account's remaining maturity at the reporting date is strictly less than one year, use the arithmetic mean of the available 3-, 6-, and 9-month checkpoint balances that fall on or before maturity; if none is available, fall back to EAD_0. Checkpoints are calculated from the reporting date with calendar-month arithmetic; SQL Server's DATEADD(month, ...) behavior therefore uses month-end when the target day does not exist. The latest EAD_AFTER_REPAYMENT on or before the checkpoint is used, including repayments due on the checkpoint date.
+
+EAD is not discounted in the upstream loader. Discounting remains in the ECL calculation step to avoid double discounting. This convention is a proposed implementation and still requires methodology-owner approval.
 
 ## 4. ECL calculation contract
 
