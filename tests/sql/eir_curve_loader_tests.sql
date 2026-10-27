@@ -28,18 +28,19 @@ BEGIN TRY
         (@WEIGHT_VERSION, 'BASE',     0.68640000, 1),
         (@WEIGHT_VERSION, 'UPTURN',   0.15680000, 1);
 
-    IF OBJECT_ID(N'CORE.dbo.rb_ftp_bv_12m', N'U') IS NOT NULL
-        THROW 52700, 'EIR source-loader test requires a disposable CORE database and no pre-existing rb_ftp_bv_12m table.', 1;
+    /* Use a test-only source database name so the test never mutates a real CORE database. */
+    IF DB_ID(N'CORE_EIR_TEST') IS NOT NULL
+        THROW 52700, 'EIR source-loader test requires CORE_EIR_TEST not to exist; remove stale synthetic test database before rerunning.', 1;
 
-    EXEC(N'CREATE DATABASE [CORE];');
-    EXEC(N'USE [CORE]; CREATE TABLE dbo.rb_ftp_bv_12m
+    EXEC(N'CREATE DATABASE [CORE_EIR_TEST];');
+    EXEC(N'USE [CORE_EIR_TEST]; CREATE TABLE dbo.rb_ftp_bv_12m
     (
         process_date date NOT NULL,
         ftp_bv decimal(19,10) NULL,
         ccy char(3) NOT NULL
     );');
 
-    EXEC(N'INSERT INTO CORE.dbo.rb_ftp_bv_12m(process_date,ftp_bv,ccy)
+    EXEC(N'INSERT INTO CORE_EIR_TEST.dbo.rb_ftp_bv_12m(process_date,ftp_bv,ccy)
            VALUES (''2026-09-30'',9.2000000000,''VND''),
                   (''2026-08-31'',9.2000000000,''VND''),
                   (''2026-05-31'',8.8000000000,''VND''),
@@ -64,7 +65,7 @@ BEGIN TRY
          'POOL-EIR', '20280930', 1, 1, 0);
 
     EXEC ecl_core.usp_StageSourceEIRCurve
-        @RUN_ID = @RUN_ID, @SOURCE_DATABASE = N'CORE',
+        @RUN_ID = @RUN_ID, @SOURCE_DATABASE = N'CORE_EIR_TEST',
         @SOURCE_SCHEMA = N'dbo', @SOURCE_TABLE = N'rb_ftp_bv_12m';
 
     EXEC ecl_core.usp_LoadEIRCurve @RUN_ID = @RUN_ID;
@@ -89,21 +90,18 @@ BEGIN TRY
 
     ROLLBACK TRANSACTION;
 
-    /* The temporary source database may not be part of the caller transaction on all platforms;
-       remove it if it was created by this test. */
-    IF DB_ID(N'CORE') IS NOT NULL
-    BEGIN
-        EXEC(N'USE master; ALTER DATABASE [CORE] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [CORE];');
-    END;
+    /* Remove only the synthetic source database created by this test. */
+    IF DB_ID(N'CORE_EIR_TEST') IS NOT NULL
+        EXEC(N'USE master; ALTER DATABASE [CORE_EIR_TEST] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [CORE_EIR_TEST];');
 
     PRINT 'PASS: EIR annual horizon, FTP_12M basis, source-rate preservation, and load audit.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    IF DB_ID(N'CORE') IS NOT NULL
+    IF DB_ID(N'CORE_EIR_TEST') IS NOT NULL
     BEGIN
         BEGIN TRY
-            EXEC(N'USE master; ALTER DATABASE [CORE] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [CORE];');
+            EXEC(N'USE master; ALTER DATABASE [CORE_EIR_TEST] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [CORE_EIR_TEST];'
         END TRY
         BEGIN CATCH
             PRINT 'WARNING: test cleanup could not drop the synthetic CORE database.';
