@@ -291,10 +291,23 @@ BEGIN
     ),
     Numbers AS
     (
-        SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+        SELECT TOP (30) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
         FROM sys.all_objects a CROSS JOIN sys.all_objects b
     )
     SELECT @MAX_HORIZON = ISNULL(MAX(HORIZON), 0) FROM AccountHorizon;
+
+    IF @MAX_HORIZON > 30
+    BEGIN
+        INSERT INTO ecl_audit.ValidationError
+            (RUN_ID, PROCESS_DATE, VALIDATION_CODE, SEVERITY, ERROR_MESSAGE)
+        SELECT @RUN_ID, @PROCESS_DATE, 'MATURITY_HORIZON_EXCEEDED', 'ERROR',
+               N'Account maturity horizon exceeds the supported maximum of 30 annual periods.'
+        WHERE NOT EXISTS
+        (
+            SELECT 1 FROM ecl_audit.ValidationError
+            WHERE RUN_ID = @RUN_ID AND VALIDATION_CODE = 'MATURITY_HORIZON_EXCEEDED'
+        );
+    END;
 
     IF @MAX_HORIZON > 0
     BEGIN
@@ -316,7 +329,7 @@ BEGIN
         ),
         Numbers AS
         (
-            SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+            SELECT TOP (30) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
             FROM sys.all_objects a CROSS JOIN sys.all_objects b
         ),
         ExpectedPeriod AS
@@ -368,7 +381,7 @@ BEGIN
         ),
         Numbers AS
         (
-            SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+            SELECT TOP (30) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
             FROM sys.all_objects a CROSS JOIN sys.all_objects b
         ),
         ExpectedPeriod AS
@@ -403,7 +416,7 @@ BEGIN
             SELECT 1
             FROM
             (
-                SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+                SELECT TOP (30) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
                 FROM sys.all_objects a CROSS JOIN sys.all_objects b
             ) n
             WHERE n.N <= @MAX_HORIZON
@@ -418,7 +431,7 @@ BEGIN
                    N'Missing or inactive shared EIR curve for required forecast period.'
             FROM
             (
-                SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+                SELECT TOP (30) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
                 FROM sys.all_objects a CROSS JOIN sys.all_objects b
             ) n
             WHERE n.N <= @MAX_HORIZON
