@@ -126,7 +126,7 @@ BEGIN
                            + QUOTENAME(@SOURCE_SCHEMA) + N'.'
                            + QUOTENAME(@SOURCE_TABLE);
 
-        /* Check schema contract before reading the source table. */
+        /* Check the database exists and the configured source has the required columns. */
         IF DB_ID(@SOURCE_DATABASE) IS NULL
         BEGIN
             DECLARE @MissingDatabaseMessage nvarchar(2048) =
@@ -134,24 +134,15 @@ BEGIN
             THROW 52507, @MissingDatabaseMessage, 1;
         END;
 
-        DECLARE @SourceColumns TABLE (COLUMN_NAME sysname NOT NULL);
-        SET @SQL = N'SELECT c.name FROM ' + QUOTENAME(@SOURCE_DATABASE) + N'.sys.columns c '
-                 + N'INNER JOIN ' + QUOTENAME(@SOURCE_DATABASE) + N'.sys.objects o ON o.object_id=c.object_id '
-                 + N'INNER JOIN ' + QUOTENAME(@SOURCE_DATABASE) + N'.sys.schemas s ON s.schema_id=o.schema_id '
-                 + N'WHERE s.name=@SchemaName AND o.name=@TableName AND o.type IN (''U'',''V'');';
-        INSERT INTO @SourceColumns (COLUMN_NAME)
-        EXEC sys.sp_executesql @SQL, N'@SchemaName sysname, @TableName sysname',
-             @SchemaName=@SOURCE_SCHEMA, @TableName=@SOURCE_TABLE;
+        SET @SQL = N'
+IF OBJECT_ID(@QualifiedObject, N''U'') IS NULL AND OBJECT_ID(@QualifiedObject, N''V'') IS NULL
+    THROW 52508, ''EIR source ETL: configured source object does not exist or is not visible.'', 1;
 
-        IF NOT EXISTS (SELECT 1 FROM @SourceColumns WHERE COLUMN_NAME=N'process_date')
-           OR NOT EXISTS (SELECT 1 FROM @SourceColumns WHERE COLUMN_NAME=N'ftp_bv')
-           OR NOT EXISTS (SELECT 1 FROM @SourceColumns WHERE COLUMN_NAME=N'ccy')
-        BEGIN
-            DECLARE @MissingSourceMessage nvarchar(2048) =
-                CONCAT(N'EIR source ETL: source object ', @SOURCE_OBJECT,
-                       N' is missing one or more required columns: process_date, ftp_bv, ccy.');
-            THROW 52508, @MissingSourceMessage, 1;
-        END;
+IF COL_LENGTH(@QualifiedObject, N''process_date'') IS NULL
+   OR COL_LENGTH(@QualifiedObject, N''ftp_bv'') IS NULL
+   OR COL_LENGTH(@QualifiedObject, N''ccy'') IS NULL
+    THROW 52509, ''EIR source ETL: required columns process_date, ftp_bv, ccy are missing.'', 1;';
+        EXEC sys.sp_executesql @SQL, N'@QualifiedObject nvarchar(776)', @QualifiedObject=@SOURCE_OBJECT;
 
         /* Fail on duplicate date/currency keys and bad source values relevant to the run horizon. */
         SET @SQL = N'
@@ -164,7 +155,7 @@ IF EXISTS
     GROUP BY s.process_date, s.ccy
     HAVING COUNT_BIG(*) > 1
 )
-    THROW 52509, ''EIR source ETL: duplicate source rows exist for process_date and currency.'', 1;
+    THROW 52510, ''EIR source ETL: duplicate source rows exist for process_date and currency.'', 1;
 
 IF EXISTS
 (
@@ -175,14 +166,14 @@ IF EXISTS
       AND (s.ftp_bv IS NULL OR TRY_CONVERT(decimal(19,12), s.ftp_bv) IS NULL
            OR TRY_CONVERT(decimal(19,12), s.ftp_bv) <= -1)
 )
-    THROW 52510, ''EIR source ETL: FTP rate must be numeric, non-null, and greater than -1.'', 1;
+    THROW 52511, ''EIR source ETL: FTP rate must be numeric, non-null, and greater than -1.'', 1;
 
 IF NOT EXISTS
 (
     SELECT 1 FROM ' + @SOURCE_OBJECT + N' AS s
     WHERE s.ccy = @Currency AND s.process_date <= DATEADD(month, 12, @ProcessDate)
 )
-    THROW 52511, ''EIR source ETL: no VND FTP observation exists on or before the first forecast target date.'', 1;
+    THROW 52512, ''EIR source ETL: no VND FTP observation exists on or before the first forecast target date.'', 1;
 
 DROP TABLE IF EXISTS #MappedEIR;
 
@@ -233,24 +224,24 @@ OUTER APPLY
 ) s;
 
 IF EXISTS (SELECT 1 FROM #MappedEIR WHERE EIR IS NULL OR EIR <= -1)
-    THROW 52512, ''EIR source ETL: one or more periods have no valid source rate.'', 1;
+    THROW 52513, ''EIR source ETL: one or more periods have no valid source rate.'', 1;
 
 IF (SELECT COUNT_BIG(*) FROM #MappedEIR) <> @Horizon
-    THROW 52513, ''EIR source ETL: generated rows do not cover the required forecast horizon.'', 1;
+    THROW 52514, ''EIR source ETL: generated rows do not cover the required forecast horizon.'', 1;
 
 IF EXISTS
 (
     SELECT FORECAST_PERIOD FROM #MappedEIR
     GROUP BY FORECAST_PERIOD HAVING COUNT_BIG(*) <> 1
 )
-    THROW 52514, ''EIR source ETL: generated canonical EIR grain is not unique.'', 1;
+    THROW 52515, ''EIR source ETL: generated canonical EIR grain is not unique.'', 1;
 
 IF EXISTS
 (
     SELECT 1 FROM #MappedEIR
     WHERE TARGET_DATE < PROCESS_DATE
 )
-    THROW 52515, ''EIR source ETL: invalid forecast target date.'', 1;
+    THROW 52516, ''EIR source ETL: invalid forecast target date.'', 1;
 
 DELETE FROM ecl_stg.EIRCurve
 WHERE RUN_ID = @RunId;
