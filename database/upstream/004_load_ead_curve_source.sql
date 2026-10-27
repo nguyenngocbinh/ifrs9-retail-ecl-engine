@@ -209,7 +209,12 @@ BEGIN
             FROM STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE AS s
             WHERE s.PROCESS_DATE = p.PROCESS_DATE
               AND s.ACCOUNT_NUMBER = p.ACCOUNT_ID
-              AND s.SCHEDULE_DUE_DATE <= p.PERIOD_END_DATE
+              AND s.SCHEDULE_DUE_DATE < DATEADD(day, 1,
+                  CASE
+                      WHEN p.MATURITY_DATE < p.PERIOD_END_DATE THEN p.MATURITY_DATE
+                      ELSE p.PERIOD_END_DATE
+                  END
+              )
               AND TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT) IS NOT NULL
             ORDER BY
                 s.SCHEDULE_DUE_DATE DESC,
