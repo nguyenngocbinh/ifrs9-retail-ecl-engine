@@ -231,11 +231,11 @@ BEGIN
                         TRY_CONVERT(decimal(19,4), checkpoint_row.EAD_AFTER_REPAYMENT),
                         p.EAD_0
                     ) AS EAD_AT_CHECKPOINT
-                FROM (VALUES (3), (6), (9)) AS offsets(MONTH_OFFSET)
+                FROM (VALUES (3), (6), (9)) AS month_values(MONTH_OFFSET)
                 CROSS APPLY
                 (
-                    SELECT DATEADD(month, offsets.MONTH_OFFSET, p.PROCESS_DATE) AS CHECKPOINT_DATE
-                ) AS checkpoint
+                    SELECT DATEADD(month, month_values.MONTH_OFFSET, p.PROCESS_DATE) AS CHECKPOINT_DATE
+                ) AS cp
                 OUTER APPLY
                 (
                     SELECT TOP (1)
@@ -243,7 +243,7 @@ BEGIN
                     FROM STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE AS s
                     WHERE s.PROCESS_DATE = p.PROCESS_DATE
                       AND s.ACCOUNT_NUMBER = p.ACCOUNT_ID
-                      AND s.SCHEDULE_DUE_DATE < DATEADD(day, 1, checkpoint.CHECKPOINT_DATE)
+                      AND s.SCHEDULE_DUE_DATE < DATEADD(day, 1, cp.CHECKPOINT_DATE)
                       AND TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT) IS NOT NULL
                     ORDER BY
                         s.SCHEDULE_DUE_DATE DESC,
