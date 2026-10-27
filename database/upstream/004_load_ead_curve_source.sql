@@ -1,12 +1,15 @@
 /*
 IFRS 9 Retail ECL Engine — upstream source EAD ETL
 Purpose:
-- Derive annual year-end EAD from STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE.
+- Derive annual time-weighted average EAD from STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE.
 - Map source ACCOUNT_NUMBER to the canonical AccountSnapshot.ACCOUNT_ID.
-- Load the resulting annual curve directly into ecl_stg.EADCurve.
-- Keep source extraction/calculation here, separate from database/006_ead_curve_loader.sql,
-  which remains a shared validation-only loader.
+- Load the resulting annual curve into ecl_stg.EADCurve.
+- Keep ecl_core.usp_LoadEADCurve validation-only.
 
+Methodology status:
+- Annual calendar-day-weighted average is proposed and requires methodology-owner approval.
+- Stage 3 remains on reporting-date EAD_0 pending confirmation of its exposure basis.
+- Missing schedule rows are not silently treated as a zero balance; EAD_0 is used only when no schedule event is effective yet, and the source procedure's synthetic row supports accounts with no future schedule.
 Source contract to confirm in the target environment:
   PROCESS_DATE, ACCOUNT_NUMBER, SCHEDULE_DUE_DATE, SCHEDULE_NO,
   EAD_0, EAD_AFTER_REPAYMENT.
@@ -59,17 +62,6 @@ BEGIN
         IF OBJECT_ID(N'STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE', N'U') IS NULL
             THROW 51904, 'EAD source ETL: STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE does not exist or is not accessible.', 1;
 
-        /*
-          Build annual periods only for accounts that:
-          1) are active in this run;
-          2) have not already been loaded into EADCurve by another product-specific ETL;
-          3) have a matching source schedule for this PROCESS_DATE. The DB2
-             source procedure emits a synthetic PROCESS_DATE row when no future
-             principal schedule exists but the reporting-date account balance does.
-
-          This allows product-specific ETLs (for example Auto) to populate their
-          own accounts without this Non-Revolving ETL deleting or overwriting them.
-        */
         DROP TABLE IF EXISTS #SourceAccounts;
 
         SELECT
@@ -123,7 +115,13 @@ BEGIN
         )
             THROW 51907, 'EAD source ETL: EAD_AFTER_REPAYMENT cannot be negative.', 1;
 
-        DROP TABLE IF EXISTS #MappedRows;
+        /*
+          Build annual periods. Stage 3 remains period 1 and uses EAD_0.
+          Performing accounts use [period start, period end) and the average
+          is weighted by calendar days. Each schedule balance is effective
+          from SCHEDULE_DUE_DATE until the next event boundary.
+        */
+        DROP TABLE IF EXISTS #AnnualPeriods;
 
         ;WITH AccountHorizon AS
         (
@@ -142,29 +140,119 @@ BEGIN
                     ELSE CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0)
                 END) AS HORIZON
             FROM #SourceAccounts AS a
-        ),
-        AnnualPeriods AS
+        )
+        SELECT
+            h.RUN_ID,
+            h.PROCESS_DATE,
+            h.ACCOUNT_ID,
+            h.MATURITY_DATE,
+            h.STAGE,
+            h.SNAPSHOT_VERSION_ID,
+            h.EAD_0,
+            n.N AS FORECAST_PERIOD,
+            DATEADD(year, n.N - 1, h.PROCESS_DATE) AS PERIOD_START_DATE,
+            DATEADD(year, n.N, h.PROCESS_DATE) AS PERIOD_END_DATE
+        INTO #AnnualPeriods
+        FROM AccountHorizon AS h
+        CROSS APPLY
+        (
+            SELECT TOP (120)
+                CONVERT(int, ROW_NUMBER() OVER (ORDER BY (SELECT NULL))) AS N
+            FROM sys.all_objects AS x
+            CROSS JOIN sys.all_objects AS y
+        ) AS n
+        WHERE n.N <= h.HORIZON;
+
+        DROP TABLE IF EXISTS #MappedRows;
+
+        ;WITH EventDates AS
         (
             SELECT
-                h.RUN_ID,
-                h.PROCESS_DATE,
-                h.ACCOUNT_ID,
-                h.MATURITY_DATE,
-                h.STAGE,
-                h.SNAPSHOT_VERSION_ID,
-                h.EAD_0,
-                h.HORIZON,
-                n.N AS FORECAST_PERIOD,
-                DATEADD(year, n.N, h.PROCESS_DATE) AS PERIOD_END_DATE
-            FROM AccountHorizon AS h
-            CROSS APPLY
-            (
-                SELECT TOP (120)
-                    CONVERT(int, ROW_NUMBER() OVER (ORDER BY (SELECT NULL))) AS N
-                FROM sys.all_objects AS x
-                CROSS JOIN sys.all_objects AS y
-            ) AS n
-            WHERE n.N <= h.HORIZON
+                p.RUN_ID, p.PROCESS_DATE, p.ACCOUNT_ID, p.MATURITY_DATE,
+                p.STAGE, p.SNAPSHOT_VERSION_ID, p.EAD_0, p.FORECAST_PERIOD,
+                p.PERIOD_START_DATE, p.PERIOD_END_DATE,
+                p.PERIOD_START_DATE AS EVENT_DATE
+            FROM #AnnualPeriods AS p
+            WHERE p.STAGE <> 3
+
+            UNION
+
+            SELECT
+                p.RUN_ID, p.PROCESS_DATE, p.ACCOUNT_ID, p.MATURITY_DATE,
+                p.STAGE, p.SNAPSHOT_VERSION_ID, p.EAD_0, p.FORECAST_PERIOD,
+                p.PERIOD_START_DATE, p.PERIOD_END_DATE,
+                CONVERT(date, s.SCHEDULE_DUE_DATE) AS EVENT_DATE
+            FROM #AnnualPeriods AS p
+            JOIN STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE AS s
+              ON s.PROCESS_DATE = p.PROCESS_DATE
+             AND s.ACCOUNT_NUMBER = p.ACCOUNT_ID
+             AND s.SCHEDULE_DUE_DATE >= p.PERIOD_START_DATE
+             AND s.SCHEDULE_DUE_DATE < p.PERIOD_END_DATE
+            WHERE p.STAGE <> 3
+              AND TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT) IS NOT NULL
+
+            UNION
+
+            SELECT
+                p.RUN_ID, p.PROCESS_DATE, p.ACCOUNT_ID, p.MATURITY_DATE,
+                p.STAGE, p.SNAPSHOT_VERSION_ID, p.EAD_0, p.FORECAST_PERIOD,
+                p.PERIOD_START_DATE, p.PERIOD_END_DATE,
+                DATEADD(day, 1, p.MATURITY_DATE) AS EVENT_DATE
+            FROM #AnnualPeriods AS p
+            WHERE p.STAGE <> 3
+              AND p.MATURITY_DATE >= p.PERIOD_START_DATE
+              AND p.MATURITY_DATE < p.PERIOD_END_DATE
+        ),
+        OrderedEvents AS
+        (
+            SELECT
+                e.*,
+                LEAD(e.EVENT_DATE, 1, e.PERIOD_END_DATE) OVER
+                (
+                    PARTITION BY e.RUN_ID, e.ACCOUNT_ID, e.FORECAST_PERIOD
+                    ORDER BY e.EVENT_DATE
+                ) AS NEXT_EVENT_DATE
+            FROM EventDates AS e
+        ),
+        Segments AS
+        (
+            SELECT
+                e.*,
+                CONVERT(decimal(19,4),
+                    CASE
+                        WHEN e.EVENT_DATE > e.MATURITY_DATE THEN 0
+                        WHEN e.EVENT_DATE > e.PERIOD_END_DATE THEN 0
+                        ELSE COALESCE
+                        (
+                            (
+                                SELECT TOP (1)
+                                    TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT)
+                                FROM STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE AS s
+                                WHERE s.PROCESS_DATE = e.PROCESS_DATE
+                                  AND s.ACCOUNT_NUMBER = e.ACCOUNT_ID
+                                  AND s.SCHEDULE_DUE_DATE < DATEADD(day, 1, e.EVENT_DATE)
+                                  AND TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT) IS NOT NULL
+                                ORDER BY s.SCHEDULE_DUE_DATE DESC, s.SCHEDULE_NO DESC
+                            ),
+                            e.EAD_0
+                        )
+                    END
+                ) AS EFFECTIVE_EAD
+            FROM OrderedEvents AS e
+        ),
+        WeightedAverage AS
+        (
+            SELECT
+                RUN_ID, PROCESS_DATE, ACCOUNT_ID, FORECAST_PERIOD,
+                CONVERT(decimal(19,4),
+                    SUM(EFFECTIVE_EAD * CONVERT(decimal(19,4), DATEDIFF(day, EVENT_DATE, NEXT_EVENT_DATE)))
+                    / NULLIF(CONVERT(decimal(19,4), DATEDIFF(day, PERIOD_START_DATE, PERIOD_END_DATE)), 0)
+                ) AS EAD
+            FROM Segments
+            WHERE NEXT_EVENT_DATE > EVENT_DATE
+            GROUP BY
+                RUN_ID, PROCESS_DATE, ACCOUNT_ID, FORECAST_PERIOD,
+                PERIOD_START_DATE, PERIOD_END_DATE
         )
         SELECT
             p.RUN_ID,
@@ -172,29 +260,17 @@ BEGIN
             p.ACCOUNT_ID,
             p.FORECAST_PERIOD,
             CONVERT(decimal(19,4),
-                COALESCE(
-                    TRY_CONVERT(decimal(19,4), schedule_row.EAD_AFTER_REPAYMENT),
-                    p.EAD_0
-                )
+                CASE WHEN p.STAGE = 3 THEN p.EAD_0 ELSE w.EAD END
             ) AS EAD,
             CONVERT(varchar(3), 'VND') AS CURRENCY_CODE,
             @VERSION_ID AS VERSION_ID,
             CONVERT(bit, 1) AS IS_ACTIVE
         INTO #MappedRows
-        FROM AnnualPeriods AS p
-        OUTER APPLY
-        (
-            SELECT TOP (1)
-                s.EAD_AFTER_REPAYMENT
-            FROM STAGING_MPP.dbo.TBL_NONREVOLVING_EAD_SCHEDULE AS s
-            WHERE s.PROCESS_DATE = p.PROCESS_DATE
-              AND s.ACCOUNT_NUMBER = p.ACCOUNT_ID
-              AND s.SCHEDULE_DUE_DATE <= p.PERIOD_END_DATE
-              AND TRY_CONVERT(decimal(19,4), s.EAD_AFTER_REPAYMENT) IS NOT NULL
-            ORDER BY
-                s.SCHEDULE_DUE_DATE DESC,
-                s.SCHEDULE_NO DESC
-        ) AS schedule_row;
+        FROM #AnnualPeriods AS p
+        LEFT JOIN WeightedAverage AS w
+          ON w.RUN_ID = p.RUN_ID
+         AND w.ACCOUNT_ID = p.ACCOUNT_ID
+         AND w.FORECAST_PERIOD = p.FORECAST_PERIOD;
 
         IF EXISTS
         (
@@ -204,7 +280,7 @@ BEGIN
                OR EAD IS NULL
                OR EAD < 0
         )
-            THROW 51908, 'EAD source ETL: mapped annual rows contain an invalid period or EAD value.', 1;
+            THROW 51908, 'EAD source ETL: mapped annual rows contain an invalid period or EAD value; check missing period coverage.', 1;
 
         IF EXISTS
         (
@@ -215,30 +291,14 @@ BEGIN
         )
             THROW 51909, 'EAD source ETL: source produced duplicate canonical account/period keys.', 1;
 
-        /*
-          Insert only accounts not already present for this run. The source ETL
-          never deletes or overwrites curves populated by another product ETL.
-        */
         INSERT INTO ecl_stg.EADCurve
         (
-            RUN_ID,
-            PROCESS_DATE,
-            ACCOUNT_ID,
-            FORECAST_PERIOD,
-            EAD,
-            CURRENCY_CODE,
-            VERSION_ID,
-            IS_ACTIVE
+            RUN_ID, PROCESS_DATE, ACCOUNT_ID, FORECAST_PERIOD, EAD,
+            CURRENCY_CODE, VERSION_ID, IS_ACTIVE
         )
         SELECT
-            m.RUN_ID,
-            m.PROCESS_DATE,
-            m.ACCOUNT_ID,
-            m.FORECAST_PERIOD,
-            m.EAD,
-            m.CURRENCY_CODE,
-            m.VERSION_ID,
-            m.IS_ACTIVE
+            m.RUN_ID, m.PROCESS_DATE, m.ACCOUNT_ID, m.FORECAST_PERIOD, m.EAD,
+            m.CURRENCY_CODE, m.VERSION_ID, m.IS_ACTIVE
         FROM #MappedRows AS m
         WHERE NOT EXISTS
         (
@@ -261,7 +321,7 @@ BEGIN
         VALUES
         (
             @RUN_ID, @PROCESS_DATE, 'EAD_SOURCE_ETL', 'SUCCEEDED',
-            N'Loaded annual Non-Revolving EAD from STAGING_MPP schedule into ecl_stg.EADCurve.',
+            N'Loaded annual time-weighted average Non-Revolving EAD from STAGING_MPP schedule into ecl_stg.EADCurve.',
             @ROW_COUNT, SUSER_SNAME()
         );
 
