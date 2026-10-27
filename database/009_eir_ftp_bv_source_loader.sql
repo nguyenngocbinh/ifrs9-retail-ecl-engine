@@ -44,9 +44,6 @@ GO
 
 CREATE OR ALTER PROCEDURE ecl_core.usp_StageSourceEIRCurve
     @RUN_ID bigint,
-    @SOURCE_DATABASE sysname = N'CORE',
-    @SOURCE_SCHEMA sysname = N'dbo',
-    @SOURCE_TABLE sysname = N'rb_ftp_bv_12m',
     @CURRENCY_CODE char(3) = 'VND'
 AS
 BEGIN
@@ -58,7 +55,7 @@ BEGIN
         @RUN_STATUS varchar(20),
         @HORIZON int,
         @ROW_COUNT bigint,
-        @SOURCE_OBJECT nvarchar(776),
+        @SOURCE_OBJECT nvarchar(776) = N'[CORE].[dbo].[rb_ftp_bv_12m]',
         @SQL nvarchar(max);
 
     BEGIN TRY
@@ -113,59 +110,6 @@ BEGIN
             THROW 52504, 'EIR source ETL: no positive forecast horizon could be derived.', 1;
         IF @HORIZON > 120
             THROW 52505, 'EIR source ETL: maximum supported forecast horizon is 120 periods.', 1;
-
-        IF @SOURCE_DATABASE IS NULL OR NULLIF(LTRIM(RTRIM(@SOURCE_DATABASE)),'') IS NULL
-           OR @SOURCE_SCHEMA IS NULL OR NULLIF(LTRIM(RTRIM(@SOURCE_SCHEMA)),'') IS NULL
-           OR @SOURCE_TABLE IS NULL OR NULLIF(LTRIM(RTRIM(@SOURCE_TABLE)),'') IS NULL
-           OR QUOTENAME(@SOURCE_DATABASE) IS NULL
-           OR QUOTENAME(@SOURCE_SCHEMA) IS NULL
-           OR QUOTENAME(@SOURCE_TABLE) IS NULL
-            THROW 52506, 'EIR source ETL: source database/schema/table names are invalid.', 1;
-
-        SET @SOURCE_OBJECT = QUOTENAME(@SOURCE_DATABASE) + N'.'
-                           + QUOTENAME(@SOURCE_SCHEMA) + N'.'
-                           + QUOTENAME(@SOURCE_TABLE);
-
-        /* Check the database exists and the configured source has the required columns. */
-        IF DB_ID(@SOURCE_DATABASE) IS NULL
-        BEGIN
-            DECLARE @MissingDatabaseMessage nvarchar(2048) =
-                CONCAT(N'EIR source ETL: source database ', QUOTENAME(@SOURCE_DATABASE), N' does not exist or is not visible.');
-            THROW 52507, @MissingDatabaseMessage, 1;
-        END;
-
-        DECLARE @MetadataSQL nvarchar(max);
-        DECLARE @SourceMetadata TABLE
-        (
-            OBJECT_ID int NULL,
-            COLUMN_NAME sysname NULL
-        );
-
-        SET @MetadataSQL = N'
-SELECT o.object_id, c.name
-FROM ' + QUOTENAME(@SOURCE_DATABASE) + N'.sys.objects AS o
-INNER JOIN ' + QUOTENAME(@SOURCE_DATABASE) + N'.sys.schemas AS s
-  ON s.schema_id = o.schema_id
-LEFT JOIN ' + QUOTENAME(@SOURCE_DATABASE) + N'.sys.columns AS c
-  ON c.object_id = o.object_id
-WHERE s.name = @SchemaName
-  AND o.name = @TableName
-  AND o.type IN (''U'',''V'');';
-
-        INSERT INTO @SourceMetadata (OBJECT_ID, COLUMN_NAME)
-        EXEC sys.sp_executesql
-            @MetadataSQL,
-            N'@SchemaName sysname, @TableName sysname',
-            @SchemaName = @SOURCE_SCHEMA,
-            @TableName = @SOURCE_TABLE;
-
-        IF NOT EXISTS (SELECT 1 FROM @SourceMetadata WHERE OBJECT_ID IS NOT NULL)
-            THROW 52508, 'EIR source ETL: configured source object does not exist or is not visible.', 1;
-
-        IF NOT EXISTS (SELECT 1 FROM @SourceMetadata WHERE COLUMN_NAME = N'process_date')
-           OR NOT EXISTS (SELECT 1 FROM @SourceMetadata WHERE COLUMN_NAME = N'ftp_bv')
-           OR NOT EXISTS (SELECT 1 FROM @SourceMetadata WHERE COLUMN_NAME = N'ccy')
-            THROW 52509, 'EIR source ETL: required columns process_date, ftp_bv, ccy are missing.', 1;
 
         CREATE TABLE #MappedEIR
         (
