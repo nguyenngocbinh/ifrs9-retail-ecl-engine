@@ -208,7 +208,7 @@ WHERE RUN_ID = @RUN_ID
 ORDER BY FORECAST_PERIOD;
 ```
 
-Forecast period N ứng với ngày mục tiêu `DATEADD(month, 12*N, RunControl.PROCESS_DATE)`; loader chọn bản ghi VND có `process_date` mới nhất nhưng không sau ngày mục tiêu. Ví dụ run tại 2026-09-30 thì kỳ 1 có target date 2027-09-30.
+Forecast period N vẫn là kỳ năm N trong horizon (ngày mục tiêu kỹ thuật là `DATEADD(month, 12*N, RunControl.PROCESS_DATE)`), nhưng rate FTP phải được chốt theo ngày chạy: loader lấy bản ghi VND có `process_date` mới nhất nhưng không sau `RunControl.PROCESS_DATE` rồi áp dụng cùng mức cho các kỳ forecast. Không lấy bản ghi nằm sau PROCESS_DATE, vì sẽ tạo look-ahead bias khi chạy lại lịch sử.
 
 **Không tự chia `ftp_bv` cho 100.** Theo hợp đồng hiện tại, giá trị nguồn được dùng nguyên trạng; tuy nhiên mẫu `9.2` sẽ tạo hệ số chiết khấu `1/(1+9.2)^t`, vì vậy cần xác nhận với data owner rằng dữ liệu nguồn thực sự được định nghĩa theo cách này trước khi chạy nghiệp vụ. Không diễn giải số 9.2 thành 9.2% nếu chưa có phê duyệt sửa hợp đồng.
 
