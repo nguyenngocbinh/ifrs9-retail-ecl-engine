@@ -156,9 +156,9 @@ BEGIN
             SELECT 1
             FROM #SourceLGD
             WHERE MATURITY_DATE IS NULL
-               OR HORIZON NOT BETWEEN 1 AND 120
+               OR HORIZON NOT BETWEEN 1 AND 30
         )
-            THROW 51909, 'LGD source ETL: invalid maturity horizon or horizon exceeds 120 annual periods.', 1;
+            THROW 51909, 'LGD source ETL: invalid maturity horizon or horizon exceeds 30 annual periods.', 1;
 
         /*
           Source version is optional: dynamically inspect source metadata first.
