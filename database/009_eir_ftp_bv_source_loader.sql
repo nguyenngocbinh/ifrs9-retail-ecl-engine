@@ -222,8 +222,6 @@ IF NOT EXISTS
 )
     THROW 52512, ''EIR source ETL: no VND FTP observation exists on or before the first forecast target date.'', 1;
 
-DROP TABLE IF EXISTS #MappedEIR;
-
 ;WITH Numbers AS
 (
     SELECT n
