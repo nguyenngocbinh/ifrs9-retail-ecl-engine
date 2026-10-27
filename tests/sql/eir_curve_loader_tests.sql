@@ -1,7 +1,6 @@
 /*
 SQL Server 2022 regression tests for the FTP 12-month EIR source loader and validator.
-Prerequisites: migrations 001-009 deployed. The test creates and removes a disposable
-CORE_EIR_TEST source database; do not run on a server where that database already exists.
+Prerequisites: migrations 001-009 deployed. The test uses a disposable source fixture in the `eir_source_test` schema.
 */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
