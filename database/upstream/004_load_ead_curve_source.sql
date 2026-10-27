@@ -159,7 +159,7 @@ BEGIN
             FROM AccountHorizon AS h
             CROSS APPLY
             (
-                SELECT TOP (120)
+                SELECT TOP (30)
                     CONVERT(int, ROW_NUMBER() OVER (ORDER BY (SELECT NULL))) AS N
                 FROM sys.all_objects AS x
                 CROSS JOIN sys.all_objects AS y
