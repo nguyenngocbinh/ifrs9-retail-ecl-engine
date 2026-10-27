@@ -378,7 +378,7 @@ BEGIN
 
         IF EXISTS
         (
-            SELECT n.N
+            SELECT v.N
             FROM (VALUES
                 (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),
                 (11),(12),(13),(14),(15),(16),(17),(18),(19),(20),
@@ -392,11 +392,11 @@ BEGIN
                 (91),(92),(93),(94),(95),(96),(97),(98),(99),(100),
                 (101),(102),(103),(104),(105),(106),(107),(108),(109),(110),
                 (111),(112),(113),(114),(115),(116),(117),(118),(119),(120)
-            ) v(N)
+            ) AS v(N)
             WHERE v.N <= @HORIZON
               AND NOT EXISTS
               (
-                  SELECT 1 FROM ecl_stg.EIRCurve e
+                  SELECT 1 FROM ecl_stg.EIRCurve AS e
                   WHERE e.RUN_ID = @RUN_ID AND e.PROCESS_DATE = @PROCESS_DATE
                     AND e.FORECAST_PERIOD = v.N AND e.IS_ACTIVE = 1
               )
