@@ -33,7 +33,7 @@ BEGIN TRY
         THROW 52700, 'EIR source-loader test requires CORE_EIR_TEST not to exist; remove stale synthetic test database before rerunning.', 1;
 
     EXEC(N'CREATE DATABASE [CORE_EIR_TEST];');
-    EXEC(N'USE [CORE_EIR_TEST]; CREATE TABLE dbo.rb_ftp_bv_12m
+    EXEC(N'CREATE TABLE CORE_EIR_TEST.dbo.rb_ftp_bv_12m
     (
         process_date date NOT NULL,
         ftp_bv decimal(19,10) NULL,
