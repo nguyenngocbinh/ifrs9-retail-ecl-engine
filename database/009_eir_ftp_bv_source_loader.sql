@@ -188,7 +188,7 @@ IF EXISTS
     SELECT 1
     FROM ' + @SOURCE_OBJECT + N' AS s
     WHERE s.ccy = @Currency
-      AND s.process_date <= DATEADD(month, @Horizon * 12, @ProcessDate)
+      AND s.process_date <= @ProcessDate
     GROUP BY s.process_date, s.ccy
     HAVING COUNT_BIG(*) > 1
 )
@@ -218,7 +218,7 @@ IF EXISTS
 IF NOT EXISTS
 (
     SELECT 1 FROM ' + @SOURCE_OBJECT + N' AS s
-    WHERE s.ccy = @Currency AND s.process_date <= DATEADD(month, 12, @ProcessDate)
+    WHERE s.ccy = @Currency AND s.process_date <= @ProcessDate
 )
     THROW 52512, ''EIR source ETL: no VND FTP observation exists on or before the first forecast target date.'', 1;
 
@@ -269,7 +269,7 @@ OUTER APPLY
     SELECT TOP (1) s.process_date, s.ftp_bv, s.ccy
     FROM ' + @SOURCE_OBJECT + N' AS s
     WHERE s.ccy = @Currency
-      AND s.process_date <= t.TARGET_DATE
+      AND s.process_date <= @ProcessDate
     ORDER BY s.process_date DESC
 ) s;
 
