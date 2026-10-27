@@ -14,7 +14,7 @@ Forecast mapping:
   FORECAST_PERIOD 2 = run PROCESS_DATE + 24 months, etc.
 For each target date, select the latest source PROCESS_DATE on or before that date,
 for VND. Missing historical observations, duplicate source-date/currency rows,
-invalid rates (NULL or <= -1), or a horizon beyond 120 periods fail closed.
+invalid rates (NULL or <= -1), or a horizon beyond 30 periods fail closed.
 
 Deploy after migrations 001-008. The source table must be readable from the same
 SQL Server instance; if CORE is on another instance, provision an approved view
@@ -108,8 +108,8 @@ BEGIN
 
         IF @HORIZON < 1
             THROW 52504, 'EIR source ETL: no positive forecast horizon could be derived.', 1;
-        IF @HORIZON > 120
-            THROW 52505, 'EIR source ETL: maximum supported forecast horizon is 120 periods.', 1;
+        IF @HORIZON > 30
+            THROW 52505, 'EIR source ETL: maximum supported forecast horizon is 30 periods.', 1;
 
         CREATE TABLE #MappedEIR
         (
@@ -323,8 +323,8 @@ BEGIN
         FROM ecl_stg.AccountSnapshot
         WHERE RUN_ID = @RUN_ID AND PROCESS_DATE = @PROCESS_DATE AND IS_ACTIVE = 1;
 
-        IF @HORIZON < 1 OR @HORIZON > 120
-            THROW 52602, 'EIR loader: active accounts must have a required horizon between 1 and 120 periods.', 1;
+        IF @HORIZON < 1 OR @HORIZON > 30
+            THROW 52602, 'EIR loader: active accounts must have a required horizon between 1 and 30 periods.', 1;
 
         IF NOT EXISTS (SELECT 1 FROM ecl_stg.EIRCurve WHERE RUN_ID = @RUN_ID)
             THROW 52603, 'EIR loader: no canonical EIR rows were staged for this run.', 1;
