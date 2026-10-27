@@ -181,6 +181,38 @@ Chạy các lệnh trong cùng một session/batch để biến `@RUN_ID` còn h
 
 ### PD, LGD, EAD và EIR
 
+#### Nạp EIR từ FTP 12 tháng
+
+Migration bổ sung `database/009_eir_ftp_bv_source_loader.sql` tạo hai procedure:
+
+- `ecl_core.usp_StageSourceEIRCurve @RUN_ID`: đọc nguồn mặc định `CORE.dbo.rb_ftp_bv_12m`, map lịch sử lãi suất thành các kỳ forecast và nạp `ecl_stg.EIRCurve`.
+- `ecl_core.usp_LoadEIRCurve @RUN_ID`: kiểm tra coverage, PROCESS_DATE, RATE_BASIS và giá trị EIR.
+
+Điều kiện quan trọng: nguồn `CORE.dbo.rb_ftp_bv_12m` phải truy cập được từ cùng SQL Server instance với engine. Nếu CORE nằm ở instance khác, cần cung cấp view/linked-server đã được phê duyệt và đổi tham số nguồn phù hợp.
+
+```sql
+-- Chạy khi RUN_ID ở trạng thái CREATED hoặc VALIDATING và AccountSnapshot đã nạp.
+EXEC ecl_core.usp_StageSourceEIRCurve
+    @RUN_ID = @RUN_ID,
+    @SOURCE_DATABASE = N'CORE',
+    @SOURCE_SCHEMA = N'dbo',
+    @SOURCE_TABLE = N'rb_ftp_bv_12m',
+    @CURRENCY_CODE = 'VND';
+
+-- Chỉ gọi sau khi source ETL thành công.
+EXEC ecl_core.usp_LoadEIRCurve @RUN_ID = @RUN_ID;
+
+SELECT RUN_ID, PROCESS_DATE, FORECAST_PERIOD, EIR, RATE_BASIS, VERSION_ID, IS_ACTIVE
+FROM ecl_stg.EIRCurve
+WHERE RUN_ID = @RUN_ID
+ORDER BY FORECAST_PERIOD;
+```
+
+Forecast period N ứng với ngày mục tiêu `DATEADD(month, 12*N, RunControl.PROCESS_DATE)`; loader chọn bản ghi VND có `process_date` mới nhất nhưng không sau ngày mục tiêu. Ví dụ run tại 2026-09-30 thì kỳ 1 có target date 2027-09-30.
+
+**Không tự chia `ftp_bv` cho 100.** Theo hợp đồng hiện tại, giá trị nguồn được dùng nguyên trạng; tuy nhiên mẫu `9.2` sẽ tạo hệ số chiết khấu `1/(1+9.2)^t`, vì vậy cần xác nhận với data owner rằng dữ liệu nguồn thực sự được định nghĩa theo cách này trước khi chạy nghiệp vụ. Không diễn giải số 9.2 thành 9.2% nếu chưa có phê duyệt sửa hợp đồng.
+
+
 #### Nạp PD từ nguồn
 
 Chạy script `database/upstream/003_load_pd_curve_source.sql` sau khi đã triển khai schema, `database/007_pd_curve_loader.sql` và schema và cấu hình trong `database/001_create_logical_schema.sql`. Procedure giả định hai bảng nguồn nằm trong cùng database với engine, schema `dbo`. Mapping scenario được lưu trong `ecl_cfg.Scenario` và được seed bởi `database/001_create_logical_schema.sql`: `RETAIL_MARGINAL_PIT_PD` có mapping `1 = BASE`, `2 = UPTURN`, `3 = DOWNTURN`. Procedure đọc mapping từ bảng cấu hình, không hard-code mã số.
