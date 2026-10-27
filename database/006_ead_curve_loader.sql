@@ -72,7 +72,7 @@ BEGIN
         /*
           Stage 3 accounts always require only FORECAST_PERIOD=1 because PD is fixed at 100%.
           Accounts with MATURITY_DATE <= PROCESS_DATE also use period 1 regardless of Stage;
-          other accounts require coverage through their annual horizon (maximum 120 periods).
+          other accounts require coverage through their annual horizon (maximum 30 periods).
         */
         IF EXISTS
         (
@@ -92,7 +92,7 @@ BEGIN
               AND a.IS_ACTIVE = 1
               AND
               (
-                  h.HORIZON > 120
+                  h.HORIZON > 30
                   OR
                   (
                       h.HORIZON >= 1
@@ -101,7 +101,7 @@ BEGIN
                           SELECT 1
                           FROM
                           (
-                              SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+                              SELECT TOP (30) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
                               FROM sys.all_objects x CROSS JOIN sys.all_objects y
                           ) n
                           WHERE n.N <= h.HORIZON
@@ -120,7 +120,7 @@ BEGIN
                   )
               )
         )
-            THROW 51606, 'EAD loader: active accounts need active VND EAD rows for every required period; Stage 3 and matured accounts use period 1. Maximum supported horizon is 120 periods.', 1;
+            THROW 51606, 'EAD loader: active accounts need active VND EAD rows for every required period; Stage 3 and matured accounts use period 1. Maximum supported horizon is 30 periods.', 1;
 
         SELECT @ROW_COUNT = COUNT_BIG(*)
         FROM ecl_stg.EADCurve
