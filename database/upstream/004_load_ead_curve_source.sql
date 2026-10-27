@@ -129,7 +129,7 @@ BEGIN
             FROM #SourceAccounts AS a
             WHERE a.STAGE <> 3
               AND a.MATURITY_DATE > @PROCESS_DATE
-              AND CEILING(DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE) / 12.0) > 30
+              AND CEILING(CONVERT(decimal(10,2), DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE)\n                    + CASE WHEN DATEADD(month, DATEDIFF(month, @PROCESS_DATE, a.MATURITY_DATE), @PROCESS_DATE) < a.MATURITY_DATE THEN 1 ELSE 0 END) / 12.0) > 30
         )
             THROW 51910, 'EAD source ETL: maturity horizon exceeds the maximum supported 30 annual periods.', 1;
 
