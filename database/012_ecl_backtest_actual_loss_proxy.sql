@@ -117,7 +117,19 @@ BEGIN
         GROUP BY f.BACKTEST_RUN_ID, f.SOURCE_RUN_ID, f.ACCOUNT_ID, f.DEFAULT_DATE;
 
         UPDATE o
-        SET ACTUAL_LOSS_PROXY =
+        SET DEFAULT_DATE =
+                CASE WHEN o.OUTCOME_STATUS = 'OBSERVED_DEFAULT'
+                           AND d.DEFAULT_DATE_ROW_COUNT = 1
+                           AND d.INVALID_OS_AMOUNT_COUNT = 0
+                           AND d.MIN_OS_AMOUNT = d.MAX_OS_AMOUNT
+                     THEN d.DEFAULT_DATE ELSE NULL END,
+            OBSERVATION_END_DATE =
+                CASE WHEN o.OUTCOME_STATUS = 'OBSERVED_DEFAULT'
+                           AND d.DEFAULT_DATE_ROW_COUNT = 1
+                           AND d.INVALID_OS_AMOUNT_COUNT = 0
+                           AND d.MIN_OS_AMOUNT = d.MAX_OS_AMOUNT
+                     THEN d.DEFAULT_DATE ELSE o.OBSERVATION_END_DATE END,
+            ACTUAL_LOSS_PROXY =
                 CASE WHEN o.OUTCOME_STATUS = 'OBSERVED_DEFAULT'
                            AND d.DEFAULT_DATE_ROW_COUNT = 1
                            AND d.INVALID_OS_AMOUNT_COUNT = 0
