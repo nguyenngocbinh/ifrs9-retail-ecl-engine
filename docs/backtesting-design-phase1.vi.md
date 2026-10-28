@@ -23,7 +23,7 @@ The canonical engine schema currently provides:
 - `ecl_result.ECLAccount`: account-level ECL components and total.
 - A source run is considered eligible only if `RunControl.RUN_STATUS = 'PUBLISHED'`.
 
-The confirmed outcome source is `[DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB]`, a monthly month-end account-level view. `ecl_bt.CohortAccount.ACCOUNT_ID` maps to source `contract_id` (business mapping: `account_id = contract_id`). Source fields used by the loader are `process_date`, `current_gb`, and `default_flag`. `first_to_default` exists only in the customer-level source and is not required for Phase 1 because the account-level `default_flag` is the 12-month outcome label. `current_gb = 1` means already defaulted at the cohort date; `current_gb = 0` means not defaulted at the cohort date. `default_flag = 1` is the forward 12-month default label, not the current default status. No production/customer rows or credentials belong in this repository.
+The confirmed outcome source is `[dbo].[VW_ODR_CONTRACT_LEVEL_IRB]`, a monthly month-end account-level view. `ecl_bt.CohortAccount.ACCOUNT_ID` maps to source `contract_id` (business mapping: `account_id = contract_id`). Source fields used by the loader are `process_date`, `current_gb`, and `default_flag`. `first_to_default` exists only in the customer-level source and is not required for Phase 1 because the account-level `default_flag` is the 12-month outcome label. `current_gb = 1` means already defaulted at the cohort date; `current_gb = 0` means not defaulted at the cohort date. `default_flag = 1` is the forward 12-month default label, not the current default status. No production/customer rows or credentials belong in this repository.
 
 ## Phase 1 objective
 
