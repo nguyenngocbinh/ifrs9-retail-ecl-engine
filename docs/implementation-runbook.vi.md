@@ -12,6 +12,7 @@
 6. **Tạo RUN_ID và kiểm soát đầu vào**: đăng ký đủ sáu nhóm ACCOUNT, PD, LGD, EAD, EIR, SCENARIO_WEIGHT; seal manifest; chạy validate và reconcile.
 7. **Tính và xuất bản ECL**: chuyển trạng thái CALCULATING → chạy tính ECL → xác nhận đối soát thành công → publish.
 8. **Đối chiếu kết quả** theo tài khoản, pool, Stage và nhật ký audit; lưu bằng chứng chạy thử.
+9. **Backtest sau publish (tùy chọn)**: chạy cohort/outcome/actual-loss proxy trên kết quả đã publish; đây là luồng kiểm định độc lập, không nằm trong phép tính ECL production.
 
 ## 2. Triển khai database
 
@@ -581,6 +582,72 @@ Nếu lỗi: dừng ở bước lỗi, đọc thông báo SQL và `ecl_audit.Val
 ## 7. Chạy test tự động bằng dữ liệu giả lập
 
 Chỉ chạy trên database DEV dùng riêng cho test. Chạy theo danh sách trong [SQL Server deployment guide](sql-server-deployment-guide.md) hoặc workflow CI. Bộ test bao gồm loader, lifecycle, input validation/reconciliation, coverage, calculation, publication gate và rollback khi lỗi. Test xanh chỉ xác nhận code trong môi trường test; không chứng minh mapping dữ liệu nghiệp vụ hay production đã sẵn sàng.
+
+## 8. Backtest 12 tháng sau khi publish ECL
+
+Backtest chỉ chạy sau khi ECL source run đã ở trạng thái `PUBLISHED`. Đây là quy trình hậu kiểm độc lập, không được gọi bên trong procedure tính ECL hoặc dùng để thay đổi kết quả đã publish.
+
+### 8.1. Triển khai backtest
+
+Sau khi đã triển khai engine và xác nhận nguồn lịch sử tồn tại, triển khai lần lượt trong DEV/UAT:
+
+1. `database/010_ecl_backtest_foundation.sql`
+2. `database/011_ecl_backtest_load_account_outcomes.sql`
+3. `database/012_ecl_backtest_actual_loss_proxy.sql`
+
+Các migration này phụ thuộc schema engine đã có và nguồn `[DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB]`. Không chạy trực tiếp ở production nếu chưa được phê duyệt. Smoke tests metadata tương ứng: `tests/sql/backtest_schema_smoke_tests.sql`, `tests/sql/backtest_outcome_loader_smoke_tests.sql`, `tests/sql/backtest_actual_loss_smoke_tests.sql`.
+
+### 8.2. Luồng thực thi
+
+Mỗi `BACKTEST_RUN_ID` xử lý một source `RUN_ID` đã publish. Dùng ngày cutoff phản ánh dữ liệu nguồn thực sự đã nạp, không mặc định lấy ngày hiện tại.
+
+```sql
+DECLARE @SOURCE_RUN_ID bigint = 123;       -- thay bằng RUN_ID đã PUBLISHED
+DECLARE @OUTCOME_AS_OF_DATE date = '2026-09-30'; -- thay bằng ngày cuối tháng dữ liệu nguồn đã hoàn tất
+DECLARE @BACKTEST_RUN_ID bigint;
+
+DECLARE @NewBacktest TABLE (BACKTEST_RUN_ID bigint);
+
+INSERT INTO ecl_bt.BacktestRun (
+    BACKTEST_NAME, COHORT_START_DATE, COHORT_END_DATE,
+    OUTCOME_AS_OF_DATE, METHODOLOGY_VERSION, RUN_NOTE
+)
+OUTPUT INSERTED.BACKTEST_RUN_ID INTO @NewBacktest(BACKTEST_RUN_ID)
+SELECT CONCAT('BT12M_RUN_', @SOURCE_RUN_ID),
+       rc.PROCESS_DATE, rc.PROCESS_DATE,
+       @OUTCOME_AS_OF_DATE, 'ACTUAL_LOSS_PROXY_V1',
+       N'Actual loss proxy = ABS(os_amount) at first observed default month-end.'
+FROM ecl_core.RunControl rc
+WHERE rc.RUN_ID = @SOURCE_RUN_ID
+  AND rc.RUN_STATUS = 'PUBLISHED';
+
+SELECT @BACKTEST_RUN_ID = BACKTEST_RUN_ID FROM @NewBacktest;
+IF @BACKTEST_RUN_ID IS NULL
+    THROW 51980, 'Source RUN_ID must exist and be PUBLISHED.', 1;
+
+EXEC ecl_bt.usp_Build12MonthCohort
+     @BACKTEST_RUN_ID = @BACKTEST_RUN_ID,
+     @SOURCE_RUN_ID = @SOURCE_RUN_ID;
+
+EXEC ecl_bt.usp_Load12MonthAccountOutcomes
+     @BACKTEST_RUN_ID = @BACKTEST_RUN_ID,
+     @SOURCE_RUN_ID = @SOURCE_RUN_ID;
+
+EXEC ecl_bt.usp_Load12MonthActualLossProxy
+     @BACKTEST_RUN_ID = @BACKTEST_RUN_ID,
+     @SOURCE_RUN_ID = @SOURCE_RUN_ID;
+
+EXEC ecl_bt.usp_Report12MonthActualLossBacktest
+     @BACKTEST_RUN_ID = @BACKTEST_RUN_ID;
+```
+
+### 8.3. Định nghĩa proxy và cách đọc báo cáo
+
+- Với `default_flag = 1`, tìm tháng đầu tiên sau ngày cohort và trong cửa sổ 12 tháng mà `current_gb = 1`; proxy = `ABS(os_amount)` tại tháng đó.
+- Với tài khoản không default, chỉ đặt proxy bằng 0 khi nhãn hợp lệ và đủ 12 tháng quan sát.
+- Tài khoản đã default tại ngày cohort, kỳ quan sát chưa trưởng thành, thiếu snapshot/nhãn, không tìm được tháng default hoặc có bản ghi trùng/ `os_amount` không hợp lệ sẽ không được đưa vào so sánh monetary; xem `ecl_bt.AccountOutcome.ACTUAL_LOSS_STATUS` và `ecl_bt.BacktestFinding`.
+- Báo cáo so sánh tổng `ECL_12_MONTH` với tổng proxy theo ngày cohort, pool và Stage; kèm số tài khoản đã giải quyết và số bị loại trừ. Đây là proxy dư nợ tại default, **không phải realized loss theo kế toán** vì chưa xét thu hồi, write-off, chi phí thu hồi hay discounting.
+- Xác nhận độ phủ và chất lượng dữ liệu trước khi diễn giải O/E hoặc chênh lệch. Không dùng tài khoản thiếu dữ liệu như mặc định là không có tổn thất.
 
 ## Tài liệu nên đọc
 
