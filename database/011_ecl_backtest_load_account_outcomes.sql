@@ -1,6 +1,6 @@
 /*
 IFRS 9 Retail ECL Engine — migration 011: load account-level 12-month outcomes.
-Source: [DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB], monthly month-end snapshots.
+Source: [dbo].[VW_ODR_CONTRACT_LEVEL_IRB], monthly month-end snapshots.
 Account mapping: ecl_bt.CohortAccount.ACCOUNT_ID = source contract_id.
 
 Agreed classification:
@@ -94,7 +94,7 @@ BEGIN
                 TRY_CONVERT(int, s.default_flag) AS DEFAULT_FLAG,
                 COUNT(s.contract_id) OVER (PARTITION BY c.ACCOUNT_ID) AS SOURCE_MATCH_COUNT
             FROM ecl_bt.CohortAccount c
-            LEFT JOIN [DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
+            LEFT JOIN [dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
               ON CONVERT(varchar(100), s.contract_id) = c.ACCOUNT_ID
              AND TRY_CONVERT(date, s.process_date) = c.PROCESS_DATE
             WHERE c.BACKTEST_RUN_ID = @BACKTEST_RUN_ID
@@ -131,7 +131,7 @@ BEGIN
                     ELSE NULL
                 END,
             o.OUTCOME_STATUS = x.CLASSIFIED_STATUS,
-            o.OUTCOME_SOURCE_OBJECT = N'[DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB]',
+            o.OUTCOME_SOURCE_OBJECT = N'[dbo].[VW_ODR_CONTRACT_LEVEL_IRB]',
             o.OUTCOME_SOURCE_VERSION = CONVERT(varchar(100), @OUTCOME_AS_OF_DATE, 23),
             o.OUTCOME_NOTE =
                 CASE
@@ -164,7 +164,7 @@ BEGIN
                    TRY_CONVERT(int, s.default_flag) AS DEFAULT_FLAG,
                    COUNT(s.contract_id) OVER (PARTITION BY c.ACCOUNT_ID) AS SOURCE_MATCH_COUNT
             FROM ecl_bt.CohortAccount c
-            LEFT JOIN [DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
+            LEFT JOIN [dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
               ON CONVERT(varchar(100), s.contract_id) = c.ACCOUNT_ID
              AND TRY_CONVERT(date, s.process_date) = c.PROCESS_DATE
             WHERE c.BACKTEST_RUN_ID = @BACKTEST_RUN_ID
@@ -196,7 +196,7 @@ BEGIN
         /* One cohort-level warning makes a completely missing source snapshot conspicuous. */
         IF NOT EXISTS (
             SELECT 1
-            FROM [DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
+            FROM [dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
             WHERE TRY_CONVERT(date, s.process_date) = @PROCESS_DATE
         )
         BEGIN
