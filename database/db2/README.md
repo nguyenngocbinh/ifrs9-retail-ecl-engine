@@ -4,7 +4,7 @@ This directory contains a DB2 LUW staging implementation for calculating EAD fro
 
 ## Objects
 
-- `001_create_nonrevolving_ead_schedule.sql`: creates `RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE`.
+- `001_create_nonrevolving_ead_schedule.sql`: creates `RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE`, including `SEGMENT`.
 - `002_sp_calc_nonrevolving_ead.sql`: creates/replaces `RM_RDM_MOP_PROD.SP_CALC_NONREVOLVING_EAD(P_PROCESS_DATE, P_SEGMENT)`.
 - `003_rename_auto_ead_objects.sql`: manual migration guidance for environments where the old Auto-named objects already exist.
 
@@ -18,7 +18,26 @@ FCC_RPTB_CL020.PRODUCT = RM_RDM_MOP_PROD.PRODUCT_CODE_IFRS9.PRODUCT_CODE
 
 and filters on `PRODUCT_CODE_IFRS9.PRODUCT_MODELLING = P_SEGMENT`. For example, the current mapping includes `D20L → Mortgage` and `D41L → Autoloan`; the mapping table remains the source of truth.
 
-Pass a non-empty segment explicitly. The procedure rejects a NULL or blank segment to avoid accidentally scanning and recalculating all segments. A run for one segment deletes/replaces only that segment's output for the given `PROCESS_DATE`; output for other segments on the same date is retained. The target output table does not store a separate `SEGMENT` column, so the delete identifies prior rows belonging to the requested segment by matching their account numbers to the CL020 snapshot and product mapping.
+The target table persists `SEGMENT`. The procedure replaces output for the requested date and segment using only:
+
+```sql
+DELETE FROM RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE
+WHERE PROCESS_DATE = P_PROCESS_DATE
+  AND SEGMENT = P_SEGMENT;
+```
+
+This avoids rescanning CL020 and joining the product mapping during deletion. The segment parameter is required; NULL or blank values are rejected to prevent accidental all-segment processing.
+
+## Existing-table migration
+
+For an environment where the target table already exists, add the column before deploying the updated procedure:
+
+```sql
+ALTER TABLE RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE
+ADD COLUMN SEGMENT VARCHAR(50);
+```
+
+Existing rows will have `SEGMENT = NULL` until backfilled. Backfill them once using the matching CL020 snapshot and product mapping, or clear/rebuild the affected process-date data in an approved maintenance window. Do not rely on the new segment-scoped DELETE to remove legacy NULL-segment rows.
 
 ## Run order for a new environment
 
@@ -40,10 +59,9 @@ Inspect staged rows:
 SELECT *
 FROM RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE
 WHERE PROCESS_DATE = DATE('2026-09-30')
+  AND SEGMENT = 'Mortgage'
 ORDER BY ACCOUNT_NUMBER, SCHEDULE_DUE_DATE, SCHEDULE_NO;
 ```
-
-The target table currently does not persist the segment. The mapping used by the procedure therefore controls both selection and segment-scoped replacement; if product mapping changes between runs, review/delete stale rows manually before recalculation.
 
 ## Current assumptions and boundaries
 
