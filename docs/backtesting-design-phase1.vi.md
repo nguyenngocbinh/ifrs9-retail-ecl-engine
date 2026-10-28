@@ -23,7 +23,7 @@ The canonical engine schema currently provides:
 - `ecl_result.ECLAccount`: account-level ECL components and total.
 - A source run is considered eligible only if `RunControl.RUN_STATUS = 'PUBLISHED'`.
 
-The repository does not define the physical historical default source table. Its source object, date semantics, default definition, and whether default records are effective-dated remain to be mapped in the target database. No production/customer data belongs in this repository.
+The confirmed outcome source is `[DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB]`, a monthly month-end account-level view. `ecl_bt.CohortAccount.ACCOUNT_ID` maps to source `contract_id` (business mapping: `account_id = contract_id`). Source fields include `process_date`, `current_gb`, `default_flag`, and `first_to_default` (mapped to `default_date`). `current_gb = 1` means already defaulted at the cohort date; `current_gb = 0` means not defaulted at the cohort date. `default_flag = 1` is the forward 12-month default label, not the current default status. No production/customer rows or credentials belong in this repository.
 
 ## Phase 1 objective
 
@@ -57,7 +57,7 @@ Migration `010_ecl_backtest_foundation.sql` creates:
 - `ecl_bt.AccountOutcome`: default observation status, default date, and observation cutoff, independent from forecasts.
 - `ecl_bt.BacktestFinding`: data quality / eligibility findings.
 
-Procedure `ecl_bt.usp_Build12MonthCohort` only builds the frozen cohort from a published source run. It does not load actual default dates. Default-source ingestion will be a later step after source mapping is confirmed.
+Procedure `ecl_bt.usp_Build12MonthCohort` builds the frozen cohort from a published source run. Migration `011_ecl_backtest_load_account_outcomes.sql` adds `ecl_bt.usp_Load12MonthAccountOutcomes`, which joins the account-level monthly source snapshot by account and `PROCESS_DATE`. It distinguishes `ALREADY_DEFAULTED` (`current_gb = 1`) from future default (`current_gb = 0`, `default_flag = 1`, and `first_to_default` within the forward 12-month horizon). `default_flag = 0` is treated as observed no-default only when `OUTCOME_AS_OF_DATE` reaches the full horizon. Missing/duplicate source rows, invalid flags, or inconsistent dates are `DATA_ISSUE`; incomplete horizon is `IMMATURE`.
 
 ## First metrics
 
@@ -73,8 +73,8 @@ Do not use an arbitrary universal pass/fail threshold. Thresholds and escalation
 
 ## Unresolved decisions / required source checks
 
-1. Exact default table/view, stable account key, default date column, default definition, and treatment of cures/re-defaults.
-2. Whether the source provides complete as-of history, including corrections/backdated default dates.
+1. Confirmed source mapping is in place; still validate the `contract_id` datatype, uniqueness per `process_date`, and the source's handling of cures/re-defaults in DEV/UAT.
+2. Whether the source provides complete as-of history, including corrections/backdated default dates, and whether historical `default_flag` values are restated after corrections.
 3. How to prove observation completeness to `PROCESS_DATE + 12 months`; snapshot disappearance alone is not proof of no default.
 4. Account closures/payoffs during the window and whether they count as observed non-defaults.
 5. Approved minimum sample size, calibration thresholds, segment grouping, and reporting frequency.
@@ -88,7 +88,10 @@ Use synthetic SQL fixtures only:
 - source run outside configured cohort date range;
 - all scenario PDs present and missing scenario;
 - Stage 3 excluded from PD denominator;
-- default exactly on cohort date, within horizon, exactly at 12 months, and after horizon;
+- `current_gb = 1` at cohort date;
+- `current_gb = 0` with `default_flag = 1` and default date within horizon, at exactly 12 months, or outside horizon;
+- `default_flag = 0` with mature and immature observation windows;
+- missing and duplicate source account/date rows;
 - immature observation and missing default source record;
 - repeated account across monthly cohorts;
 - reconciliation between cohort rows and active account snapshots;
