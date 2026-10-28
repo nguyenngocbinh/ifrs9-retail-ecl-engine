@@ -19,20 +19,11 @@ BEGIN
             SET MESSAGE_TEXT = 'P_SEGMENT is required (for example Mortgage or Autoloan).';
     END IF;
 
-    -- Delete only rows for the requested segment so a run for another segment
-    -- on the same process date is preserved.
-    DELETE FROM RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE T
-    WHERE T.PROCESS_DATE = P_PROCESS_DATE
-      AND EXISTS
-      (
-          SELECT 1
-          FROM TPBCSO_SEC.FCC_RPTB_CL020 R
-          INNER JOIN RM_RDM_MOP_PROD.PRODUCT_CODE_IFRS9 P
-              ON P.PRODUCT_CODE = R.PRODUCT
-          WHERE R.CONTRACT_REF_NO = T.ACCOUNT_NUMBER
-            AND DATE(R.BACKUP_DATE) = P_PROCESS_DATE
-            AND P.PRODUCT_MODELLING = P_SEGMENT
-      );
+    -- Segment is persisted in the target, so replacement does not need to
+    -- rescan CL020 or join the product mapping table.
+    DELETE FROM RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE
+    WHERE PROCESS_DATE = P_PROCESS_DATE
+      AND SEGMENT = P_SEGMENT;
 
     INSERT INTO RM_RDM_MOP_PROD.TBL_NONREVOLVING_EAD_SCHEDULE
     (
@@ -44,7 +35,8 @@ BEGIN
         EAD_0,
         PRINCIPAL_REPAYMENT,
         CUM_PRINCIPAL_REPAYMENT,
-        EAD_AFTER_REPAYMENT
+        EAD_AFTER_REPAYMENT,
+        SEGMENT
     )
     WITH BASE_EAD AS
     (
@@ -108,7 +100,8 @@ BEGIN
         CASE
             WHEN EAD_0 - CUM_PRINCIPAL_REPAYMENT < 0 THEN 0
             ELSE EAD_0 - CUM_PRINCIPAL_REPAYMENT
-        END AS EAD_AFTER_REPAYMENT
+        END AS EAD_AFTER_REPAYMENT,
+        P_SEGMENT AS SEGMENT
     FROM CUMULATIVE_EAD;
 
 END
