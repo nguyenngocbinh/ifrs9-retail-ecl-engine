@@ -87,7 +87,7 @@ BEGIN
                MIN(TRY_CONVERT(date, s.process_date)) AS DEFAULT_DATE
         INTO #FirstDefault
         FROM ecl_bt.CohortAccount c
-        JOIN [DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
+        JOIN [dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
           ON CONVERT(varchar(100), s.contract_id) = c.ACCOUNT_ID
          AND TRY_CONVERT(date, s.process_date) > c.PROCESS_DATE
          AND TRY_CONVERT(date, s.process_date) <= DATEADD(month, 12, c.PROCESS_DATE)
@@ -110,7 +110,7 @@ BEGIN
                SUM(CASE WHEN TRY_CONVERT(decimal(28,8), s.os_amount) IS NULL THEN 1 ELSE 0 END) AS INVALID_OS_AMOUNT_COUNT
         INTO #DefaultSnapshot
         FROM #FirstDefault f
-        JOIN [DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
+        JOIN [dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
           ON CONVERT(varchar(100), s.contract_id) = f.ACCOUNT_ID
          AND TRY_CONVERT(date, s.process_date) = f.DEFAULT_DATE
          AND TRY_CONVERT(int, s.current_gb) = 1
