@@ -158,6 +158,18 @@ BEGIN
           AND o.SOURCE_RUN_ID = @SOURCE_RUN_ID;
 
         /* Missing/invalid labels follow agreed non-default treatment but remain visible as WARN findings. */
+        ;WITH SourceOutcome AS (
+            SELECT c.BACKTEST_RUN_ID, c.SOURCE_RUN_ID, c.ACCOUNT_ID, c.PROCESS_DATE,
+                   TRY_CONVERT(int, s.current_gb) AS CURRENT_GB,
+                   TRY_CONVERT(int, s.default_flag) AS DEFAULT_FLAG,
+                   COUNT(s.contract_id) OVER (PARTITION BY c.ACCOUNT_ID) AS SOURCE_MATCH_COUNT
+            FROM ecl_bt.CohortAccount c
+            LEFT JOIN [DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
+              ON CONVERT(varchar(100), s.contract_id) = c.ACCOUNT_ID
+             AND TRY_CONVERT(date, s.process_date) = c.PROCESS_DATE
+            WHERE c.BACKTEST_RUN_ID = @BACKTEST_RUN_ID
+              AND c.SOURCE_RUN_ID = @SOURCE_RUN_ID
+        )
         INSERT INTO ecl_bt.BacktestFinding (
             BACKTEST_RUN_ID, SOURCE_RUN_ID, ACCOUNT_ID, FINDING_CODE,
             SEVERITY, FINDING_MESSAGE
@@ -176,47 +188,7 @@ BEGIN
                        THEN N'Multiple source rows for this account/date; outcome classified DATA_ISSUE.'
                    ELSE N'Missing/invalid current_gb or default_flag; outcome treated as non-default. Check source values.'
                END
-        ;WITH SourceOutcome AS (
-            SELECT c.BACKTEST_RUN_ID, c.SOURCE_RUN_ID, c.ACCOUNT_ID, c.PROCESS_DATE,
-                   DATEADD(month, 12, c.PROCESS_DATE) AS HORIZON_END_DATE,
-                   TRY_CONVERT(int, s.current_gb) AS CURRENT_GB,
-                   TRY_CONVERT(int, s.default_flag) AS DEFAULT_FLAG,
-                   COUNT(s.contract_id) OVER (PARTITION BY c.ACCOUNT_ID) AS SOURCE_MATCH_COUNT
-            FROM ecl_bt.CohortAccount c
-            LEFT JOIN [DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
-              ON CONVERT(varchar(100), s.contract_id) = c.ACCOUNT_ID
-             AND TRY_CONVERT(date, s.process_date) = c.PROCESS_DATE
-            WHERE c.BACKTEST_RUN_ID = @BACKTEST_RUN_ID
-              AND c.SOURCE_RUN_ID = @SOURCE_RUN_ID
-        ),
-        Classified AS (
-            SELECT *,
-                CASE
-                    WHEN SOURCE_MATCH_COUNT > 1 THEN 'DATA_ISSUE'
-                    WHEN SOURCE_MATCH_COUNT = 0 THEN 'OBSERVED_NO_DEFAULT'
-                    WHEN CURRENT_GB = 1 THEN 'ALREADY_DEFAULTED'
-                    WHEN CURRENT_GB IS NULL OR CURRENT_GB NOT IN (0,1)
-                      OR DEFAULT_FLAG IS NULL OR DEFAULT_FLAG NOT IN (0,1) THEN 'OBSERVED_NO_DEFAULT'
-                    WHEN DEFAULT_FLAG = 1 THEN 'OBSERVED_DEFAULT'
-                    WHEN DEFAULT_FLAG = 0 AND @OUTCOME_AS_OF_DATE >= HORIZON_END_DATE THEN 'OBSERVED_NO_DEFAULT'
-                    WHEN DEFAULT_FLAG = 0 THEN 'IMMATURE'
-                    ELSE 'OBSERVED_NO_DEFAULT'
-                END AS CLASSIFIED_STATUS
-            FROM SourceOutcome
-        )
-        SELECT @BACKTEST_RUN_ID, x.SOURCE_RUN_ID, x.ACCOUNT_ID,
-               CASE
-                   WHEN x.SOURCE_MATCH_COUNT = 0 THEN 'OUTCOME_SNAPSHOT_MISSING'
-                   WHEN x.SOURCE_MATCH_COUNT > 1 THEN 'OUTCOME_SNAPSHOT_DUPLICATE'
-                   ELSE 'OUTCOME_LABEL_INVALID'
-               END,
-               'WARN',
-               CASE
-                   WHEN x.SOURCE_MATCH_COUNT = 0 THEN N'Missing source snapshot for this account/date; outcome treated as non-default. Check source completeness.'
-                   WHEN x.SOURCE_MATCH_COUNT > 1 THEN N'Multiple source rows for this account/date; outcome classified DATA_ISSUE.'
-                   ELSE N'Missing/invalid current_gb or default_flag; outcome treated as non-default. Check source values.'
-               END
-        FROM Classified x
+        FROM SourceOutcome x
         WHERE x.SOURCE_MATCH_COUNT <> 1
            OR x.CURRENT_GB IS NULL OR x.CURRENT_GB NOT IN (0,1)
            OR x.DEFAULT_FLAG IS NULL OR x.DEFAULT_FLAG NOT IN (0,1);
