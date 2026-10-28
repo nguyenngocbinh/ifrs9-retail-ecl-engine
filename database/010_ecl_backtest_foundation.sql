@@ -204,8 +204,8 @@ BEGIN
 
         ;WITH PD12 AS (
             SELECT p.RUN_ID, p.ACCOUNT_ID,
-                   SUM(CONVERT(decimal(38,16), p.MARGINAL_PD)
-                       * CONVERT(decimal(38,16), w.SCENARIO_WEIGHT)) AS FORECAST_PD_12M,
+                   SUM(CONVERT(decimal(19,12), p.MARGINAL_PD)
+                       * CONVERT(decimal(9,8), w.SCENARIO_WEIGHT)) AS FORECAST_PD_12M,
                    COUNT(DISTINCT p.SCENARIO_CODE) AS SCENARIO_COUNT
             FROM ecl_stg.PDCurve p
             JOIN ecl_cfg.ScenarioWeight w
