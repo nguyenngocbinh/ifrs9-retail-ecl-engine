@@ -16,7 +16,7 @@ Input reconciliation currently compares manifest counts with physical staging co
 | PD | `RUN_ID + ACCOUNT_ID + SCENARIO_CODE + FORECAST_PERIOD` | Scenario-specific unconditional marginal annual PD for the original cohort; periods are full annual periods. Values are supplied upstream; do not derive PD from PD FWL ± 1 SE. |
 | LGD | `RUN_ID + ACCOUNT_ID + FORECAST_PERIOD` | Undiscounted loss-given-default ratio for each full annual period. Flat across scenarios in v1. |
 | EAD | `RUN_ID + ACCOUNT_ID + FORECAST_PERIOD` | Exposure at expected default under the agreed year-end annual-period convention; VND in v1. No partial-year prorating. |
-| EIR | `RUN_ID + FORECAST_PERIOD` | One shared FTP selling-funds rate for 12 months for each forecast period; same rate curve is applied across accounts/pools and all stages. The numeric value is dimensionless and consumed as supplied, without percentage/decimal conversion. |
+| EIR | `RUN_ID + FORECAST_PERIOD` | One shared FTP selling-funds rate for 12 months for each forecast period; same rate curve is applied across accounts/pools and all stages. The numeric value is dimensionless and consumed as supplied, without percentage/decimal conversion. Source ETL may use `CORE.dbo.rb_ftp_bv_12m(process_date, ftp_bv, ccy)` with `ccy='VND'`; forecast period N targets `DATEADD(month, 12*N, RunControl.PROCESS_DATE)` and selects the latest source row on or before that date. |
 | SCENARIO_WEIGHT | `VERSION_ID + SCENARIO_CODE` | Downturn 0.1568, Base 0.6864, Upturn 0.1568 for the selected configuration version; sum is 1. Version and effective-date history are retained. |
 
 All curve rows must be compatible with the run's reporting date and input version. Forecast periods start at 1. For accounts that have not matured, curves must cover the full annual periods needed through contractual maturity. For unpaid accounts whose `PROCESS_DATE >= MATURITY_DATE`, apply the post-maturity convention in Section 8.1.
@@ -25,7 +25,7 @@ All curve rows must be compatible with the run's reporting date and input versio
 
 The EIR input is the supplied FTP selling-funds rate for 12 months. The engine does not estimate EIR or build a term structure. Keep `RATE_BASIS='FTP_12M'` as the source semantic identifier; do not silently relabel it as annual-effective or nominal.
 
-The numeric value has no unit and must be consumed as supplied. Do not multiply or divide by 100, infer a percentage convention, or apply any other transformation. The agreed discount formula remains:
+The numeric value has no unit and must be consumed as supplied. For the `CORE.dbo.rb_ftp_bv_12m` source, even if a sample value is displayed as `9.2`, do not multiply or divide by 100, infer a percentage convention, or apply any other transformation unless a separately approved methodology change explicitly revises this contract. The agreed discount formula remains:
 
 `DF(t) = 1 / (1 + EIR(t)) ^ t`
 
@@ -71,7 +71,7 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 - Product-specific ETL calculates one annual EAD value per account and forecast period, then writes it directly into canonical `ecl_stg.EADCurve`. No separate `EADCurveInput` table is used.
 - The common procedure `ecl_core.usp_LoadEADCurve @RUN_ID` validates the rows already loaded into `ecl_stg.EADCurve` and records the successful validation in `ecl_audit.RunEvent`; it does not copy, transform, or calculate EAD.
 - The run's `PROCESS_DATE` must match the run control and account snapshot; currency must be VND; EAD must be non-negative.
-- For accounts that have not matured, Stage 1/2 must have active EAD rows for all annual forecast periods through contractual maturity, with a maximum supported horizon of 120 periods. Stage 3 requires only period-1 EAD because its calculation horizon is fixed at one period.
+- For accounts that have not matured, Stage 1/2 must have active EAD rows for all annual forecast periods through contractual maturity, with a maximum supported horizon of 30 periods. Stage 3 requires only period-1 EAD because its calculation horizon is fixed at one period.
 - Auto and Non-Revolving source ETL are responsible for source-specific schedule/balance transformations before inserting into the canonical table. The shared procedure does not infer settlement, write-off, waiver, or amortization semantics.
 
 ### 8.1. Unpaid accounts at or after contractual maturity
@@ -89,7 +89,7 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 - Source-specific ETL must resolve the facility rating, approved business segment, source bucket, reporting date, forecast period, and scenario before inserting into canonical `ecl_stg.PDCurve`.
 - `ecl_core.usp_LoadPDCurve @RUN_ID` validates the rows already loaded into `ecl_stg.PDCurve`; it does not calculate PD or silently infer source scenario codes.
 - Every PD row must match the run `PROCESS_DATE` and an active account snapshot. Values must be within [0,1].
-- Stage 1/2 accounts must have active rows for `DOWNTURN`, `BASE`, and `UPTURN` for each annual forecast period through maturity (maximum 120 periods). Stage 3 accounts require these three scenario rows only for `FORECAST_PERIOD = 1`.
+- Stage 1/2 accounts must have active rows for `DOWNTURN`, `BASE`, and `UPTURN` for each annual forecast period through maturity (maximum 30 periods). Stage 3 accounts require these three scenario rows only for `FORECAST_PERIOD = 1`.
 - The source `RETAIL_MARGINAL_PIT_PD` stores `FINAL_MARGINAL_PIT_PD` by `SEGMENT_LV1`, `SEGMENT_LV2`, `BUCKET`, `RATING`, and `SCENARIO`. Source-to-canonical mapping is configured in `ecl_cfg.Scenario` by `SOURCE_SCENARIO_CODE`; do not hard-code numeric scenario mappings in ETL procedures. The initial seed for `RETAIL_MARGINAL_PIT_PD` is `1 = BASE`, `2 = UPTURN`, `3 = DOWNTURN`.
 - The source ETL procedure is `ecl_core.usp_StageSourcePDCurve`, defined in `database/upstream/003_load_pd_curve_source.sql`. It joins facility rating to the active run snapshot by `ACCOUNT_ID` and `REPORTING_DATE`, then joins PD by `BUCKET`, `RATING`, and `ecl_cfg.PoolName.SEGMENT = SEGMENT_LV2`. It uses `PERIOD` as `FORECAST_PERIOD` and `FINAL_MARGINAL_PIT_PD` as `MARGINAL_PD`.
 - Deploy the upstream script after the core schema and shared PD validator exist, and only after confirming the actual source database/schema and column definitions. The procedure defaults to source schema `dbo`; pass `@SOURCE_DATABASE` and `@SOURCE_SCHEMA` when needed.
@@ -100,8 +100,17 @@ For a maturity horizon of 3 years and 6 months, PD and EAD still use the supplie
 ## 10. Shared LGD loading
 
 - The source `IRB_MHRR.lgd.irb_tt14_nhnn_lgd_upload` provides one account-level observation at `reporting_date`, not a multi-year curve.
-- Source ETL `ecl_core.usp_StageSourceLGDCurve @RUN_ID` matches `account_id` to the run's `AccountSnapshot.ACCOUNT_ID`, requires a source row at the run `PROCESS_DATE`, and expands `calibration_lgd` into each full annual forecast period through `MATURITY_DATE` (maximum 120 periods).
+- Source ETL `ecl_core.usp_StageSourceLGDCurve @RUN_ID` matches `account_id` to the run's `AccountSnapshot.ACCOUNT_ID`, requires a source row at the run `PROCESS_DATE`, and expands `calibration_lgd` into each full annual forecast period through `MATURITY_DATE` (maximum 30 periods).
 - The v1 canonical LGD contract is flat across scenarios, so `calibration_lgd` is used for all periods and scenarios. Source `downturn_lgd` is intentionally not used until scenario-specific LGD is approved as a separate methodology change.
 - Canonical `VERSION_ID` is copied from the account snapshot; the source's text `version` is retained as source provenance in operational lineage rather than converted to the integer canonical version.
 - Run `ecl_core.usp_LoadLGDCurve @RUN_ID` after source ETL. It validates reporting date, LGD range [0,1], account matching and active coverage through maturity for Stage 1/2; Stage 3 requires only period 1. It then records `LGD_LOAD` in `ecl_audit.RunEvent`.
 - Duplicate source rows for an account/reporting date, missing account LGD, or invalid `calibration_lgd` fail the source ETL. Use a new `RUN_ID` for reruns; the loader will not overwrite existing canonical curve rows.
+
+
+## 11. FTP 12-month EIR source ETL
+
+- Migration `database/009_eir_ftp_bv_source_loader.sql` extends the canonical `RATE_BASIS` check constraint to permit the agreed `FTP_12M` semantic.
+- `ecl_core.usp_StageSourceEIRCurve @RUN_ID` reads `process_date`, `ftp_bv`, and `ccy` from the configured source object, defaulting to `CORE.dbo.rb_ftp_bv_12m`. The source object must exist and be readable on the same SQL Server instance; an off-instance CORE source requires an approved view/linked-server abstraction.
+- Forecast period N is mapped to `DATEADD(month, 12*N, RunControl.PROCESS_DATE)`, but the source rate is fixed as-of the run date: the loader selects the latest VND observation with `process_date <= RunControl.PROCESS_DATE` and applies that value to every required forecast period. It must not select observations dated after the run's PROCESS_DATE, which would introduce look-ahead bias in historical runs. It validates duplicate (date, currency) keys, numeric/non-null rates, rate > -1, and the 1..30 horizon. It replaces only the EIR rows for that RUN_ID in a transaction and writes an audit event.
+- Source `ftp_bv` is inserted as-is into `ecl_stg.EIRCurve.EIR`; it is not divided by 100. This follows the current canonical contract, which explicitly specifies no percentage/decimal conversion. Confirm this interpretation with the data owner before using a value such as 9.2 in the discount formula: technically it yields `1/(1+9.2)^t`, not the discount factor for 9.2%.
+- After source ETL, run `ecl_core.usp_LoadEIRCurve @RUN_ID` to validate complete coverage and `RATE_BASIS='FTP_12M'`. Record the EIR row count in the run manifest as input family EIR.

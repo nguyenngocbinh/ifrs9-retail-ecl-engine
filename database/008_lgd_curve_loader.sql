@@ -84,13 +84,13 @@ BEGIN
               AND a.IS_ACTIVE = 1
               AND
               (
-                  h.HORIZON < 1 OR h.HORIZON > 120
+                  h.HORIZON < 1 OR h.HORIZON > 30
                   OR EXISTS
                   (
                       SELECT 1
                       FROM
                       (
-                          SELECT TOP (120) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+                          SELECT TOP (30) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
                           FROM sys.all_objects x CROSS JOIN sys.all_objects y
                       ) n
                       WHERE n.N <= h.HORIZON
@@ -106,7 +106,7 @@ BEGIN
                   )
               )
         )
-            THROW 51806, 'LGD loader: each active Stage 1/2 account needs LGD rows through maturity; Stage 3 needs only period 1 (maximum 120 periods).', 1;
+            THROW 51806, 'LGD loader: each active Stage 1/2 account needs LGD rows through maturity; Stage 3 needs only period 1 (maximum 30 periods).', 1;
 
         SELECT @ROW_COUNT = COUNT_BIG(*)
         FROM ecl_stg.LGDCurve

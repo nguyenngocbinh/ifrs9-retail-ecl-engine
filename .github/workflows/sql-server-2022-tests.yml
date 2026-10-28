@@ -99,6 +99,8 @@ jobs:
             "tests/sql/ead_curve_loader_tests.sql"
             "database/007_pd_curve_loader.sql"
             "tests/sql/pd_curve_loader_tests.sql"
+            "database/009_eir_ftp_bv_source_loader.sql"
+            "tests/sql/eir_curve_loader_tests.sql"
             "tests/sql/input_contract_regression_tests.sql"
             "tests/sql/maturity_curve_coverage_tests.sql"
             "tests/sql/canonical_input_happy_path_tests.sql"

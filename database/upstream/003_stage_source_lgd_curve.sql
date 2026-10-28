@@ -11,7 +11,7 @@ Purpose:
 Optimization notes:
 - Materialize one LGD observation per active account before annual expansion.
 - Validate source cardinality and maturity horizons before expansion.
-- Generate forecast periods from a bounded 1..120 numbers set.
+- Generate forecast periods from a bounded 1..30 numbers set.
 - Index #MappedLGD on the canonical key before validation/insertion.
 - Preserve the canonical grain, annual horizon semantics, transactional replace,
   audit event, and existing source validation errors.
@@ -156,9 +156,9 @@ BEGIN
             SELECT 1
             FROM #SourceLGD
             WHERE MATURITY_DATE IS NULL
-               OR HORIZON NOT BETWEEN 1 AND 120
+               OR HORIZON NOT BETWEEN 1 AND 30
         )
-            THROW 51909, 'LGD source ETL: invalid maturity horizon or horizon exceeds 120 annual periods.', 1;
+            THROW 51909, 'LGD source ETL: invalid maturity horizon or horizon exceeds 30 annual periods.', 1;
 
         /*
           Source version is optional: dynamically inspect source metadata first.
@@ -210,18 +210,7 @@ BEGIN
         (
             SELECT n
             FROM (VALUES
-                (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),
-                (11),(12),(13),(14),(15),(16),(17),(18),(19),(20),
-                (21),(22),(23),(24),(25),(26),(27),(28),(29),(30),
-                (31),(32),(33),(34),(35),(36),(37),(38),(39),(40),
-                (41),(42),(43),(44),(45),(46),(47),(48),(49),(50),
-                (51),(52),(53),(54),(55),(56),(57),(58),(59),(60),
-                (61),(62),(63),(64),(65),(66),(67),(68),(69),(70),
-                (71),(72),(73),(74),(75),(76),(77),(78),(79),(80),
-                (81),(82),(83),(84),(85),(86),(87),(88),(89),(90),
-                (91),(92),(93),(94),(95),(96),(97),(98),(99),(100),
-                (101),(102),(103),(104),(105),(106),(107),(108),(109),(110),
-                (111),(112),(113),(114),(115),(116),(117),(118),(119),(120)
+                (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15),(16),(17),(18),(19),(20),(21),(22),(23),(24),(25),(26),(27),(28),(29),(30)
             ) AS v(n)
         )
         SELECT
