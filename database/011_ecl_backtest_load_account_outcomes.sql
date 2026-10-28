@@ -81,7 +81,7 @@ BEGIN
                 TRY_CONVERT(int, s.current_gb) AS CURRENT_GB,
                 TRY_CONVERT(int, s.default_flag) AS DEFAULT_FLAG,
                 TRY_CONVERT(date, s.first_to_default) AS DEFAULT_DATE,
-                COUNT(*) OVER (PARTITION BY c.ACCOUNT_ID) AS SOURCE_MATCH_COUNT
+                COUNT(s.contract_id) OVER (PARTITION BY c.ACCOUNT_ID) AS SOURCE_MATCH_COUNT
             FROM ecl_bt.CohortAccount c
             LEFT JOIN [DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB] s
               ON CONVERT(varchar(100), s.contract_id) = c.ACCOUNT_ID
