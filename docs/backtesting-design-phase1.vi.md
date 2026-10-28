@@ -10,7 +10,7 @@ Status: implementation proposal on feature branch; not approved as production me
 - Account identifier: stable across monthly snapshots.
 - Default source: a default date is available.
 - First horizon: 12 months.
-- Actual monetary loss: not defined yet; this phase must not claim to validate ECL amount against actual loss.
+- Actual-loss proxy (temporary): use ABS(os_amount) at the first month-end with current_gb=1 within 12 months after cohort date. This is default exposure, not realized accounting loss; recoveries/workout cash flows are not modelled.
 - Development controls: feature branch + pull request; no direct changes or merge to `main`.
 
 ## Repository facts verified
@@ -34,7 +34,7 @@ Build auditable monthly cohorts from published runs and preserve:
 4. Stage and pool at the cohort date;
 5. outcome status and observation cutoff separately from forecast fields.
 
-This phase supports default-rate / PD calibration. It does **not** calculate actual loss, LGD accuracy, EAD accuracy, or monetary ECL bias.
+This phase supports default-rate / PD calibration and a preliminary ECL-vs-default-exposure comparison using a temporary actual-loss proxy. It does **not** validate realized accounting loss, LGD accuracy, EAD accuracy, or final monetary ECL bias.
 
 ## Cohort and eligibility rules
 
@@ -58,7 +58,7 @@ Migration `010_ecl_backtest_foundation.sql` creates:
 - `ecl_bt.AccountOutcome`: default observation status, default date, and observation cutoff, independent from forecasts.
 - `ecl_bt.BacktestFinding`: data quality / eligibility findings.
 
-Procedure `ecl_bt.usp_Build12MonthCohort` builds the frozen cohort from a published source run. Migration `011_ecl_backtest_load_account_outcomes.sql` adds `ecl_bt.usp_Load12MonthAccountOutcomes`, which joins the account-level monthly source snapshot by account and `PROCESS_DATE`. It distinguishes `ALREADY_DEFAULTED` (`current_gb = 1`) from future default (`current_gb = 0` and `default_flag = 1`), without requiring `first_to_default`. `default_flag = 0` is treated as observed no-default only when `OUTCOME_AS_OF_DATE` reaches the full horizon. Missing snapshots or invalid/missing flags follow the agreed non-default treatment but emit account-level `WARN` findings; a completely empty source snapshot emits an additional cohort-level warning. Duplicate source rows are `DATA_ISSUE`; incomplete horizons for valid `default_flag = 0` records are `IMMATURE`.
+Procedure `ecl_bt.usp_Build12MonthCohort` builds the frozen cohort from a published source run. Migration `011_ecl_backtest_load_account_outcomes.sql` adds `ecl_bt.usp_Load12MonthAccountOutcomes`, which joins the account-level monthly source snapshot by account and `PROCESS_DATE`. It distinguishes `ALREADY_DEFAULTED` (`current_gb = 1`) from forward 12-month default (`current_gb = 0` and `default_flag = 1`), without requiring `first_to_default`. `default_flag = 0` is treated as observed no-default only when `OUTCOME_AS_OF_DATE` reaches the full horizon. Missing snapshots or invalid/missing flags follow the agreed operational non-default treatment but emit account-level `WARN` findings; a completely empty source snapshot emits an additional cohort-level warning. Duplicate source rows are `DATA_ISSUE`; incomplete horizons for valid `default_flag = 0` records are `IMMATURE`. Migration `012_ecl_backtest_actual_loss_proxy.sql` adds `ACTUAL_LOSS_PROXY` and `ACTUAL_LOSS_STATUS`, procedure `ecl_bt.usp_Load12MonthActualLossProxy`, and report procedure `ecl_bt.usp_Report12MonthActualLossBacktest`. For accounts labelled `OBSERVED_DEFAULT`, it finds the first month-end with `current_gb = 1` after the cohort date and within the 12-month window, then sets the proxy to `ABS(os_amount)` at that month-end. Mature, valid no-default outcomes receive proxy zero. Already-defaulted-at-cohort, immature, duplicate, missing, invalid, or unresolved observations are excluded from monetary comparison and surfaced through status/findings. The report compares summed `ECL_12_MONTH` with summed proxy exposure by cohort date, pool, and Stage.
 
 ## First metrics
 
@@ -79,7 +79,7 @@ Do not use an arbitrary universal pass/fail threshold. Thresholds and escalation
 3. How to prove observation completeness to `PROCESS_DATE + 12 months`; snapshot disappearance alone is not proof of no default.
 4. Account closures/payoffs during the window and whether they count as observed non-defaults.
 5. Approved minimum sample size, calibration thresholds, segment grouping, and reporting frequency.
-6. Actual loss definition, recoveries, write-offs, costs, discounting and workout maturity. This is explicitly deferred.
+6. Production-grade actual loss still needs an approved definition covering recoveries, write-offs, costs, discounting and workout maturity. The current ABS(os_amount)-at-default proxy is temporary and must not be described as realized loss.
 7. Source run statuses and whether all required historical published runs remain queryable.
 
 ## Test plan before use
@@ -96,6 +96,9 @@ Use synthetic SQL fixtures only:
 - invalid/missing flags create warnings and use the agreed non-default treatment;
 - an entirely empty source snapshot creates a cohort-level warning;
 - immature observation and missing default source record;
+- first future month-end with `current_gb = 1` supplies `ABS(os_amount)`; missing/duplicate/invalid default-month snapshot is excluded and warned;
+- mature no-default outcome gets zero proxy; already-defaulted-at-cohort is excluded;
+- actual-loss report compares `ECL_12_MONTH` to proxy only for resolved eligible observations and reports excluded counts;
 - repeated account across monthly cohorts;
 - reconciliation between cohort rows and active account snapshots;
 - zero expected defaults and no division-by-zero;
@@ -103,4 +106,4 @@ Use synthetic SQL fixtures only:
 
 ## Deployment boundary
 
-Deploy only to a disposable DEV/UAT database after review. The migration is additive and is not wired into existing ECL calculation or publication. Do not run it against production without change approval, backup/rollback plan, and target-database source mapping.
+Deploy only to a disposable DEV/UAT database after review. The migrations are additive and do not change ECL calculation or publication. The backtest workflow is explicitly run after published ECL output: build cohort → load 12-month outcomes → load actual-loss proxy → report. It must not be inserted into the production ECL calculation path. Do not run it against production without change approval, backup/rollback plan, and target-database source mapping.
