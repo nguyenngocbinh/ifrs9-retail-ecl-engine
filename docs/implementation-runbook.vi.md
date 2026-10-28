@@ -595,7 +595,7 @@ Sau khi đã triển khai engine và xác nhận nguồn lịch sử tồn tại
 2. `database/011_ecl_backtest_load_account_outcomes.sql`
 3. `database/012_ecl_backtest_actual_loss_proxy.sql`
 
-Các migration này phụ thuộc schema engine đã có và nguồn `[DEFAULT].[dbo].[VW_ODR_CONTRACT_LEVEL_IRB]`. Không chạy trực tiếp ở production nếu chưa được phê duyệt. Smoke tests metadata tương ứng: `tests/sql/backtest_schema_smoke_tests.sql`, `tests/sql/backtest_outcome_loader_smoke_tests.sql`, `tests/sql/backtest_actual_loss_smoke_tests.sql`.
+Các migration này phụ thuộc schema engine đã có và nguồn `[dbo].[VW_ODR_CONTRACT_LEVEL_IRB]`. Không chạy trực tiếp ở production nếu chưa được phê duyệt. Smoke tests metadata tương ứng: `tests/sql/backtest_schema_smoke_tests.sql`, `tests/sql/backtest_outcome_loader_smoke_tests.sql`, `tests/sql/backtest_actual_loss_smoke_tests.sql`.
 
 ### 8.2. Luồng thực thi
 
