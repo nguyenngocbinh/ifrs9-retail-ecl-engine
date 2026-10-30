@@ -12,6 +12,7 @@
 6. **Tạo RUN_ID và kiểm soát đầu vào**: đăng ký đủ sáu nhóm ACCOUNT, PD, LGD, EAD, EIR, SCENARIO_WEIGHT; seal manifest; chạy validate và reconcile.
 7. **Tính và xuất bản ECL**: chuyển trạng thái CALCULATING → chạy tính ECL → xác nhận đối soát thành công → publish.
 8. **Đối chiếu kết quả** theo tài khoản, pool, Stage và nhật ký audit; lưu bằng chứng chạy thử.
+9. **Backtest sau publish (tùy chọn)**: chạy cohort/outcome/actual-loss proxy trên kết quả đã publish; đây là luồng kiểm định độc lập, không nằm trong phép tính ECL production.
 
 ## 2. Triển khai database
 
@@ -581,6 +582,235 @@ Nếu lỗi: dừng ở bước lỗi, đọc thông báo SQL và `ecl_audit.Val
 ## 7. Chạy test tự động bằng dữ liệu giả lập
 
 Chỉ chạy trên database DEV dùng riêng cho test. Chạy theo danh sách trong [SQL Server deployment guide](sql-server-deployment-guide.md) hoặc workflow CI. Bộ test bao gồm loader, lifecycle, input validation/reconciliation, coverage, calculation, publication gate và rollback khi lỗi. Test xanh chỉ xác nhận code trong môi trường test; không chứng minh mapping dữ liệu nghiệp vụ hay production đã sẵn sàng.
+
+## 8. Backtest 12 tháng sau khi publish ECL
+
+Backtest là quy trình hậu kiểm độc lập, chỉ chạy sau khi ECL source run đã có `RUN_STATUS = 'PUBLISHED'`. Backtest không tính lại, sửa hoặc publish lại ECL lịch sử. Mỗi lần backtest phải lưu `BACKTEST_RUN_ID`, `SOURCE_RUN_ID`, cutoff dữ liệu và phiên bản phương pháp để truy vết.
+
+> **Cảnh báo phạm vi:** migration 012 hiện so sánh `ECL_12_MONTH` với **proxy dư nợ tại thời điểm default** (`ABS(os_amount))), không phải tổn thất thực tế theo kế toán. Ngoài ra, report procedure hiện lọc `IS_PD_BACKTEST_ELIGIBLE = 1`, nên chỉ báo cáo Stage 1/2; Stage 3 chưa được đưa vào báo cáo ECL/proxy dù vẫn được lưu trong cohort. Không diễn giải báo cáo này là xác nhận độ chính xác actual loss hoặc ECL Stage 3.
+
+### 8.1. Điều kiện trước khi chạy
+
+- Chạy thử ở database DEV/UAT, không chạy production nếu chưa được phê duyệt.
+- Đã triển khai schema engine và migration backtest theo thứ tự 010 → 011 → 012.
+- Chạy script trong database `IFRS9_ECL`, nơi có view nguồn `[dbo].[VW_ODR_CONTRACT_LEVEL_IRB]`. Xác nhận view có dữ liệu lịch sử theo tháng và `contract_id` ánh xạ đúng với `ecl_bt.CohortAccount.ACCOUNT_ID`.
+- `SOURCE_RUN_ID` phải tồn tại và có `ecl_core.RunControl.RUN_STATUS = 'PUBLISHED'`; kết quả ECL account phải tồn tại.
+- `OUTCOME_AS_OF_DATE` phải là ngày dữ liệu nguồn đã nạp đầy đủ, không phải mặc định ngày hiện tại. Với outcome non-default, chỉ kết luận được khi đã quan sát đủ 12 tháng kể từ `PROCESS_DATE`.
+- Không dùng dữ liệu thiếu hoặc nhãn không hợp lệ như bằng chứng chắc chắn rằng tài khoản không default. Các cảnh báo phải được rà soát trước khi sử dụng kết quả.
+
+Triển khai các migration trong DEV/UAT:
+
+1. `database/010_ecl_backtest_foundation.sql`
+2. `database/011_ecl_backtest_load_account_outcomes.sql`
+3. `database/012_ecl_backtest_actual_loss_proxy.sql`
+
+Smoke tests metadata: `tests/sql/backtest_schema_smoke_tests.sql`, `tests/sql/backtest_outcome_loader_smoke_tests.sql`, `tests/sql/backtest_actual_loss_smoke_tests.sql`. Smoke test metadata không thay thế việc chạy end-to-end với fixture trên SQL Server.
+
+### 8.2. Tạo và chạy một backtest
+
+Ví dụ dưới đây tạo một backtest cho một source run và chỉ chạy khi source run đã publish. Thay `123` và ngày cutoff bằng giá trị thật của môi trường:
+
+```sql
+USE [IFRS9_ECL];
+GO
+
+DECLARE @SOURCE_RUN_ID bigint = 123; -- RUN_ID ECL đã PUBLISHED
+DECLARE @OUTCOME_AS_OF_DATE date = '2026-09-30'; -- ngày cuối kỳ nguồn đã nạp hoàn chỉnh
+DECLARE @BACKTEST_RUN_ID bigint;
+
+DECLARE @NewBacktest TABLE (BACKTEST_RUN_ID bigint);
+
+INSERT INTO ecl_bt.BacktestRun (
+    BACKTEST_NAME, COHORT_START_DATE, COHORT_END_DATE,
+    OUTCOME_AS_OF_DATE, METHODOLOGY_VERSION, RUN_NOTE
+)
+OUTPUT INSERTED.BACKTEST_RUN_ID INTO @NewBacktest(BACKTEST_RUN_ID)
+SELECT CONCAT('BT12M_RUN_', @SOURCE_RUN_ID),
+       rc.PROCESS_DATE, rc.PROCESS_DATE,
+       @OUTCOME_AS_OF_DATE, 'ACTUAL_LOSS_PROXY_V1',
+       N'Proxy only: ABS(os_amount) at first observed default month-end.'
+FROM ecl_core.RunControl rc
+WHERE rc.RUN_ID = @SOURCE_RUN_ID
+  AND rc.RUN_STATUS = 'PUBLISHED';
+
+SELECT @BACKTEST_RUN_ID = BACKTEST_RUN_ID FROM @NewBacktest;
+
+IF @BACKTEST_RUN_ID IS NULL
+    THROW 51980, 'Source RUN_ID must exist and be PUBLISHED.', 1;
+
+-- Bước 1: đóng băng forecast, Stage, pool và cohort từ ECL run đã publish.
+EXEC ecl_bt.usp_Build12MonthCohort
+     @BACKTEST_RUN_ID = @BACKTEST_RUN_ID,
+     @SOURCE_RUN_ID = @SOURCE_RUN_ID;
+
+-- Bước 2: nạp nhãn default 12 tháng từ view snapshot nguồn.
+EXEC ecl_bt.usp_Load12MonthAccountOutcomes
+     @BACKTEST_RUN_ID = @BACKTEST_RUN_ID,
+     @SOURCE_RUN_ID = @SOURCE_RUN_ID;
+
+-- Bước 3: tạo proxy dư nợ tại default (không phải actual loss thực tế).
+EXEC ecl_bt.usp_Load12MonthActualLossProxy
+     @BACKTEST_RUN_ID = @BACKTEST_RUN_ID,
+     @SOURCE_RUN_ID = @SOURCE_RUN_ID;
+
+-- Bước 4: báo cáo ECL_12_MONTH so với proxy.
+EXEC ecl_bt.usp_Report12MonthActualLossBacktest
+     @BACKTEST_RUN_ID = @BACKTEST_RUN_ID;
+
+SELECT @BACKTEST_RUN_ID AS BACKTEST_RUN_ID,
+       @SOURCE_RUN_ID AS SOURCE_RUN_ID;
+```
+
+Lưu `BACKTEST_RUN_ID` và `SOURCE_RUN_ID` từ kết quả cuối. Nếu procedure thất bại, dừng tại bước lỗi, đọc thông báo và kiểm tra trạng thái/finding trước khi quyết định. Không tự ý xóa các dòng backtest để chạy lại; tạo backtest mới sau khi đã xử lý nguyên nhân gốc.
+
+### 8.3. Kiểm tra trạng thái và độ phủ dữ liệu
+
+Thay `@BACKTEST_RUN_ID` bằng ID vừa tạo:
+
+```sql
+DECLARE @BACKTEST_RUN_ID bigint = 1;
+
+-- Trạng thái vòng đời backtest.
+SELECT BACKTEST_RUN_ID, BACKTEST_NAME, COHORT_START_DATE,
+       COHORT_END_DATE, OUTCOME_AS_OF_DATE, HORIZON_MONTHS,
+       RUN_STATUS, METHODOLOGY_VERSION, CREATED_AT, FINISHED_AT, RUN_NOTE
+FROM ecl_bt.BacktestRun
+WHERE BACKTEST_RUN_ID = @BACKTEST_RUN_ID;
+
+-- Số tài khoản theo trạng thái outcome và proxy.
+SELECT c.SOURCE_RUN_ID, c.STAGE,
+       o.OUTCOME_STATUS, o.ACTUAL_LOSS_STATUS,
+       COUNT_BIG(*) AS ACCOUNT_COUNT
+FROM ecl_bt.CohortAccount c
+JOIN ecl_bt.AccountOutcome o
+  ON o.BACKTEST_RUN_ID = c.BACKTEST_RUN_ID
+ AND o.SOURCE_RUN_ID = c.SOURCE_RUN_ID
+ AND o.ACCOUNT_ID = c.ACCOUNT_ID
+WHERE c.BACKTEST_RUN_ID = @BACKTEST_RUN_ID
+GROUP BY c.SOURCE_RUN_ID, c.STAGE, o.OUTCOME_STATUS, o.ACTUAL_LOSS_STATUS
+ORDER BY c.SOURCE_RUN_ID, c.STAGE, o.OUTCOME_STATUS, o.ACTUAL_LOSS_STATUS;
+
+-- Tổng hợp finding; WARN phải được đọc, không được bỏ qua chỉ vì procedure chạy xong.
+SELECT FINDING_CODE, SEVERITY, COUNT_BIG(*) AS FINDING_COUNT
+FROM ecl_bt.BacktestFinding
+WHERE BACKTEST_RUN_ID = @BACKTEST_RUN_ID
+GROUP BY FINDING_CODE, SEVERITY
+ORDER BY CASE SEVERITY WHEN 'FATAL' THEN 1 WHEN 'ERROR' THEN 2
+                       WHEN 'WARN' THEN 3 ELSE 4 END,
+         FINDING_CODE;
+
+-- Xem chi tiết tài khoản có finding (giới hạn số dòng để kiểm tra mẫu).
+SELECT TOP (200) SOURCE_RUN_ID, ACCOUNT_ID, FINDING_CODE,
+       SEVERITY, FINDING_MESSAGE, CREATED_AT
+FROM ecl_bt.BacktestFinding
+WHERE BACKTEST_RUN_ID = @BACKTEST_RUN_ID
+ORDER BY CASE SEVERITY WHEN 'FATAL' THEN 1 WHEN 'ERROR' THEN 2
+                       WHEN 'WARN' THEN 3 ELSE 4 END,
+         FINDING_ID;
+```
+
+Các trạng thái cần chú ý:
+
+- `OUTCOME_STATUS = 'OBSERVED_DEFAULT'`: tại cohort đang `current_gb = 0` và nhãn `default_flag = 1` cho biết default trong 12 tháng tiếp theo.
+- `OUTCOME_STATUS = 'OBSERVED_NO_DEFAULT'`: nhãn không-default hợp lệ và đủ 12 tháng theo quy tắc hiện tại. Tuy nhiên, script cũng dùng trạng thái này cho snapshot/nhãn thiếu hoặc không hợp lệ theo quy tắc vận hành đã thống nhất; phải kiểm tra `BacktestFinding` và không gộp các trường hợp có cảnh báo vào kết quả chính.
+- `ALREADY_DEFAULTED`: đã default tại ngày cohort; không thuộc mẫu “future default” của PD 12 tháng.
+- `IMMATURE`: chưa đủ 12 tháng quan sát.
+- `DATA_ISSUE`: có vấn đề dữ liệu, ví dụ bản ghi trùng.
+- `ACTUAL_LOSS_STATUS = 'OBSERVED_DEFAULT'`: đã tìm được snapshot tháng default duy nhất và proxy `ABS(os_amount)` hợp lệ.
+- `ZERO_NO_DEFAULT`: outcome non-default đủ kỳ; report dùng giá trị proxy bằng 0 qua `ISNULL`, dù cột proxy có thể để `NULL`.
+- `UNRESOLVED`, `DATA_ISSUE`, `IMMATURE`, `ALREADY_DEFAULTED`, `PENDING`: không được đưa vào so sánh monetary của report hiện tại.
+
+### 8.4. Đọc báo cáo PD 12 tháng
+
+Hiện các migration tạo cohort/outcome và trạng thái eligibility, nhưng chưa có stored procedure báo cáo PD calibration riêng. Truy vấn dưới đây tính tỷ lệ default và O/E trên các tài khoản đủ điều kiện, outcome đã quan sát được và không có finding về snapshot/nhãn. Dùng nó như báo cáo chẩn đoán, sau khi rà soát định nghĩa nhãn và chất lượng nguồn:
+
+```sql
+DECLARE @BACKTEST_RUN_ID bigint = 1;
+
+WITH ValidOutcome AS (
+    SELECT c.BACKTEST_RUN_ID, c.SOURCE_RUN_ID, c.PROCESS_DATE,
+           c.POOL_NAME, c.STAGE, c.ACCOUNT_ID, c.FORECAST_PD_12M,
+           o.OUTCOME_STATUS
+    FROM ecl_bt.CohortAccount c
+    JOIN ecl_bt.AccountOutcome o
+      ON o.BACKTEST_RUN_ID = c.BACKTEST_RUN_ID
+     AND o.SOURCE_RUN_ID = c.SOURCE_RUN_ID
+     AND o.ACCOUNT_ID = c.ACCOUNT_ID
+    WHERE c.BACKTEST_RUN_ID = @BACKTEST_RUN_ID
+      AND c.IS_PD_BACKTEST_ELIGIBLE = 1
+      AND o.OUTCOME_STATUS IN ('OBSERVED_DEFAULT','OBSERVED_NO_DEFAULT')
+      AND NOT EXISTS (
+          SELECT 1
+          FROM ecl_bt.BacktestFinding f
+          WHERE f.BACKTEST_RUN_ID = c.BACKTEST_RUN_ID
+            AND f.SOURCE_RUN_ID = c.SOURCE_RUN_ID
+            AND f.ACCOUNT_ID = c.ACCOUNT_ID
+            AND f.FINDING_CODE IN (
+                'OUTCOME_SNAPSHOT_MISSING',
+                'OUTCOME_LABEL_INVALID',
+                'OUTCOME_SNAPSHOT_DUPLICATE'
+            )
+      )
+)
+SELECT PROCESS_DATE, POOL_NAME, STAGE,
+       COUNT_BIG(*) AS OBSERVED_ACCOUNT_COUNT,
+       SUM(CASE WHEN OUTCOME_STATUS = 'OBSERVED_DEFAULT'
+                THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END) AS OBSERVED_DEFAULT_COUNT,
+       AVG(CASE WHEN OUTCOME_STATUS = 'OBSERVED_DEFAULT'
+                THEN 1.0 ELSE 0.0 END) AS OBSERVED_DEFAULT_RATE,
+       SUM(FORECAST_PD_12M) AS EXPECTED_DEFAULT_COUNT,
+       AVG(FORECAST_PD_12M) AS MEAN_PREDICTED_PD_12M,
+       CASE WHEN SUM(FORECAST_PD_12M) = 0 THEN NULL
+            ELSE SUM(CASE WHEN OUTCOME_STATUS = 'OBSERVED_DEFAULT'
+                          THEN 1.0 ELSE 0.0 END)
+                 / NULLIF(SUM(FORECAST_PD_12M),0) END AS OBSERVED_TO_EXPECTED
+FROM ValidOutcome
+GROUP BY PROCESS_DATE, POOL_NAME, STAGE
+ORDER BY PROCESS_DATE, POOL_NAME, STAGE;
+```
+
+Cách đọc:
+
+- `OBSERVED_ACCOUNT_COUNT`: số tài khoản được đưa vào mẫu sau khi loại cohort không đủ điều kiện, outcome chưa trưởng thành và các cảnh báo nguồn đã nêu.
+- `OBSERVED_DEFAULT_RATE`: tỷ lệ tài khoản có nhãn default trong 12 tháng trong mẫu hợp lệ.
+- `EXPECTED_DEFAULT_COUNT`: tổng PD 12 tháng dự báo của các tài khoản trong cùng mẫu; đây là số default kỳ vọng, không phải số nguyên.
+- `OBSERVED_TO_EXPECTED` (O/E) = số default quan sát / số default kỳ vọng. O/E gần 1 biểu thị tổng số default quan sát gần mức kỳ vọng trên mẫu này; thấp hơn 1 nghĩa là observed thấp hơn expected, cao hơn 1 nghĩa là observed cao hơn expected. O/E không ổn định khi expected default rất nhỏ và không thay thế phân tích calibration theo nhóm/rủi ro.
+- Không áp dụng ngưỡng pass/fail chung nếu chưa được Model Risk/phụ trách mô hình phê duyệt. Các cohort tháng liền nhau có thể chồng lấn và không phải mẫu độc lập.
+
+### 8.5. Đọc báo cáo ECL so với proxy
+
+`ecl_bt.usp_Report12MonthActualLossBacktest` trả kết quả theo `PROCESS_DATE`, `POOL_NAME`, `STAGE`, gồm:
+
+| Chỉ tiêu | Ý nghĩa |
+|---|---|
+| `RESOLVED_ACCOUNT_COUNT` | Số tài khoản có outcome monetary được xử lý là default hoặc zero-no-default. |
+| `DEFAULT_ACCOUNT_COUNT` | Số tài khoản có proxy dư nợ tại default hợp lệ. |
+| `FORECAST_ECL_12M_TOTAL` | Tổng `ECL_12_MONTH` trên các tài khoản được đưa vào so sánh. |
+| `ACTUAL_LOSS_PROXY_TOTAL` | Tổng proxy dư nợ tại default; non-default được tính 0 trong phép tổng hợp. |
+| `ACTUAL_MINUS_ECL` | Proxy trừ ECL dự báo; số dương nghĩa proxy dư nợ lớn hơn ECL, không có nghĩa tổn thất thực tế vượt ECL. |
+| `ACTUAL_TO_ECL_RATIO` | Proxy / ECL; không phải tỷ lệ actual loss/ECL và không phải thước đo LGD chính thức. |
+| `EXCLUDED_ACCOUNT_COUNT` | Số tài khoản có trạng thái bị loại khỏi phép so sánh hiện tại. |
+
+**Giới hạn bắt buộc khi diễn giải:**
+
+1. Báo cáo hiện dùng `IS_PD_BACKTEST_ELIGIBLE = 1`; do đó Stage 3 bị loại. Không dùng kết quả này để kết luận về ECL Stage 3.
+2. `ABS(os_amount)` tại default là exposure proxy, không phải realized loss. Chưa có thu hồi, write-off, chi phí thu hồi, dòng tiền workout hoặc discounting.
+3. So sánh proxy 12 tháng với `ECL_12_MONTH` chỉ là kiểm tra sơ bộ trên cùng tập tài khoản đủ điều kiện; không xác nhận ECL theo IFRS 9 đúng/sai và không thay thế backtest LGD/EAD.
+4. Tỷ lệ loại trừ cao, finding nguồn còn mở hoặc snapshot tháng cohort không đầy đủ thì chưa nên công bố chỉ số tổng hợp.
+5. Stage 3 cần thiết kế riêng với outcome và horizon phù hợp ECL Stage 3; không đơn giản gộp với Stage 1/2.
+
+### 8.6. Checklist trước khi chấp nhận kết quả
+
+- [ ] Source ECL run có trạng thái `PUBLISHED`, đúng `PROCESS_DATE` và đúng phiên bản trọng số/kịch bản.
+- [ ] Cutoff nguồn phản ánh đúng dữ liệu đã nạp; cohort có đủ kỳ quan sát 12 tháng cho các outcome non-default.
+- [ ] Số lượng cohort được đối chiếu với active account snapshot của source run.
+- [ ] Đã xem số lượng theo `OUTCOME_STATUS` và `ACTUAL_LOSS_STATUS`, không chỉ nhìn tổng ECL/proxy.
+- [ ] Đã xem toàn bộ nhóm `WARN`/data issue và loại các bản ghi nguồn không hợp lệ khỏi kết quả PD chính.
+- [ ] Đã kiểm tra Stage, pool, ngày cohort, tài khoản trùng và `os_amount` bất thường.
+- [ ] Báo cáo được gắn nhãn đúng là PD 12-month backtest hoặc ECL-vs-default-exposure-proxy; không gọi proxy là actual loss.
+- [ ] Đã lưu SQL/script version, `BACKTEST_RUN_ID`, `SOURCE_RUN_ID`, cutoff, số tài khoản đủ điều kiện/loại trừ và các finding.
+- [ ] Đã chạy end-to-end trên DEV/UAT với fixture; smoke test metadata đơn lẻ chưa đủ để xác nhận.
+
 
 ## Tài liệu nên đọc
 
